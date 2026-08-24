@@ -1,8 +1,3 @@
-### 1. Document Content
-
-The following block contains the raw Markdown content for the `architecture.md` file as requested.
-
-```markdown
 # Architecture
 
 ## Overview
@@ -439,4 +434,4 @@ Stack: React + Vite. The build is served statically by Tent.
 | Logical FK over physical FK | Module decoupling | No referential integrity in the database |
 | Direct DI + Event-Driven | Simple for sync, decoupled for reactive | Two patterns to maintain |
 | Render free tier | Zero cost | 512MB RAM, cold start |
-```
+
