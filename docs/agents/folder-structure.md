@@ -4,14 +4,14 @@
 
 | Path | Purpose |
 |---|---|
-| `backend/` | Node.js/NestJS app, TypeScript + TypeORM/MySQL (the Auth and Mail modules exist — the domain data model is left to each project, see `docs/agents/product.md`) |
-| `frontend/` | React 19 + Vite app — the login modal, device-authorization flow, hash routing, and `client/` HTTP layer already exist; application views are added per project |
+| `backend/` | Node.js/NestJS app, TypeScript + TypeORM/MySQL. The Auth and Mail modules exist; each domain module (`bank`, `protocol`, `car-performance`, `links`, …) gets its own folder under `src/` — see `docs/agents/product.md` |
+| `frontend/` | React 19 + Vite app — the login modal, device-authorization flow, hash routing, and `client/` HTTP layer already exist; each domain module adds its own `client/<Name>Client.js` and pages under `components/resources/<area>/pages/` |
 | `proxy/` | PHP Tent proxy config (`dev_configuration/`, `prod_configuration/`, `extension/`) |
 | `dockerfiles/` | `base/` (one shared Dockerfile for all four `*-base` images) plus one directory per leaf image |
 | `docker_volumes/` | Bind-mount targets for local dev (gitignored contents) |
 | `docs/agents/` | Agent-facing documentation, hub + per-topic pages (this directory) |
 | `bin/` | Language-agnostic CI shell scripts (`image.sh`, `deploy_frontend.sh`) |
-| `scripts/` | Release shell scripts (`bump_version.sh`, `deploy.sh`, `render.sh`, `wake_navi.sh`, `warm_navi_cache.sh`), plus `init_project.sh`, which replaces the template's placeholder name with a new project's name |
+| `scripts/` | Release shell scripts (`bump_version.sh`, `deploy.sh`, `render.sh`, `wake_navi.sh`, `warm_navi_cache.sh`) |
 | `.circleci/` | CI pipeline config (validate with `docker-compose run --rm circleci config validate`) |
 | `.claude/agents/` | Specialist AI agent definitions |
 | `.github/` | Commit/PR templates + `copilot-instructions.md` |
@@ -82,7 +82,7 @@
 | Subdirectory / File | Description |
 |---|---|
 | `architecture/` | Per-area architecture pages (`proxy.md`, `frontend.md`, `backend.md`, `modular-pattern.md`, `infra.md`) |
-| `modules/` | Per-backend-module documentation (routes, entities, events) — `auth.md` today |
+| `modules/` | One page per backend module (tier, entities, events, config, rules), plus `<module>/<topic>.md` sub-pages — `auth.md` (+ `auth/user-approval.md`) and `mail.md` today; each domain module adds its own |
 | `specs/` | Temporary per-feature spec folders (`specs/<feature>/`), listed in and governed by `specs.md`; each is deleted once its feature is folded into the permanent docs |
 | `plans/` | Implementation plans, one directory per issue |
 | `issues/` | Detailed specs for open issues, one file per issue |

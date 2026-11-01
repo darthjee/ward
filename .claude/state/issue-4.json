@@ -1,0 +1,9 @@
+{
+  "tags": [
+    "shipit",
+    "spawned"
+  ],
+  "updated_at": "2026-10-18T20:43:54Z",
+  "title": "Session-lookup gate: sid claim checked on every authenticated request",
+  "state": "open"
+}

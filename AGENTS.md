@@ -1,14 +1,24 @@
 # Project Instructions
 
-_Last updated: 2026-09-29_
+_Last updated: 2026-11-01_
 
-Ward is a template for web applications: a NestJS backend and a React/Vite frontend, served
-together through the Tent reverse proxy. It ships a ready-made lightweight account layer
-(username/password, a JWT `access_token` cookie, and a rotating refresh token; users log in
-directly or by approving the login from an already-logged-in device via the
-device-authorization flow), plus a transactional-email module. Each project built from this template adds its own domain
-on top. See [Flow](docs/agents/flow.md) for the request/data flow and
-[Product Definitions](docs/agents/product.md) for what's decided vs. left to each project.
+Ward is a personal, modular web application for organising everyday life. It consolidates
+independent utilities into a single NestJS backend and React/Vite frontend, served together
+through the Tent caching reverse proxy. Each utility is a self-contained backend module with its
+own tables, routes, frontend client and pages, and modules are added one at a time.
+
+| Module | Tier | Purpose | Status |
+|--------|------|---------|--------|
+| `auth` | Always-on | Accounts and login: username/password, JWT `access_token` cookie + rotating refresh token, device-authorization, admin approval | Implemented |
+| `mail` | Always-on (service-only) | Transactional email | Implemented |
+| `bank` | Lazy | Bank accounts, business expenses to send to the accountant, bills to pay | Planned |
+| `protocol` | Lazy | Protocol numbers of requests made to companies | Planned |
+| `car-performance` | Lazy | Fuel consumption and cost per car | Planned |
+| `links` | Lazy | Links saved to check later | Planned |
+
+More modules will follow. Ward runs on the Render free tier (512 MB RAM), which is why rarely used
+modules are lazy-loaded and Tent caches GET responses. See [Flow](docs/agents/flow.md) for the
+request/data flow and [Product Definitions](docs/agents/product.md) for product decisions.
 
 ## Stack
 
@@ -21,8 +31,8 @@ on top. See [Flow](docs/agents/flow.md) for the request/data flow and
 - Jest + `@swc/jest` + `supertest` + `@nestjs/testing` (tests and coverage)
 - ESLint (linting, flat config, `typescript-eslint`)
 
-Only the Auth and Mail modules exist so far — the domain data model is left to each project
-built from this template (see [Product Definitions](docs/agents/product.md)). See
+Only the Auth and Mail modules exist so far; the domain modules above are planned (see
+[Product Definitions](docs/agents/product.md)). See
 [Backend Architecture](docs/agents/architecture/backend.md) for the module classification
 (Core/Always-on/Lazy) and inter-module communication guidelines. A new module must follow them
 unless its issue or plan explicitly documents why it deviates.
@@ -37,8 +47,8 @@ unless its issue or plan explicitly documents why it deviates.
 
 Real auth UI exists (a route-independent login/register/device-authorization modal, hash-based
 routing, and a `client/` HTTP layer — see
-[Frontend Architecture](docs/agents/architecture/frontend.md)); application-specific views are
-added per project.
+[Frontend Architecture](docs/agents/architecture/frontend.md)); each domain module adds its own
+client and pages.
 
 ### Infrastructure
 
@@ -104,10 +114,10 @@ All project documentation lives under [`docs/agents/`](docs/agents/):
 | [Index](docs/agents/index.md) | Link-only table of contents for `docs/agents/` — fetch this first to navigate the doc set. |
 | [Summary](docs/agents/summary.md) | 2-4 line abstract of each doc under `docs/agents/`, to decide whether to open the full file. |
 | [Folder Structure](docs/agents/folder-structure.md) | Top-level directory layout and the role of each folder. |
-| [Flow](docs/agents/flow.md) | Stub: the generic login flow; each derived project adds its own request/data flow. |
+| [Flow](docs/agents/flow.md) | Request/data flow: proxy routing, login/session flow, and per-module flows. |
 | [Architecture](docs/agents/architecture.md) | Hub page linking to per-area architecture pages (`proxy`, `frontend`, `infra`, `backend`) plus the cross-cutting modular-pattern page. |
 | [Contributing](docs/agents/contributing.md) | Commit guidelines, PR standards, code organization, and refactoring rules. |
-| [Product Definitions](docs/agents/product.md) | Stub — template-level decisions plus sections each derived project fills in. Consult before planning any issue that introduces new entities. |
+| [Product Definitions](docs/agents/product.md) | Product decisions for Ward and its modules. Consult before planning any issue that introduces new entities. |
 | [External Tooling](docs/agents/external.md) | Hub linking full usage guides for external, project-agnostic tools (Tent, Navi, navi-hey-client). |
 | [Cache Warmer](docs/agents/cache-warmer.md) | Navi setup for warming the proxy cache after release (CI and local); used by the `cache` agent. |
 | [Specs](docs/agents/specs.md) | Permanent hub for feature specs: temporary, shared definitions of multi-issue features (lifecycle, conventions, active/completed list). |
@@ -136,3 +146,12 @@ docs/agents/plans/<issue_id>_<topic>/<related_files>.md
 
 See `.claude/agents/` for the full roster (`architect`, `backend`, `infra`, `frontend`, `proxy`,
 `cache`, `security`, `data-access`, `product-owner`).
+
+## Boundaries
+
+- Never install packages or invoke any package manager or language runtime (e.g. `yarn`, `npm`,
+  `php`) directly on the host machine — always run it through `docker-compose`. The only exception
+  is a specific command the user has explicitly allowed on the host, either in their message in the
+  current conversation or through a standing user instruction (for example a user memory entry).
+- Keep backend controllers thin — business logic belongs in each module's service, not the
+  controller, unless a change explicitly documents why an exception is warranted.

@@ -50,10 +50,10 @@ folder to its CircleCI job(s) and the equivalent local commands.
 
 | Modified folder | CI job(s) | Local commands |
 |------------------|-----------|-----------------|
-| `backend/` | `backend_tests`, `backend_checks` | `docker-compose run ward_tests yarn coverage` and `docker-compose run ward_tests yarn lint` |
+| `backend/` | `backend_tests`, `backend_integration`, `backend_checks` | `docker-compose run ward_tests yarn coverage`, `docker-compose run --rm ward_tests yarn test:integration` and `docker-compose run ward_tests yarn lint` |
 | `frontend/` | `jasmine`, `frontend-checks` | `docker-compose run ward_fe yarn coverage` and `docker-compose run ward_fe yarn lint` |
 | `proxy/` | `proxy_extension_tests` | `docker-compose run proxy_tests` and `docker-compose run --rm proxy_lint` (PSR-12 check, local only — no CI job) |
-| `.circleci/`, `scripts/`, `bin/`, `dockerfiles/`, `docker-compose.yml`, `proxy/prod_configuration/` | `upload_proxy_files`, `upload_fe_files`, `build-and-release`, `release`, `warm-up-cache` | The jobs themselves run only in CI / on tagged releases. For `.circleci/config.yml`, validate the config locally with `docker-compose run --rm circleci config validate` (use `... circleci config process .circleci/config.yml` to inspect the expanded jobs); for the rest, verify by reading the job definitions in `.circleci/config.yml`. |
+| `.circleci/`, `scripts/`, `bin/`, `dockerfiles/`, `docker-compose.yml`, `proxy/prod_configuration/` | `release-*-base` (base images), `upload_extension`, `upload_proxy_files`, `upload_fe_files`, `copy_proxy_configuration`, `build-and-release`, `release`, `coverage-final` | The jobs themselves run only in CI / on tagged releases. For `.circleci/config.yml`, validate the config locally with `docker-compose run --rm circleci config validate` (use `... circleci config process .circleci/config.yml` to inspect the expanded jobs); for the rest, verify by reading the job definitions in `.circleci/config.yml`. |
 
 If a new top-level folder is added in the future, its corresponding test and check jobs must be
 added to `.circleci/config.yml` and to this table before merging changes to that folder.
@@ -64,6 +64,35 @@ opening a PR.
 
 ## Code Organization
 
+### File Responsibility: Declarers vs Scripts
+
+Every source file (excluding tests) must be a **declarer**: it defines and exports classes,
+functions, constants or types. It must not act as a **script**, i.e. run logic or side effects
+at import time.
+
+The only exceptions are the entrypoints:
+
+| Application | Entrypoint |
+|---|---|
+| Backend app | `backend/src/main.ts` |
+| TypeORM CLI | `backend/src/database/data-source.ts` |
+| Frontend app | `frontend/assets/js/main.jsx` |
+
+```ts
+// Good: declarer — defines and exports a class
+@Injectable()
+export class LinkService {
+  list(userId: number) { /* ... */ }
+}
+
+// Bad: script — executes logic at module level
+const service = new LinkService();
+service.warmUp();
+export default service;
+```
+
+Test files are exempt and may run setup code freely.
+
 ### Backend (`backend/`)
 
 - **Controllers are thin:** business logic belongs in the module's service
@@ -71,7 +100,8 @@ opening a PR.
 - **One module per concern:** new backend features are their own module under `src/<name>/`,
   following the standard module structure (`<name>.module.ts`, `.controller.ts`, `.service.ts`,
   `dto/`, `entities/`, `events/`, `tests/`) — see
-  [Architecture — Modular Pattern](architecture/modular-pattern.md).
+  [Architecture — Modular Pattern](architecture/modular-pattern.md). When adding a module,
+  follow that page's "Adding a new module" checklist.
 - **Method order:** within a class, public methods should be declared before private
   (`#`-prefixed) methods (enforced by `eslint-plugin-sort-class-members`).
 - **File naming:** `kebab-case.ts` matching the exported class's purpose (e.g.
@@ -93,8 +123,10 @@ opening a PR.
   `App.jsx` for `function App()`).
 - **Specs mirror source:** `frontend/specs/` mirrors the structure of `frontend/assets/js/`,
   with a matching spec file name (e.g. `AppSpec.js`).
-- See `architecture/frontend.md` for the full component architecture and conventions once one
-  exists beyond the placeholder shell.
+- **Class files are PascalCase:** files that export a class (clients, controllers, helpers)
+  match the class name (e.g. `AccountsClient.js` for `class AccountsClient`), and their specs
+  follow suit (`AccountsClientSpec.js`). Non-class utility modules use camelCase.
+- See `architecture/frontend.md` for the full component architecture and conventions.
 
 ## Dependency Injection
 

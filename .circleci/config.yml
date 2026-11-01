@@ -123,23 +123,9 @@ commands:
       - run:
           name: Yarn install
           command: yarn install
-  # Template-only escape hatch: when the CircleCI project sets CITADEL_SKIP_RELEASE=true (only the
-  # template repo does), release jobs end green without doing anything. Projects built from the
-  # template never set it, so they release normally.
-  skip_release_if_disabled:
-    steps:
-      - run:
-          name: Skip release if CITADEL_SKIP_RELEASE=true
-          command: |
-            if [ "$CITADEL_SKIP_RELEASE" = "true" ]; then
-              echo "CITADEL_SKIP_RELEASE=true, skipping release job."
-              circleci-agent step halt
-            fi
 jobs:
   # Minimal bootstrap CI: backend, frontend and proxy-extension tests/lint. The release chain
   # (build/upload/deploy) lives further down in this same file, gated to semver tag pushes only.
-  # Every release-type job (including release-image) halts green when CITADEL_SKIP_RELEASE=true
-  # (see skip_release_if_disabled).
   #
   # Backend/frontend tests and lint are all instances of this one job (see the workflow entries
   # above): checkout, keep only `dir`, yarn install, run `npm run <script>`, and optionally upload
@@ -228,8 +214,7 @@ jobs:
 
   # Multi-arch (amd64 + arm64) publish of Ward's 4 base images. Instantiated once via a workflow `matrix` (image x suffix). Runs on
   # tag builds only — bin/image.sh's skip_if_not_tag/skip_if_unchanged decide whether to actually
-  # build/push, unless FORCE_IMAGE_BUILD bypasses those guards. CITADEL_SKIP_RELEASE=true halts
-  # the job before any of that (FORCE_IMAGE_BUILD does not override it).
+  # build/push, unless FORCE_IMAGE_BUILD bypasses those guards.
   #
   # `suffix` is "" for amd64 or "-arm64" for arm64; the release step strips the leading "-" so
   # bin/image.sh keeps receiving an empty arch (amd64) or "arm64".
@@ -242,7 +227,6 @@ jobs:
         default: ""
     machine: true
     steps:
-      - skip_release_if_disabled
       - checkout
       - run:
           name: Set up QEMU
@@ -260,7 +244,6 @@ jobs:
   build-and-release:
     machine: true
     steps:
-      - skip_release_if_disabled
       - checkout
       - run:
           name: Update Render Deploy Branch
@@ -276,7 +259,6 @@ jobs:
       - image: darthjee/tent:0.10.4
     working_directory: /home/app/app
     steps:
-      - skip_release_if_disabled
       - checkout
       - run:
           name: Generate key file
@@ -293,7 +275,6 @@ jobs:
       - image: darthjee/tent:0.10.4
     working_directory: /home/app/app
     steps:
-      - skip_release_if_disabled
       - checkout
       - run:
           name: Generate key file
@@ -314,7 +295,6 @@ jobs:
       - image: darthjee/tent:0.10.4
     working_directory: /home/app/app
     steps:
-      - skip_release_if_disabled
       - checkout
       - run:
           name: Generate key file
@@ -332,7 +312,6 @@ jobs:
     docker:
       - image: darthjee/vite_ward-base:0.0.1
     steps:
-      - skip_release_if_disabled
       - checkout
       - setup_project:
           dir: frontend
@@ -357,7 +336,6 @@ jobs:
     docker:
       - image: darthjee/vite_ward-base:0.0.1
     steps:
-      - skip_release_if_disabled
       - checkout
       - run:
           name: Generate key file

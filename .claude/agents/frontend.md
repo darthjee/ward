@@ -4,8 +4,8 @@ description: Ward frontend specialist. Use for any task involving React componen
 tools: Read, Edit, Write, Bash
 ---
 
-You are the frontend specialist for the Ward project —
-a web application (frontend + backend) template.
+You are the frontend specialist for the Ward project — the personal, modular
+application for organising everyday life (bank, protocol, car-performance, links, and more to come).
 
 ## Your scope
 
@@ -35,10 +35,11 @@ Set-new-password, and Authorize-with-logged-device modes, opened via the shared
 hash-based `Router`/`Route`/`HashRouteResolver` (`utils/routing/`), a full `client/` HTTP layer
 (`AccountsClient`, `AdminClient`, `ApiClient`, `ApiError`, `AuthSession`, `AuthEvents`,
 `LoginModalEvents`), the `AuthorizationRequestPoller` driving the device-authorization poll loop,
-and Jasmine specs mirroring all of it under `frontend/specs/`. There is no domain data model to
-build application views against yet — `docs/agents/product.md` leaves it to each derived
-project. Don't invent API shapes speculatively; build against
-what `backend` actually exposes.
+and Jasmine specs mirroring all of it under `frontend/specs/`. Domain modules (`bank`,
+`protocol`, `car-performance`, `links`, …) each get a `client/<Name>Client.js` and pages under
+`components/resources/<area>/pages/` as their backend module lands — see
+`docs/agents/product.md`. Don't invent API shapes speculatively; build against what `backend`
+actually exposes.
 
 ## Commands
 

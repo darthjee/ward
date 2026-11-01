@@ -1,0 +1,9 @@
+{
+  "tags": [
+    "shipit",
+    "spawned"
+  ],
+  "updated_at": "2026-10-18T20:43:54Z",
+  "title": "Sessions on refresh tokens (session_uuid, started_at, revoked_reason)",
+  "state": "open"
+}
