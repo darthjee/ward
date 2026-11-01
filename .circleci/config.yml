@@ -166,7 +166,7 @@ jobs:
   # suite's Jest globalSetup retries the connection until MySQL is ready.
   backend_integration:
     docker:
-      - image: darthjee/circleci_ward-base:0.0.1
+      - image: darthjee/circleci_ward-base:0.1.0
       - image: mysql:9.3.0
         environment:
           MYSQL_DATABASE: ward_test
@@ -192,7 +192,7 @@ jobs:
   # get.sh uploader only needs bash/curl and the job doesn't touch repository files.
   coverage-final:
     docker:
-      - image: darthjee/circleci_ward-base:0.0.1
+      - image: darthjee/circleci_ward-base:0.1.0
     steps:
       - run:
           name: Finalize Codacy coverage
