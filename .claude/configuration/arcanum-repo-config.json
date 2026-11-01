@@ -1,5 +1,5 @@
 {
-  "version": "1.0.0",
+  "version": "2.3.1",
   "auto-fix-all": {
     "ignored_check_patterns": [
       "codacy"
@@ -19,6 +19,18 @@
       "infra": "darthjee+infra@gmail.com",
       "proxy": "darthjee+infra@gmail.com",
       "security": "darthjee+security@gmail.com"
+    }
+  },
+  "next_step": {
+    "auto": {
+      "enhance-issue": true,
+      "discuss-issue": true,
+      "auto-plan-issue": true
+    },
+    "clear": {
+      "enhance-issue": true,
+      "discuss-issue": true,
+      "auto-plan-issue": true
     }
   }
 }

@@ -133,7 +133,6 @@ push runs the jobs but they fail against unset/placeholder credentials.
 | `NAVI_API_TOKEN` | Auth token for Navi's `navi-client`. | `scripts/warm_navi_cache.sh` |
 | `WARD_NAMESPACE` | Combined with the CircleCI workspace ID to build a per-build Navi namespace. | Not yet consumed — reserved for a future `warm-up-cache` job (cache warm-up is out of scope for the current release chain; see `docs/agents/cache-warmer.md`). |
 | `CODACY_PROJECT_TOKEN` | Coverage upload target, read implicitly by Codacy's own uploader script. | `backend_tests`/`jasmine` CI jobs |
-| `CITADEL_SKIP_RELEASE` | **Template-only.** Set to exactly `true` only on the template repo's own CircleCI project, so every release-type job (the release chain above plus the `release-image` matrix) halts green without doing anything. Any other value, or leaving it unset, releases normally. Projects built from the template must not set it. `scripts/init_project.sh` does not rename it. | `skip_release_if_disabled` command in `.circleci/config.yml` |
 
 ## Keeping this doc honest
 

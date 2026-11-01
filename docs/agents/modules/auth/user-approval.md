@@ -133,8 +133,7 @@ expose the review tools, whatever the flag. See [Admin routes](../../backend/rou
 varchar(16) NOT NULL` with **no column default**: it adds the column nullable, backfills every
 existing row to `approved`, then makes it `NOT NULL`. Every code path that creates a user sets the
 status explicitly, so an implicit default can never silently grant or deny access. The backfill
-is kept even though the template has no live users, so a derived project that already has users
-is not locked out when it pulls the change. Seed migrations running after it must insert
+is kept so a database that already has users is not locked out when it runs the migration. Seed migrations running after it must insert
 `status: 'approved'` explicitly.
 
 ## Reference

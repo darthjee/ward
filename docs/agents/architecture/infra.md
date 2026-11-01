@@ -16,18 +16,6 @@ push, but `bin/image.sh`'s `skip_if_not_tag` guard makes them a fast no-op unles
 tag, and `skip_if_unchanged` makes even tag builds a no-op when neither `dockerfiles/base/` nor
 `bin/image.sh` has changed since the last release (see "Shared base Dockerfile" below).
 
-**Template-only skip.** Every release-type job (`release-image`, `build-and-release`, the
-`upload_*` jobs, `copy_proxy_configuration` and `release`) starts with the
-`skip_release_if_disabled` command. When the CircleCI project sets `CITADEL_SKIP_RELEASE=true`,
-that step runs `circleci-agent step halt` before `checkout`, so the job ends green without doing
-anything and the jobs that depend on it still run. Only the template repo sets this flag.
-Projects built from it leave it unset and release normally (see
-`docs/agents/environment-variables.md` §4). One consequence for the template: its image releases
-are skipped too, so `backend_tests`/`backend_integration`/`backend_checks` depend on the
-`circleci_ward-base` tag pinned in `.circleci/config.yml` already being on Docker
-Hub. To bump that image version in the template, unset the flag for that release.
-`FORCE_IMAGE_BUILD` does not override it.
-
 ```
 release-circleci_ward-base(-arm64) ─┬─ backend_tests ──┐
                                         ├─ backend_integration ─┤

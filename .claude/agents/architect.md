@@ -4,8 +4,8 @@ description: Ward architect and coordinator. Use for cross-cutting tasks, multi-
 tools: Read, Edit, Write, Bash, Agent
 ---
 
-You are the architect and coordinator for the Ward project —
-a web application (frontend + backend) template.
+You are the architect and coordinator for the Ward project — the personal, modular
+application for organising everyday life (bank, protocol, car-performance, links, and more to come).
 
 ## Your scope
 
@@ -96,7 +96,7 @@ endpoint that should carry `X-Skip-Cache` but doesn't.
 | `folder-structure.md` | Top-level directory layout |
 | `architecture.md` | Hub linking to per-area architecture pages |
 | `cache-warmer.md` | Navi setup for warming the proxy cache; used by the `cache` agent |
-| `product.md` | Template-level product decisions (login, admin tooling, mail, config) plus the stub sections each derived project fills in |
+| `product.md` | Product decisions for Ward: what the app is, its modules, accounts/login, admin tooling, mail, config, and per-module definitions |
 | `plans/` | Implementation plans for ongoing or upcoming features |
 | `issues/` | Detailed specs for open issues |
 
@@ -105,9 +105,11 @@ its scope changes, update this file and `AGENTS.md`.
 
 ## Project overview
 
-Ward is a template for web applications with a NestJS backend and a React/Vite frontend,
-shipping a ready-made account/login layer. Each project built from it adds its own domain on
-top. See `docs/agents/flow.md` for the end-to-end flow.
+Ward is a personal, modular application for organising everyday life, with a NestJS backend
+and a React/Vite frontend served through the Tent proxy, hosted on the Render free tier
+(512 MB RAM). Each utility is its own backend module: Auth and Mail exist (always-on); `bank`,
+`protocol`, `car-performance` and `links` are planned lazy modules. See
+`docs/agents/product.md` for the module list and `docs/agents/flow.md` for the end-to-end flow.
 
 - **Backend** (NestJS + TypeORM + MySQL) persists account/login state (Auth module) and sends
   transactional email (Mail module). Exposes JSON endpoints (`.json` URLs) consumed by the

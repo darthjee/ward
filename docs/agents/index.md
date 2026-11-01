@@ -8,6 +8,7 @@ For a short abstract of each doc's content, see [summary.md](summary.md) instead
 - [Folder Structure](folder-structure.md)
 - [Flow](flow.md)
 - [Architecture](architecture.md)
+- [Modular Pattern](architecture/modular-pattern.md)
 - [API Caching](architecture/caching.md)
 - [Modules](modules/)
   - [Auth](modules/auth.md)
@@ -22,6 +23,7 @@ For a short abstract of each doc's content, see [summary.md](summary.md) instead
 - [Contributing](contributing.md)
 - [Product Definitions](product.md)
 - [Issue Enhancement](issue-enhancement.md)
+- [Arcanum Split Issue](arcanum-split-issue.md)
 - [Environment Variables](environment-variables.md)
 
 ## External tooling

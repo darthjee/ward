@@ -2,8 +2,8 @@
 
 React 19 + Vite, built and tested the same way regardless of backend language. Hash-based
 routing, a `client/` HTTP layer, and a login/register/device-authorization modal already exist
-(see "Auth flow" below) — application-specific views are left to each project built from this
-template.
+(see "Auth flow" below). Each backend domain module gets a matching
+`client/<Name>Client.js` and its own pages under `components/resources/<area>/pages/`.
 
 ## Stack
 

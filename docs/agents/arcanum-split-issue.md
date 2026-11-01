@@ -7,3 +7,5 @@ A checklist of concerns to consider when splitting a broad issue into sub-issues
 - **Shared contracts** — interfaces, schemas, or config keys touched by more than one sub-issue, and who owns getting them right first.
 - **Sequencing** — is there a natural order sub-issues should be implemented/merged in, or can they proceed in parallel?
 - **Responsible agents** — which specialist agent(s) each sub-issue is likely to fall to.
+- **Backend/frontend split** — typically one sub-issue for the backend module (entities, migrations, routes) and one for the frontend client and pages, backend first.
+- **Module boundaries** — keep each sub-issue inside a single module where possible; cross-module work goes through exported services or events.

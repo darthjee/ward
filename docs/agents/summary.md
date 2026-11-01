@@ -8,11 +8,17 @@ full file before loading it. For a bare link-only table of contents instead, see
 
 - **[Folder Structure](folder-structure.md)** — Top-level directory layout: what each top-level
   folder (`backend/`, `frontend/`, `proxy/`, `dockerfiles/`, `docs/`, etc.) is for.
-- **[Flow](flow.md)** — Stub: the generic login flow (password/register/recover/device
-  authorization) plus the per-user cache note; each derived project adds its own data flow.
+- **[Flow](flow.md)** — The request path every module shares: login (password/register/
+  recover/device authorization), opening a module page, Tent cache vs. backend (and Render cold
+  starts), guards and lazy loading, session renewal, plus the per-user cache note.
 - **[Architecture](architecture.md)** — Hub page splitting the architecture by concern (proxy,
-  frontend, backend, modular pattern, infra) to keep agent contexts small. Read the linked area
-  page relevant to your task instead of loading everything.
+  frontend, backend, modular pattern, infra) to keep agent contexts small, plus Ward's hosting
+  constraints (Render free tier, 512 MB) and key trade-offs. Read the linked area page relevant
+  to your task instead of loading everything.
+- **[Modular Pattern](architecture/modular-pattern.md)** — The rules every backend module
+  follows: Core/always-on/lazy tiers, the planned-modules table with table prefixes, DI vs.
+  events (and the lazy-listener caveat), database ownership, what a module page must contain,
+  and the "Adding a new module" checklist. Read it before creating or extending a module.
 - **[Modules](modules/)** — Per-backend-module documentation (routes, entities, events), one
   file per module (`modules/auth.md` and `modules/mail.md` today). Read the module's page before
   extending or consuming it.
@@ -35,12 +41,15 @@ full file before loading it. For a bare link-only table of contents instead, see
 
 - **[Contributing](contributing.md)** — Commit guidelines (atomic, no unrelated changes,
   separate refactors) and PR standards (descriptive summary, description files when needed).
-- **[Product Definitions](product.md)** — Stub: template-level decisions (login/session, admin
-  tooling, mail, env-driven config) plus empty sections for the derived project's entities,
-  ownership, roles and editing rules. Read it before planning any issue that introduces new
+- **[Product Definitions](product.md)** — What Ward is, its module list (Auth/Mail implemented;
+  `bank`, `protocol`, `car-performance`, `links` planned), cross-cutting decisions
+  (login/session, user approval, admin tooling, mail, config, per-user data ownership) and what
+  is still open per planned module. Read it before planning any issue that introduces new
   entities.
 - **[Issue Enhancement](issue-enhancement.md)** — Checklist of concerns (`/enhance-issue` uses
   this) for fleshing out a vague issue idea before it reaches the `Created` stage.
+- **[Arcanum Split Issue](arcanum-split-issue.md)** — Checklist of concerns
+  (`/arcanum-split-issue` uses this) for breaking a broad issue into sub-issues.
 - **[Environment Variables](environment-variables.md)** — Every env var Ward's production
   deployment needs: backend runtime (Render), the cache warmer, and CircleCI deploy-pipeline
   secrets — with each one marked as actually consumed by code or still reserved. Update it
