@@ -9,7 +9,7 @@ workflows:
       - yarn_project:
           name: backend_tests
           dir: backend
-          image: darthjee/circleci_ward-base:0.0.1
+          image: darthjee/circleci_ward-base:0.1.0
           script: coverage
           step_name: Tests
           upload_coverage: true
@@ -23,7 +23,7 @@ workflows:
       - yarn_project:
           name: backend_checks
           dir: backend
-          image: darthjee/circleci_ward-base:0.0.1
+          image: darthjee/circleci_ward-base:0.1.0
           script: lint
           step_name: Check JS Lint
           requires: [release-circleci_ward-base, release-circleci_ward-base-arm64]
