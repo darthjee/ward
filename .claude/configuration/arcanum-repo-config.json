@@ -29,8 +29,7 @@
     },
     "clear": {
       "enhance-issue": true,
-      "discuss-issue": true,
-      "auto-plan-issue": true
+      "discuss-issue": true
     }
   }
 }
