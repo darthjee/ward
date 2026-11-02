@@ -162,8 +162,9 @@ jobs:
                 command: bash <(curl -Ls https://coverage.codacy.com/get.sh) report --partial -r coverage/lcov.info || true
 
   # Backend MySQL-backed integration suite (`*.integration-spec.ts`). Its own job rather than a
-  # yarn_project instance since it needs a second (MySQL service) image. No wait step: the
-  # suite's Jest globalSetup retries the connection until MySQL is ready.
+  # yarn_project instance since it needs a second (MySQL service) image. No wait step:
+  # `createTestDataSource()` retries the connection until MySQL is ready (the integration Jest
+  # config deliberately has no globalSetup).
   backend_integration:
     docker:
       - image: darthjee/circleci_ward-base:0.1.0
