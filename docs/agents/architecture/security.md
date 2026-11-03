@@ -51,11 +51,15 @@ Edge cases, decided in the implementation (`isCrossSiteRequestAllowed` in the sa
   `Host` comparison includes the port.
 
 The frontend and the API share one origin through Tent (`*.json` goes to the backend), so the
-app's own requests are always `same-origin`. Tent's `default_proxy` handler forwards every
-incoming request header unchanged (`getallheaders()` straight into its curl executor, verified in
-the `darthjee/tent:0.10.4` image's `ProxyRequestHandler`; recheck on a Tent upgrade), so
-`Origin`, `Sec-Fetch-Site` and `Host` reach the backend intact. **Any future proxy rule or
-middleware on `*.json` must keep forwarding those three headers.** If one strips or rewrites
+app's own requests are always `same-origin`. Tent's `default_proxy` handler forwards the
+incoming request headers (`getallheaders()` into its curl executor), so `Origin` and
+`Sec-Fetch-Site` reach the backend intact. `Host` does not: `DefaultProxyRequestHandler` always
+renames it to `X-Forwarded-Host` and sets `Host` to the backend host (for example
+`backend:8080`). This was verified in the `darthjee/tent:1.1.0` image, and `0.10.4` behaves the
+same way. Recheck it on every Tent upgrade. Because of this, the "`Origin` host equals `Host`"
+row never matches behind Tent, so an older browser that sends no `Sec-Fetch-Site` and an
+`Origin` outside the trusted list fails closed with `403`. **Any future proxy rule or middleware
+on `*.json` must keep forwarding `Origin` and `Sec-Fetch-Site`.** If one strips or rewrites
 them, `OriginGuard` either fails closed (`403` on legitimate requests) or open.
 
 ### Unauthenticated routes (login CSRF)

@@ -50,8 +50,8 @@ release-image matrix (4 base images x amd64/arm64) + tests + lint
 | `proxy_extension_tests` | `darthjee/tent-test:1.1.0` |
 | backend tests/lint | `darthjee/circleci_ward-base:0.2.0` |
 
-Today the SSH jobs run on `tent:0.10.4` and `vite_ward-base:0.0.1`; the pins move as described
-in [ssh/proxy.md](ssh/proxy.md) and [images.md](images.md).
+The Tent-based SSH jobs already run on `tent:1.1.0`. The `vite_ward-base` jobs still run on
+`vite_ward-base:0.0.1`; that pin moves as described in [images.md](images.md).
 
 ## Reference
 
