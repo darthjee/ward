@@ -40,5 +40,6 @@ proxy/prod_configuration/locals.php
 Thumbs.db
 
 .claude/state
+.claude/state/*
 proxy/extension/.phpunit.result.cache
 proxy/extension/vendor
