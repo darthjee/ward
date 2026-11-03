@@ -32,10 +32,11 @@ through `docker-compose run` or the relevant image.
 | `ward_app` | `darthjee/ward` | 3030 | Backend dev server |
 | `ward_tests` | `darthjee/ward` | — | Backend test runner |
 | `ward_fe` | built from `dockerfiles/vite_ward/` | 3010 | Vite dev server / build |
-| `ward_proxy` | `darthjee/tent:0.10.1` | 3000 | Reverse proxy (single entry point) |
-| `proxy_lint` | `darthjee/tent-test:0.10.4` | — | PSR-12 PHPCS check for `proxy/` (ruleset: root `phpcs.xml`) |
+| `ward_proxy` | `darthjee/tent:1.1.0` | 3000 | Reverse proxy (single entry point) |
+| `proxy_tests` | `darthjee/tent-test:1.1.0` | — | PHPUnit tests for `proxy/extension/` |
+| `proxy_lint` | `darthjee/tent-test:1.1.0` | — | PSR-12 PHPCS check for `proxy/` (ruleset: root `phpcs.xml`) |
 | `ward_mysql` | `mysql:9.3.0` | configurable | Database |
-| `ward_navi` | `darthjee/navi-hey:1.5.1` | 3100 | Cache warmer (local) |
+| `ward_navi` | `darthjee/navi-hey:1.6.1` | 3100 | Cache warmer (local) |
 | `ward_phpmyadmin` | `phpmyadmin/phpmyadmin` | 3050 | DB admin UI |
 
 ## Backend image publishing
