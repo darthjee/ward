@@ -54,7 +54,9 @@ this file changes.
 
 ## Active specs
 
-none
+| Feature | Specs | Epic |
+|---|---|---|
+| Deployment (Render backend, SSH-hosted proxy and frontend, tag-driven CircleCI release) | [specs/deploy/](specs/deploy/README.md) | [#10](https://github.com/darthjee/ward/issues/10) |
 
 ## Completed specs
 
