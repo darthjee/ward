@@ -4,7 +4,9 @@ CircleCI (`.circleci/config.yml`) is Ward's only CI/CD pipeline: it runs tests/l
 push and, on semver tag pushes only, builds/publishes images and triggers the production
 release. This page documents that pipeline's job graph — the "infra" counterpart to
 `architecture/proxy.md`/`frontend.md`/`backend.md`. Ward deploys to Render and doesn't warm
-the Navi cache from CI yet (see `docs/agents/cache-warmer.md`).
+the Navi cache from CI yet (see `docs/agents/cache-warmer.md`). For how a release runs end to
+end (Render, SSH staging, the release swap, rollback, security, provisioning), see
+[Deployment](../deployment.md).
 
 ## Workflow
 
@@ -141,11 +143,10 @@ step strips the leading `-` from `suffix` before calling `bin/image.sh push <ima
 | `release-production_ward-base(-arm64)` | `production_ward-base` | Production backend base image (`production_ward` is `FROM` this, by `:latest`) |
 | `release-vite_ward-base(-arm64)` | `vite_ward-base` | Frontend/proxy build base image |
 
-The backend image family (`ward-base`, `circleci_ward-base`, `production_ward-base`)
-is built in CI but **not actually published to Docker Hub** — only the frontend/proxy
-(`vite_ward*`) images are. `bin/image.sh` still runs the `release-image` job for all of them
-so the ordering/`requires` machinery stays uniform; see `docs/agents/environment-variables.md`
-for which Docker Hub credentials are actually wired up.
+All four base images are pushed to Docker Hub as `<version>[-arm64]` and `latest[-arm64]`
+(subject to the `skip_if_not_tag`/`skip_if_unchanged` guards). What is never published is the
+backend **app** image (`dockerfiles/production_ward/Dockerfile`): Render builds it itself from
+the tag, on top of `production_ward-base`. See [Deployment](../deployment.md#images).
 
 ### Shared base Dockerfile
 
