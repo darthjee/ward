@@ -54,9 +54,7 @@ this file changes.
 
 ## Active specs
 
-| Feature | Specs | Epic |
-|---|---|---|
-| Deployment (Render backend, SSH-hosted proxy and frontend, tag-driven CircleCI release) | [specs/deploy/](specs/deploy/README.md) | [#10](https://github.com/darthjee/ward/issues/10) |
+None.
 
 ## Completed specs
 
@@ -64,4 +62,5 @@ Features whose specs were folded into the permanent docs, and where their defini
 
 | Feature | Folded into | Epic |
 |---|---|---|
+| Deployment (Render backend, SSH-hosted proxy and frontend, tag-driven CircleCI release); specs were `specs/deploy/`, removed by #16 | [deployment.md](deployment.md), [environment-variables.md](environment-variables.md) §4 | [#10](https://github.com/darthjee/ward/issues/10) |
 | User approval (optional admin approval of new registrations, plus the session-lookup gate it needs); specs were `specs/user-approval/`, removed by #7 | [modules/auth/user-approval.md](modules/auth/user-approval.md) | [#1](https://github.com/darthjee/citadel/issues/1) |
