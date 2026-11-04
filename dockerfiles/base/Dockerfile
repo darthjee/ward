@@ -8,7 +8,7 @@
 # darthjee/node (or darthjee/circleci_node) versions are defined.
 
 # Only visible to the FROM lines below
-ARG SCRIPTS_IMAGE=darthjee/scripts:0.8.0
+ARG SCRIPTS_IMAGE=darthjee/scripts:0.12.0
 ARG NODE_IMAGE_VERSION=0.2.1
 # bin/image.sh always passes it; the default only keeps the FROM line valid
 ARG BASE_IMAGE=darthjee/node
@@ -83,6 +83,10 @@ FROM final AS ward-base
 CMD ["sh", "-c", "yarn build && node dist/main.js"]
 
 FROM final AS vite_ward-base
+
+# deploy_frontend.sh (from darthjee/scripts, already executable there) is used
+# by the CircleCI deploy jobs
+COPY --from=scripts /home/scripts/sbin/deploy_frontend.sh /usr/local/sbin/deploy_frontend.sh
 
 CMD ["npm", "run", "server"]
 
