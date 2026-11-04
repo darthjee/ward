@@ -6,10 +6,12 @@ workflows:
       # Backend unit/e2e specs (`*.spec.ts`, `*.e2e-spec.ts`) use fakes and need no database
       # (backend_tests). `*.integration-spec.ts` run against a throwaway MySQL service container in
       # backend_integration (no coverage upload).
+      # circleci_ward-base stays on the published 0.1.0 (not the `version` file's 0.2.0) until the
+      # first tag build publishes 0.2.0; move these pins to 0.2.0 after that.
       - yarn_project:
           name: backend_tests
           dir: backend
-          image: darthjee/circleci_ward-base:0.2.0
+          image: darthjee/circleci_ward-base:0.1.0
           script: coverage
           step_name: Tests
           upload_coverage: true
@@ -23,7 +25,7 @@ workflows:
       - yarn_project:
           name: backend_checks
           dir: backend
-          image: darthjee/circleci_ward-base:0.2.0
+          image: darthjee/circleci_ward-base:0.1.0
           script: lint
           step_name: Check JS Lint
           requires: [release-circleci_ward-base, release-circleci_ward-base-arm64]
@@ -180,9 +182,10 @@ jobs:
   # yarn_project instance since it needs a second (MySQL service) image. No wait step:
   # `createTestDataSource()` retries the connection until MySQL is ready (the integration Jest
   # config deliberately has no globalSetup).
+  # circleci_ward-base pinned to 0.1.0 until a tag publishes 0.2.0 (see the workflow comment).
   backend_integration:
     docker:
-      - image: darthjee/circleci_ward-base:0.2.0
+      - image: darthjee/circleci_ward-base:0.1.0
       - image: mysql:9.3.0
         environment:
           MYSQL_DATABASE: ward_test
@@ -206,9 +209,10 @@ jobs:
   # Finalizes the aggregated Codacy coverage report once both partial uploads
   # (backend_tests, jasmine) have completed. Reuses circleci_ward-base since the
   # get.sh uploader only needs bash/curl and the job doesn't touch repository files.
+  # circleci_ward-base pinned to 0.1.0 until a tag publishes 0.2.0 (see the workflow comment).
   coverage-final:
     docker:
-      - image: darthjee/circleci_ward-base:0.2.0
+      - image: darthjee/circleci_ward-base:0.1.0
     steps:
       - run:
           name: Finalize Codacy coverage
