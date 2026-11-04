@@ -6,11 +6,11 @@
 |---|---|
 | `backend/` | Node.js/NestJS app, TypeScript + TypeORM/MySQL. The Auth and Mail modules exist; each domain module (`bank`, `protocol`, `car-performance`, `links`, …) gets its own folder under `src/` — see `docs/agents/product.md` |
 | `frontend/` | React 19 + Vite app — the login modal, device-authorization flow, hash routing, and `client/` HTTP layer already exist; each domain module adds its own `client/<Name>Client.js` and pages under `components/resources/<area>/pages/` |
-| `proxy/` | PHP Tent proxy config (`dev_configuration/`, `prod_configuration/`, `extension/`) |
+| `proxy/` | PHP Tent proxy config (`dev_configuration/`, `prod_configuration/`, `extension/`), plus `extension.exclude` (patterns left out when `upload_extension` deploys `extension/`) |
 | `dockerfiles/` | `base/` (one shared Dockerfile for all four `*-base` images) plus one directory per leaf image |
 | `docker_volumes/` | Bind-mount targets for local dev (gitignored contents) |
 | `docs/agents/` | Agent-facing documentation, hub + per-topic pages (this directory) |
-| `bin/` | Language-agnostic CI shell scripts (`image.sh`, `deploy_frontend.sh`) |
+| `bin/` | Language-agnostic CI shell scripts (`image.sh`). `deploy_frontend.sh` is not in the repo — it ships in the `vite_ward-base` and `darthjee/tent` images (see `docs/agents/deployment.md`) |
 | `scripts/` | Release shell scripts (`bump_version.sh`, `deploy.sh`, `render.sh`, `wake_navi.sh`, `warm_navi_cache.sh`) |
 | `.circleci/` | CI pipeline config (validate with `docker-compose run --rm circleci config validate`) |
 | `.claude/agents/` | Specialist AI agent definitions |

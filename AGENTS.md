@@ -119,6 +119,7 @@ All project documentation lives under [`docs/agents/`](docs/agents/):
 | [Contributing](docs/agents/contributing.md) | Commit guidelines, PR standards, code organization, and refactoring rules. |
 | [Product Definitions](docs/agents/product.md) | Product decisions for Ward and its modules. Consult before planning any issue that introduces new entities. |
 | [External Tooling](docs/agents/external.md) | Hub linking full usage guides for external, project-agnostic tools (Tent, Navi, navi-hey-client). |
+| [Deployment](docs/agents/deployment.md) | Operator guide for releases: deploy variables (where/what/how to get them) and rollout notes. |
 | [Cache Warmer](docs/agents/cache-warmer.md) | Navi setup for warming the proxy cache after release (CI and local); used by the `cache` agent. |
 | [Specs](docs/agents/specs.md) | Permanent hub for feature specs: temporary, shared definitions of multi-issue features (lifecycle, conventions, active/completed list). |
 | [Plans](docs/agents/plans/) | Implementation plans for ongoing or upcoming features. |

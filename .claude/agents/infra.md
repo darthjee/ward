@@ -13,7 +13,8 @@ application for organising everyday life (bank, protocol, car-performance, links
 - `dockerfiles/` — all service images (backend, frontend, production, CI variants)
 - `.circleci/config.yml` — CI/CD pipeline
 - `scripts/` — deployment and release scripts
-- `bin/` — CI/build shell scripts (`image.sh`, `deploy_frontend.sh`)
+- `bin/` — CI/build shell scripts (`image.sh`). `deploy_frontend.sh` is not in the repo: it comes from
+  `darthjee/scripts:0.12.0` via `vite_ward-base` (`/usr/local/sbin/`) and `darthjee/tent:1.1.0` (`/usr/sbin/`)
 - `Makefile` — development command interface
 - `version` — base-image version registry
 - Production configuration files (when added to the repository)
@@ -54,7 +55,8 @@ a change to either rebuilds all four; `FORCE_IMAGE_BUILD` bypasses both guards w
 rebuild/republish is needed.
 
 `backend_tests`/`backend_checks` now run from the published `darthjee/circleci_ward-base:0.1.0`
-image (pinned to the version in the root `version` file, not `:latest`), `requires:`-gated on
+image (an explicit published tag, not `:latest`; it moves to `0.2.0`, the version in the root `version`
+file, once a tag build publishes it), `requires:`-gated on
 `release-circleci_ward-base`/`release-circleci_ward-base-arm64` so they wait for a fresh
 publish on tag builds; `yarn install` still runs but reads from the base image's pre-warmed cache
 instead of a cold network install. `jasmine`/`frontend-checks` intentionally stay on the generic

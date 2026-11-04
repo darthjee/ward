@@ -6,6 +6,8 @@ workflows:
       # Backend unit/e2e specs (`*.spec.ts`, `*.e2e-spec.ts`) use fakes and need no database
       # (backend_tests). `*.integration-spec.ts` run against a throwaway MySQL service container in
       # backend_integration (no coverage upload).
+      # circleci_ward-base stays on the published 0.1.0 (not the `version` file's 0.2.0) until the
+      # first tag build publishes 0.2.0; move these pins to 0.2.0 after that.
       - yarn_project:
           name: backend_tests
           dir: backend
@@ -123,6 +125,21 @@ commands:
       - run:
           name: Yarn install
           command: yarn install
+  # Writes the SSH key and pins the host key for deploy_frontend.sh. Fails fast when
+  # SSH_KNOWN_HOSTS is empty: the script would otherwise silently fall back to
+  # StrictHostKeyChecking=no.
+  setup_ssh:
+    steps:
+      - run:
+          name: Check SSH_KNOWN_HOSTS
+          command: |
+            if [ -z "${SSH_KNOWN_HOSTS:-}" ]; then
+              echo "SSH_KNOWN_HOSTS is not set; refusing to deploy without host-key pinning" >&2
+              exit 1
+            fi
+      - run:
+          name: Generate SSH key file
+          command: deploy_frontend.sh generate_key_file
 jobs:
   # Minimal bootstrap CI: backend, frontend and proxy-extension tests/lint. The release chain
   # (build/upload/deploy) lives further down in this same file, gated to semver tag pushes only.
@@ -165,6 +182,7 @@ jobs:
   # yarn_project instance since it needs a second (MySQL service) image. No wait step:
   # `createTestDataSource()` retries the connection until MySQL is ready (the integration Jest
   # config deliberately has no globalSetup).
+  # circleci_ward-base pinned to 0.1.0 until a tag publishes 0.2.0 (see the workflow comment).
   backend_integration:
     docker:
       - image: darthjee/circleci_ward-base:0.1.0
@@ -191,6 +209,7 @@ jobs:
   # Finalizes the aggregated Codacy coverage report once both partial uploads
   # (backend_tests, jasmine) have completed. Reuses circleci_ward-base since the
   # get.sh uploader only needs bash/curl and the job doesn't touch repository files.
+  # circleci_ward-base pinned to 0.1.0 until a tag publishes 0.2.0 (see the workflow comment).
   coverage-final:
     docker:
       - image: darthjee/circleci_ward-base:0.1.0
@@ -262,12 +281,10 @@ jobs:
     working_directory: /home/app/app
     steps:
       - checkout
-      - run:
-          name: Generate key file
-          command: bin/deploy_frontend.sh generate_key_file
+      - setup_ssh
       - run:
           name: Upload proxy files
-          command: SOURCE=/var/www/html/ bin/deploy_frontend.sh upload
+          command: SOURCE=/var/www/html/ deploy_frontend.sh upload
 
   # Uploads the production proxy configuration, then copies over server-side state that only
   # ever lives on the host (locals.php with real secrets, and .htaccess for the Apache front
@@ -278,57 +295,46 @@ jobs:
     working_directory: /home/app/app
     steps:
       - checkout
-      - run:
-          name: Generate key file
-          command: bin/deploy_frontend.sh generate_key_file
+      - setup_ssh
       - run:
           name: Upload proxy configuration
-          command: SOURCE=proxy/prod_configuration/ DEPLOY_PATH=configuration/ bin/deploy_frontend.sh upload
+          command: SOURCE=proxy/prod_configuration/ DEPLOY_PATH=configuration/ deploy_frontend.sh upload
       - run:
           name: Setup locals
-          command: TARGET=configuration/locals.php DEPLOY_PATH=configuration/ bin/deploy_frontend.sh copy_files
+          command: TARGET=configuration/locals.php DEPLOY_PATH=configuration/ deploy_frontend.sh copy_files
       - run:
           name: Setup .htaccess
-          command: TARGET=.htaccess DEPLOY_PATH=./ bin/deploy_frontend.sh copy_files
+          command: TARGET=.htaccess DEPLOY_PATH=./ deploy_frontend.sh copy_files
 
-  # Uploads the Tent proxy extension, stripped of its test suite (not needed at runtime).
+  # Uploads the Tent proxy extension, excluding its test suite (not needed at runtime) via
+  # proxy/extension.exclude.
   upload_extension:
     docker:
       - image: darthjee/tent:1.1.0
     working_directory: /home/app/app
     steps:
       - checkout
-      - run:
-          name: Generate key file
-          command: bin/deploy_frontend.sh generate_key_file
-      - run:
-          name: Remove test files
-          command: rm -rf proxy/extension/tests/
+      - setup_ssh
       - run:
           name: Upload proxy extension
-          command: SOURCE=proxy/extension/ DEPLOY_PATH=extension/ bin/deploy_frontend.sh upload
+          command: SOURCE=proxy/extension/ DEPLOY_PATH=extension/ EXCLUDE_FROM=proxy/extension.exclude deploy_frontend.sh upload
 
   # Builds the Vite frontend and uploads the static build output to the SSH deploy host's
   # workspace-scoped temp dir — staged, not yet swapped live (see the `release` job below).
   upload_fe_files:
     docker:
-      - image: darthjee/vite_ward-base:0.0.1
+      - image: darthjee/vite_ward-base:0.2.0
     steps:
       - checkout
       - setup_project:
           dir: frontend
       - run:
           name: Build assets
-          command: bin/deploy_frontend.sh build
-      - run:
-          name: Generate key file
-          command: bin/deploy_frontend.sh generate_key_file
-      - run:
-          name: Generate folder
-          command: DEPLOY_PATH=static/ bin/deploy_frontend.sh generate_folder
+          command: deploy_frontend.sh build
+      - setup_ssh
       - run:
           name: Upload assets
-          command: SOURCE=dist/ DEPLOY_PATH=static/ bin/deploy_frontend.sh upload
+          command: SOURCE=dist/ DEPLOY_PATH=static/ deploy_frontend.sh upload
 
   # Atomic swap: only runs once every upload/build job above (and the backend's
   # build-and-release, which blocks until Render reports "live") has succeeded, so frontend,
@@ -336,12 +342,13 @@ jobs:
   # this job simply never runs and the previously-live build keeps serving unchanged.
   release:
     docker:
-      - image: darthjee/vite_ward-base:0.0.1
+      - image: darthjee/vite_ward-base:0.2.0
     steps:
       - checkout
-      - run:
-          name: Generate key file
-          command: bin/deploy_frontend.sh generate_key_file
+      - setup_ssh
       - run:
           name: Release assets
-          command: bin/deploy_frontend.sh release
+          command: KEEP_OLD=true deploy_frontend.sh release
+      - run:
+          name: Clean up stale staging folders
+          command: deploy_frontend.sh cleanup

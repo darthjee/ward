@@ -103,6 +103,11 @@ workflow at all — nothing downstream depends on it being fresh.
 
 ## CI jobs
 
+The every-push jobs on `circleci_ward-base` (`backend_tests`, `backend_integration`,
+`backend_checks`, `coverage-final`) stay pinned to the published `0.1.0` until the first tag
+build publishes `0.2.0` (the version in `version`); `release-image` is a no-op on branch
+builds, so a pin to an unpublished tag fails to pull. Move them to `0.2.0` once it exists.
+
 | Job | Image/Executor | Filter | Purpose |
 |-----|-----------------|--------|---------|
 | `backend_tests` | `darthjee/circleci_ward-base:0.1.0` | every push | `yarn_project` instance (`dir: backend`, `script: coverage`, `upload_coverage: true`): backend test suite + coverage; uploads a partial Codacy coverage report afterward (best-effort, non-blocking) |
@@ -115,10 +120,10 @@ workflow at all — nothing downstream depends on it being fresh.
 | `release-image` | machine (multi-arch: amd64 + arm64) | every push (no-op unless tag) | Publishes one of the 4 base images to Docker Hub via `bin/image.sh`; instantiated through a single workflow `matrix` (4 images × 2 archs = 8 jobs) — see below |
 | `build-and-release` | `machine: image: ubuntu-2204:current` | tag only | Triggers the Render deploy of the backend (`scripts/deploy.sh`), blocks until it reports "live" |
 | `upload_proxy_files` | `darthjee/tent:1.1.0` | tag only | Uploads Tent proxy runtime to the SSH deploy host's staging dir |
-| `upload_fe_files` | `darthjee/vite_ward-base:0.1.0` | tag only | Builds the Vite frontend, uploads the static output to the staging dir |
-| `upload_extension` | `darthjee/tent:1.1.0` | tag only | Uploads the proxy PHP extension (test files stripped) |
+| `upload_fe_files` | `darthjee/vite_ward-base:0.2.0` | tag only | Builds the Vite frontend, uploads the static output to the staging dir |
+| `upload_extension` | `darthjee/tent:1.1.0` | tag only | Uploads the proxy PHP extension, leaving out the patterns in `proxy/extension.exclude` (`tests/`) via `EXCLUDE_FROM` |
 | `copy_proxy_configuration` | `darthjee/tent:1.1.0` | tag only | Uploads prod proxy config + restores host-only state (`locals.php`, `.htaccess`) |
-| `release` | `darthjee/vite_ward-base:0.1.0` | tag only | Atomic swap: only runs once every upload/build job above has succeeded |
+| `release` | `darthjee/vite_ward-base:0.2.0` | tag only | Atomic swap with `KEEP_OLD=true` (previous release kept as `${SSH_REMOTE_DIR}_old_<epoch>` for rollback), then `deploy_frontend.sh cleanup` removes stale staging folders; only runs once every upload/build job above has succeeded |
 
 ### `release-image` instances
 
@@ -223,7 +228,7 @@ docker-compose run --rm circleci config process .circleci/config.yml   # expande
 | `scripts/bump_version.sh` | Bump the version string across the repo |
 | `scripts/wake_navi.sh` / `scripts/warm_navi_cache.sh` | Navi cache-warmer scripts — not yet wired into CircleCI, see `docs/agents/cache-warmer.md` |
 | `bin/image.sh` | Builds/pushes a `release-image` instance; `skip_if_not_tag`/`skip_if_unchanged` guards, `qemu`/`push` subcommands |
-| `bin/deploy_frontend.sh` | SSH-based upload/release helpers used by `upload_proxy_files`, `upload_fe_files`, `upload_extension`, `copy_proxy_configuration`, `release` |
+| `deploy_frontend.sh` (image-provided) | SSH-based build/upload/release/cleanup helpers from `darthjee/scripts:0.12.0`, on `PATH` in `vite_ward-base` (`/usr/local/sbin/`) and `darthjee/tent:1.1.0` (`/usr/sbin/`); no repo copy. Used by `upload_proxy_files`, `upload_fe_files`, `upload_extension`, `copy_proxy_configuration`, `release`. Every SSH job starts with the `setup_ssh` command, which fails when `SSH_KNOWN_HOSTS` is empty and then runs `deploy_frontend.sh generate_key_file` (host-key pinning, `StrictHostKeyChecking=yes`). See [Deployment](../deployment.md) |
 
 ## Migrations on production boot
 
