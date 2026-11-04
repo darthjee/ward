@@ -2,9 +2,9 @@
 
 [![Build Status](https://circleci.com/gh/darthjee/ward.svg?style=shield)](https://circleci.com/gh/darthjee/ward)
 
-**Current Version:** [0.0.1](https://github.com/darthjee/ward/releases/tag/0.0.1)
+**Current Version:** [0.1.0](https://github.com/darthjee/ward/releases/tag/0.1.0)
 
-**Next Release:** [0.1.0](https://github.com/darthjee/ward/compare/0.0.1...main)
+**Next Release:** [0.1.1](https://github.com/darthjee/ward/compare/0.1.0...main)
 
 ![ward](https://raw.githubusercontent.com/darthjee/ward/main/ward.png)
 
