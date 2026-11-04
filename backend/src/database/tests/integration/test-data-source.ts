@@ -75,6 +75,8 @@ export function testDataSourceOptions(env: NodeJS.ProcessEnv = process.env): Mys
     username: env.WARD_TEST_MYSQL_USER,
     password: env.WARD_TEST_MYSQL_PASSWORD,
     database,
+    // The throwaway test MySQL is plaintext — never inherit the app's TLS settings.
+    ssl: undefined,
     poolSize: 5,
     entities: ENTITIES,
     migrations: MIGRATIONS.map(({ migration }) => migration),

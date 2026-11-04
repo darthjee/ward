@@ -338,7 +338,8 @@ including the ones the pipeline doesn't use, is in
 `CIRCLE_WORKFLOW_WORKSPACE_ID` is set by CircleCI itself. The Render service's own variables are
 the backend runtime variables in
 [environment-variables.md](environment-variables.md#1-backend-application-runtime)
-(`NODE_ENV=production`, `WARD_SECRET_KEY`, `WARD_MYSQL_*`, `FRONTEND_BASE_URL` /
+(`NODE_ENV=production`, `WARD_SECRET_KEY`, `WARD_MYSQL_*` — including `WARD_MYSQL_SSL=true`,
+without which the backend refuses to boot — `FRONTEND_BASE_URL` /
 `WARD_ALLOWED_ORIGINS`, `WARD_EMAILS_ENABLED` and `WARD_EMAIL_*`). Render injects `PORT`.
 
 ## Provisioning checklist
@@ -353,6 +354,9 @@ Render service:
 - [ ] Docker command **`bin/server.sh`**.
 - [ ] The backend runtime variables set (see above). The database already exists; only its
       connection variables are set.
+- [ ] The MySQL host accepts TLS, and `WARD_MYSQL_SSL=true` is set (plus `WARD_MYSQL_SSL_CA`
+      when its certificate is not signed by a public CA). If the host has no TLS, use an SSH
+      tunnel or a TLS-capable host instead — never run production without it.
 - [ ] The service name matches `RENDER_SERVICE_NAME` (default `ward`).
 
 SSH host:

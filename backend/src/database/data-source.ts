@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import 'reflect-metadata';
 import { DataSource, DataSourceOptions } from 'typeorm';
+import { buildMysqlSslOptions } from './mysql-ssl.js';
 
 /**
  * TypeORM data source config, read once from env vars at process start —
@@ -16,6 +17,11 @@ import { DataSource, DataSourceOptions } from 'typeorm';
  *   its own options through `ConfigService` (DI-friendly, independently
  *   testable) rather than importing this module directly — see
  *   `src/app.module.ts`.
+ *
+ * The connection is TLS-encrypted when `WARD_MYSQL_SSL=true` (optionally
+ * verified against `WARD_MYSQL_SSL_CA`), via the shared
+ * `buildMysqlSslOptions` — which also refuses to build a plaintext config
+ * when `NODE_ENV=production`, so migrations run on Render are covered too.
  */
 export const dataSourceOptions: DataSourceOptions = {
   type: 'mysql',
@@ -24,6 +30,7 @@ export const dataSourceOptions: DataSourceOptions = {
   username: process.env.WARD_MYSQL_USER,
   password: process.env.WARD_MYSQL_PASSWORD,
   database: process.env.WARD_MYSQL_NAME,
+  ssl: buildMysqlSslOptions((key) => process.env[key]),
   poolSize: 5,
   entities: ['dist/**/*.entity.js'],
   // Only timestamp-prefixed files are migrations; `helpers.ts` (shared, non-migration exports) must not be loaded.
