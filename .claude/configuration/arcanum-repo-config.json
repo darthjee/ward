@@ -24,8 +24,7 @@
   "next_step": {
     "auto": {
       "enhance-issue": true,
-      "discuss-issue": true,
-      "auto-plan-issue": true
+      "discuss-issue": true
     },
     "clear": {
       "enhance-issue": true,
