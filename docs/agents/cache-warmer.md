@@ -63,24 +63,24 @@ endpoint is added, follow these rules:
 
 ## CI (CircleCI)
 
-`warm-up-cache` runs automatically after `release`, gated to version tags (`\d+\.\d+\.\d+`). It
-uses `darthjee/navi-hey-client:latest` directly as the executor and runs `infra`'s
-`scripts/warm_navi_cache.sh` in two steps: `config` (pushes every file listed in that script's
-`RESOURCE_FILES` array — currently just `clients.yml` — via one `navi-client -a config --file
-...` call per file) and `engine-start` (triggers the warm-up for the build's namespace). See
-[`external/HOW_TO_USE_NAVI-CLIENT.md`](external/HOW_TO_USE_NAVI-CLIENT.md) for the `navi-client`
-CLI/library reference.
+No CircleCI job warms the cache yet. Navi warm-up is out of scope for the release pipeline
+(see [deployment.md](deployment.md)): `.circleci/config.yml` has no `warm-up-cache` or
+`wake-navi` job, and nothing runs after `release`. The scripts such a job would use already
+exist and are owned by `infra`:
 
-`wake-navi` runs `infra`'s `scripts/wake_navi.sh` early in the workflow (no `requires:`, so it
-doesn't gate or get gated by anything) to ping `$NAVI_URL` awake before `warm-up-cache` needs
-it, retrying while the server responds `502`.
+- `scripts/warm_navi_cache.sh` runs in two steps: `config` (pushes every file listed in its
+  `RESOURCE_FILES` array — currently just `clients.yml` — via one `navi-client -a config --file
+  ...` call per file) and `engine-start` (triggers the warm-up for the build's namespace). It is
+  meant to run on `darthjee/navi-hey-client:latest`. See
+  [`external/HOW_TO_USE_NAVI-CLIENT.md`](external/HOW_TO_USE_NAVI-CLIENT.md) for the
+  `navi-client` CLI/library reference.
+- `scripts/wake_navi.sh` pings `$NAVI_URL` awake, retrying while the server responds `502`.
 
-Namespace resolution: every included resource file declares `namespace: $NAVI_NAMEPACE`. In CI,
-`infra`'s `warm-up-cache` job computes
-`NAVI_NAMEPACE="${WARD_NAMESPACE}-${CIRCLE_WORKFLOW_WORKSPACE_ID}"` before invoking
-`navi-client`, so each build gets its own namespace slice. `$WARD_NAMESPACE`, `$NAVI_URL`,
-and `$NAVI_API_TOKEN` must be set in the CircleCI project settings (Project Settings →
-Environment Variables), the same convention used for `$WARD_PRODUCTION_URL`.
+If a warm-up job is added, it should run after `release`, gated to version tags
+(`\d+\.\d+\.\d+`), and compute `NAVI_NAMEPACE="${WARD_NAMESPACE}-${CIRCLE_WORKFLOW_WORKSPACE_ID}"`
+so each build gets its own namespace slice (every included resource file declares
+`namespace: $NAVI_NAMEPACE`). `$WARD_NAMESPACE`, `$NAVI_URL` and `$NAVI_API_TOKEN` would then be
+set in the CircleCI project settings (Project Settings → Environment Variables).
 
 ## Local testing (Docker Compose)
 

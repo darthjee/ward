@@ -100,8 +100,8 @@ toggle) — don't look for a production equivalent, there isn't one.
 
 ## 3. Cache warmer (Navi)
 
-Used by the `ward_navi` compose service and the CI `warm-up-cache`/`wake-navi` jobs (see
-`docs/agents/cache-warmer.md`):
+Used by the `ward_navi` compose service and the Navi scripts (`scripts/warm_navi_cache.sh`,
+`scripts/wake_navi.sh`). No CircleCI job warms the cache yet (see `docs/agents/cache-warmer.md`):
 
 | Variable | Purpose | Source |
 |---|---|---|
@@ -112,28 +112,35 @@ Used by the `ward_navi` compose service and the CI `warm-up-cache`/`wake-navi` j
 ## 4. CircleCI project variables (deploy pipeline)
 
 Not part of any `.env` file — set directly in CircleCI's project (or org) settings, consumed as
-plain shell env vars by `scripts/`/`bin/` during CI jobs. `.circleci/config.yml`'s release chain
-(`build-and-release`, `upload_proxy_files`, `copy_proxy_configuration`, `upload_extension`,
-`upload_fe_files`, `release`), gated to semver tag pushes, requires every variable below. No real
-Render service or SSH deploy host exists for Ward yet, though — provisioning that
-infrastructure and filling in these values is a separate, not-yet-done step; until then, a tag
-push runs the jobs but they fail against unset/placeholder credentials.
+plain shell env vars by `scripts/`/`bin/` and the image-provided `deploy_frontend.sh` during CI
+jobs. `.circleci/config.yml`'s release chain (`build-and-release`, `upload_proxy_files`,
+`upload_extension`, `copy_proxy_configuration`, `upload_fe_files`, `release`), gated to semver tag
+pushes, needs every variable below except the Navi, `WARD_NAMESPACE` and `CODACY_PROJECT_TOKEN`
+rows. Filling them in is part of the one-time manual setup — see the
+[provisioning checklist](deployment.md#provisioning-checklist) in `deployment.md`, which also
+says how to get each value.
 
 | Variable | Purpose | Used by |
 |---|---|---|
-| `DOCKER_ID_USER` | Docker Hub namespace for pushed images (frontend/proxy only — the backend image is never published, see `docs/agents/architecture/backend.md`). | `bin/image.sh` |
-| `DOCKER_HUB_USERNAME` / `DOCKER_HUB_PASSWORD` | Docker Hub login for pushing images. | `bin/image.sh` |
-| `RENDER_API_KEY` | Authenticates Render API calls (trigger/watch deploys). | `scripts/render.sh` |
-| `RENDER_SERVICE_NAME` | Which Render service to deploy (defaults to `ward`). | `scripts/render.sh` |
-| `SSH_PRIVATE_KEY` | SSH key for the proxy/static-asset deploy host. | `deploy_frontend.sh` (image-provided, `darthjee/scripts:0.12.0`) |
-| `SSH_HOST` / `SSH_PORT` / `SSH_USER` | ditto | `deploy_frontend.sh` (image-provided, `darthjee/scripts:0.12.0`) |
-| `SSH_REMOTE_DIR` | Live path on the deploy host, atomically swapped on release (the previous release is kept as `${SSH_REMOTE_DIR}_old_<epoch>`). | `deploy_frontend.sh` (image-provided, `darthjee/scripts:0.12.0`) |
-| `SSH_REMOTE_TEMP_DIR` | Workspace-scoped staging path before the atomic swap; stale `${SSH_REMOTE_TEMP_DIR}-*` folders are removed by `cleanup`. | `deploy_frontend.sh` (image-provided, `darthjee/scripts:0.12.0`) |
-| `SSH_KNOWN_HOSTS` | Pinned host key(s) of the deploy host (`ssh-keyscan -p <port> <host>` output). Required: the `setup_ssh` CircleCI command fails when it is empty. | `setup_ssh` + `deploy_frontend.sh` (image-provided, `darthjee/scripts:0.12.0`) |
-| `NAVI_URL` | Navi server URL for cache warm-up and wake calls. | `scripts/warm_navi_cache.sh`, `scripts/wake_navi.sh` |
-| `NAVI_API_TOKEN` | Auth token for Navi's `navi-client`. | `scripts/warm_navi_cache.sh` |
+| `DOCKER_ID_USER` | Docker Hub namespace the four base images (`ward-base`, `circleci_ward-base`, `production_ward-base`, `vite_ward-base`) are pushed to. The backend app image is never published — Render builds it (see `docs/agents/deployment.md`). | `bin/image.sh` (`release-image`) |
+| `DOCKER_HUB_USERNAME` / `DOCKER_HUB_PASSWORD` | Docker Hub login for pushing the base images. | `bin/image.sh` (`release-image`) |
+| `RENDER_API_KEY` | Authenticates Render API calls (repoint the deploy branch, trigger and watch the deploy). | `scripts/render.sh` (`build-and-release`) |
+| `RENDER_SERVICE_NAME` | Which Render service to deploy (defaults to `ward`); no service with that name fails the job. | `scripts/render.sh`, `scripts/deploy.sh` (`build-and-release`) |
+| `SSH_HOST` / `SSH_PORT` / `SSH_USER` | Connection to the SSH deploy host (proxy + static files). | `deploy_frontend.sh` (image-provided, `darthjee/scripts:0.12.0`), every SSH job |
+| `SSH_PRIVATE_KEY` | Deploy-only private key for that host. | `deploy_frontend.sh generate_key_file`, run by the `setup_ssh` command in every SSH job |
+| `SSH_KNOWN_HOSTS` | Pinned host key(s) of the deploy host (`ssh-keyscan -p <port> <host>` output); SSH runs with `StrictHostKeyChecking=yes`. Required: the `setup_ssh` CircleCI command fails when it is empty. | `setup_ssh` + `deploy_frontend.sh`, every SSH job |
+| `SSH_REMOTE_DIR` | Live path on the deploy host, swapped on release (the previous release is kept as `${SSH_REMOTE_DIR}_old_<epoch>`). | `deploy_frontend.sh` (`copy_proxy_configuration`, `release`) |
+| `SSH_REMOTE_TEMP_DIR` | Prefix of the workflow's staging directory (`${SSH_REMOTE_TEMP_DIR}-${CIRCLE_WORKFLOW_WORKSPACE_ID}`); stale `${SSH_REMOTE_TEMP_DIR}-*` directories are removed by `cleanup`. | `deploy_frontend.sh`, every SSH job |
+| `NAVI_URL` | Navi server URL for cache warm-up and wake calls. | `scripts/warm_navi_cache.sh`, `scripts/wake_navi.sh` — not run by any CircleCI job yet (see `docs/agents/cache-warmer.md`). |
+| `NAVI_API_TOKEN` | Auth token for Navi's `navi-client`. | `scripts/warm_navi_cache.sh` — not run by any CircleCI job yet. |
 | `WARD_NAMESPACE` | Combined with the CircleCI workspace ID to build a per-build Navi namespace. | Not yet consumed — reserved for a future `warm-up-cache` job (cache warm-up is out of scope for the current release chain; see `docs/agents/cache-warmer.md`). |
 | `CODACY_PROJECT_TOKEN` | Coverage upload target, read implicitly by Codacy's own uploader script. | `backend_tests`/`jasmine` CI jobs |
+
+`CIRCLE_WORKFLOW_WORKSPACE_ID` is set by CircleCI itself and suffixes the staging directory. The
+per-call `deploy_frontend.sh` variables (`SOURCE`, `DEPLOY_PATH`, `TARGET`, `EXCLUDE_FROM`,
+`KEEP_OLD`, `CLEANUP_MAX_AGE_MINUTES`) are set inline in `.circleci/config.yml`, not in the
+project settings — see `docs/agents/deployment.md`. The Render service itself needs the backend
+runtime variables of §1; the SSH host needs no environment variables (§2).
 
 ## Keeping this doc honest
 
