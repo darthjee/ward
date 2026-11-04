@@ -277,12 +277,10 @@ jobs:
     working_directory: /home/app/app
     steps:
       - checkout
-      - run:
-          name: Generate key file
-          command: bin/deploy_frontend.sh generate_key_file
+      - setup_ssh
       - run:
           name: Upload proxy files
-          command: SOURCE=/var/www/html/ bin/deploy_frontend.sh upload
+          command: SOURCE=/var/www/html/ deploy_frontend.sh upload
 
   # Uploads the production proxy configuration, then copies over server-side state that only
   # ever lives on the host (locals.php with real secrets, and .htaccess for the Apache front
@@ -293,35 +291,29 @@ jobs:
     working_directory: /home/app/app
     steps:
       - checkout
-      - run:
-          name: Generate key file
-          command: bin/deploy_frontend.sh generate_key_file
+      - setup_ssh
       - run:
           name: Upload proxy configuration
-          command: SOURCE=proxy/prod_configuration/ DEPLOY_PATH=configuration/ bin/deploy_frontend.sh upload
+          command: SOURCE=proxy/prod_configuration/ DEPLOY_PATH=configuration/ deploy_frontend.sh upload
       - run:
           name: Setup locals
-          command: TARGET=configuration/locals.php DEPLOY_PATH=configuration/ bin/deploy_frontend.sh copy_files
+          command: TARGET=configuration/locals.php DEPLOY_PATH=configuration/ deploy_frontend.sh copy_files
       - run:
           name: Setup .htaccess
-          command: TARGET=.htaccess DEPLOY_PATH=./ bin/deploy_frontend.sh copy_files
+          command: TARGET=.htaccess DEPLOY_PATH=./ deploy_frontend.sh copy_files
 
-  # Uploads the Tent proxy extension, stripped of its test suite (not needed at runtime).
+  # Uploads the Tent proxy extension, excluding its test suite (not needed at runtime) via
+  # proxy/extension.exclude.
   upload_extension:
     docker:
       - image: darthjee/tent:1.1.0
     working_directory: /home/app/app
     steps:
       - checkout
-      - run:
-          name: Generate key file
-          command: bin/deploy_frontend.sh generate_key_file
-      - run:
-          name: Remove test files
-          command: rm -rf proxy/extension/tests/
+      - setup_ssh
       - run:
           name: Upload proxy extension
-          command: SOURCE=proxy/extension/ DEPLOY_PATH=extension/ bin/deploy_frontend.sh upload
+          command: SOURCE=proxy/extension/ DEPLOY_PATH=extension/ EXCLUDE_FROM=proxy/extension.exclude deploy_frontend.sh upload
 
   # Builds the Vite frontend and uploads the static build output to the SSH deploy host's
   # workspace-scoped temp dir — staged, not yet swapped live (see the `release` job below).
@@ -334,16 +326,11 @@ jobs:
           dir: frontend
       - run:
           name: Build assets
-          command: bin/deploy_frontend.sh build
-      - run:
-          name: Generate key file
-          command: bin/deploy_frontend.sh generate_key_file
-      - run:
-          name: Generate folder
-          command: DEPLOY_PATH=static/ bin/deploy_frontend.sh generate_folder
+          command: deploy_frontend.sh build
+      - setup_ssh
       - run:
           name: Upload assets
-          command: SOURCE=dist/ DEPLOY_PATH=static/ bin/deploy_frontend.sh upload
+          command: SOURCE=dist/ DEPLOY_PATH=static/ deploy_frontend.sh upload
 
   # Atomic swap: only runs once every upload/build job above (and the backend's
   # build-and-release, which blocks until Render reports "live") has succeeded, so frontend,
@@ -354,9 +341,10 @@ jobs:
       - image: darthjee/vite_ward-base:0.2.0
     steps:
       - checkout
-      - run:
-          name: Generate key file
-          command: bin/deploy_frontend.sh generate_key_file
+      - setup_ssh
       - run:
           name: Release assets
-          command: bin/deploy_frontend.sh release
+          command: KEEP_OLD=true deploy_frontend.sh release
+      - run:
+          name: Clean up stale staging folders
+          command: deploy_frontend.sh cleanup
