@@ -54,7 +54,8 @@ from rebuilding on every tag — `skip_if_unchanged` diffs `dockerfiles/base/` a
 a change to either rebuilds all four; `FORCE_IMAGE_BUILD` bypasses both guards when a forced
 rebuild/republish is needed.
 
-`backend_tests`/`backend_checks` now run from the published `darthjee/circleci_ward-base:0.2.0`
+`backend_tests`/`backend_checks` now run from the published `darthjee/circleci_ward-base:0.1.0`
+(kept on the published tag until a tag build publishes `0.2.0`, the version in the root `version` file)
 image (pinned to the version in the root `version` file, not `:latest`), `requires:`-gated on
 `release-circleci_ward-base`/`release-circleci_ward-base-arm64` so they wait for a fresh
 publish on tag builds; `yarn install` still runs but reads from the base image's pre-warmed cache

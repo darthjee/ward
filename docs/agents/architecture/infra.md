@@ -103,15 +103,20 @@ workflow at all — nothing downstream depends on it being fresh.
 
 ## CI jobs
 
+The every-push jobs on `circleci_ward-base` (`backend_tests`, `backend_integration`,
+`backend_checks`, `coverage-final`) stay pinned to the published `0.1.0` until the first tag
+build publishes `0.2.0` (the version in `version`); `release-image` is a no-op on branch
+builds, so a pin to an unpublished tag fails to pull. Move them to `0.2.0` once it exists.
+
 | Job | Image/Executor | Filter | Purpose |
 |-----|-----------------|--------|---------|
-| `backend_tests` | `darthjee/circleci_ward-base:0.2.0` | every push | `yarn_project` instance (`dir: backend`, `script: coverage`, `upload_coverage: true`): backend test suite + coverage; uploads a partial Codacy coverage report afterward (best-effort, non-blocking) |
-| `backend_integration` | `darthjee/circleci_ward-base:0.2.0` + `mysql:9.3.0` service container | every push | Standalone job (not a `yarn_project` instance, since it needs a second image): `setup_project` (`dir: backend`), then `npm run test:integration` — the `*.integration-spec.ts` suite against a throwaway MySQL database (`ward_test`, reached at `127.0.0.1:3306` via the job-level `WARD_TEST_MYSQL_*` env). No wait step (the suite's Jest `globalSetup` retries the connection) and no coverage upload |
-| `backend_checks` | `darthjee/circleci_ward-base:0.2.0` | every push | `yarn_project` instance (`dir: backend`, `script: lint`): backend ESLint |
+| `backend_tests` | `darthjee/circleci_ward-base:0.1.0` | every push | `yarn_project` instance (`dir: backend`, `script: coverage`, `upload_coverage: true`): backend test suite + coverage; uploads a partial Codacy coverage report afterward (best-effort, non-blocking) |
+| `backend_integration` | `darthjee/circleci_ward-base:0.1.0` + `mysql:9.3.0` service container | every push | Standalone job (not a `yarn_project` instance, since it needs a second image): `setup_project` (`dir: backend`), then `npm run test:integration` — the `*.integration-spec.ts` suite against a throwaway MySQL database (`ward_test`, reached at `127.0.0.1:3306` via the job-level `WARD_TEST_MYSQL_*` env). No wait step (the suite's Jest `globalSetup` retries the connection) and no coverage upload |
+| `backend_checks` | `darthjee/circleci_ward-base:0.1.0` | every push | `yarn_project` instance (`dir: backend`, `script: lint`): backend ESLint |
 | `jasmine` | `darthjee/circleci_node:0.2.1` | every push | `yarn_project` instance (`dir: frontend`, `script: coverage`, `upload_coverage: true`): frontend test suite + coverage; uploads a partial Codacy coverage report afterward (best-effort, non-blocking) |
 | `frontend-checks` | `darthjee/circleci_node:0.2.1` | every push | `yarn_project` instance (`dir: frontend`, `script: lint`): frontend ESLint |
 | `proxy_extension_tests` | `darthjee/tent-test:1.1.0` | every push | PHPUnit tests for `proxy/extension/` |
-| `coverage-final` | `darthjee/circleci_ward-base:0.2.0` | every push | Finalizes the aggregated Codacy coverage report once `backend_tests`/`jasmine`'s partial uploads land (best-effort, non-blocking) |
+| `coverage-final` | `darthjee/circleci_ward-base:0.1.0` | every push | Finalizes the aggregated Codacy coverage report once `backend_tests`/`jasmine`'s partial uploads land (best-effort, non-blocking) |
 | `release-image` | machine (multi-arch: amd64 + arm64) | every push (no-op unless tag) | Publishes one of the 4 base images to Docker Hub via `bin/image.sh`; instantiated through a single workflow `matrix` (4 images × 2 archs = 8 jobs) — see below |
 | `build-and-release` | `machine: image: ubuntu-2204:current` | tag only | Triggers the Render deploy of the backend (`scripts/deploy.sh`), blocks until it reports "live" |
 | `upload_proxy_files` | `darthjee/tent:1.1.0` | tag only | Uploads Tent proxy runtime to the SSH deploy host's staging dir |
