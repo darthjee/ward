@@ -55,8 +55,8 @@ a change to either rebuilds all four; `FORCE_IMAGE_BUILD` bypasses both guards w
 rebuild/republish is needed.
 
 `backend_tests`/`backend_checks` now run from the published `darthjee/circleci_ward-base:0.1.0`
-(kept on the published tag until a tag build publishes `0.2.0`, the version in the root `version` file)
-image (pinned to the version in the root `version` file, not `:latest`), `requires:`-gated on
+image (an explicit published tag, not `:latest`; it moves to `0.2.0`, the version in the root `version`
+file, once a tag build publishes it), `requires:`-gated on
 `release-circleci_ward-base`/`release-circleci_ward-base-arm64` so they wait for a fresh
 publish on tag builds; `yarn install` still runs but reads from the base image's pre-warmed cache
 instead of a cold network install. `jasmine`/`frontend-checks` intentionally stay on the generic
