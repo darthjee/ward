@@ -15,6 +15,7 @@ import { LoggingModule } from './core/logging.module.js';
 import { OriginGuard } from './core/origin.guard.js';
 import { RequestContextMiddleware } from './core/request-context.middleware.js';
 import { buildSecretKeys } from './core/secret-keys.js';
+import { buildMysqlSslOptions } from './database/mysql-ssl.js';
 import { HealthController } from './health/health.controller.js';
 import { HealthService } from './health/health.service.js';
 import { MailModule } from './mail/mail.module.js';
@@ -67,6 +68,10 @@ export function buildJwtSignOptions(configService: ConfigService): { expiresIn: 
  * `ValidationPipe` failures, guard rejections and unexpected exceptions —
  * into the standard `{ error: { code, message, details? }, statusCode,
  * timestamp }` body.
+ *
+ * The MySQL connection is TLS-encrypted when `WARD_MYSQL_SSL=true` (see
+ * `database/mysql-ssl.ts`, shared with the TypeORM CLI's `data-source.ts`);
+ * boot fails when `NODE_ENV=production` and TLS is off.
  */
 @Module({
   imports: [
@@ -85,6 +90,7 @@ export function buildJwtSignOptions(configService: ConfigService): { expiresIn: 
         username: configService.get<string>('WARD_MYSQL_USER'),
         password: configService.get<string>('WARD_MYSQL_PASSWORD'),
         database: configService.get<string>('WARD_MYSQL_NAME'),
+        ssl: buildMysqlSslOptions((key) => configService.get<string>(key)),
         autoLoadEntities: true,
         synchronize: false,
         poolSize: 5,
