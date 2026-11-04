@@ -123,6 +123,21 @@ commands:
       - run:
           name: Yarn install
           command: yarn install
+  # Writes the SSH key and pins the host key for deploy_frontend.sh. Fails fast when
+  # SSH_KNOWN_HOSTS is empty: the script would otherwise silently fall back to
+  # StrictHostKeyChecking=no.
+  setup_ssh:
+    steps:
+      - run:
+          name: Check SSH_KNOWN_HOSTS
+          command: |
+            if [ -z "${SSH_KNOWN_HOSTS:-}" ]; then
+              echo "SSH_KNOWN_HOSTS is not set; refusing to deploy without host-key pinning" >&2
+              exit 1
+            fi
+      - run:
+          name: Generate SSH key file
+          command: deploy_frontend.sh generate_key_file
 jobs:
   # Minimal bootstrap CI: backend, frontend and proxy-extension tests/lint. The release chain
   # (build/upload/deploy) lives further down in this same file, gated to semver tag pushes only.
