@@ -25,6 +25,7 @@ For a short abstract of each doc's content, see [summary.md](summary.md) instead
 - [Issue Enhancement](issue-enhancement.md)
 - [Arcanum Split Issue](arcanum-split-issue.md)
 - [Environment Variables](environment-variables.md)
+- [Deployment](deployment.md)
 
 ## External tooling
 

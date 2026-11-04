@@ -54,6 +54,10 @@ full file before loading it. For a bare link-only table of contents instead, see
   deployment needs: backend runtime (Render), the cache warmer, and CircleCI deploy-pipeline
   secrets — with each one marked as actually consumed by code or still reserved. Update it
   whenever a "reserved" var gets wired up or a new one is added.
+- **[Deployment](deployment.md)** — Operator guide for tag releases: every CircleCI variable the
+  deploy needs (where to set it, what it is for, how to get it, e.g. `ssh-keyscan` for
+  `SSH_KNOWN_HOSTS`), plus rollout notes (host-key pinning must be set first, kept
+  `_old_<epoch>` releases are pruned by hand). Links to `specs/deploy/` for the design.
 
 ## API caching
 

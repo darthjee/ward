@@ -26,6 +26,7 @@ This page is the hub. See the area pages for details:
   `Cache-Control` policy, freshness/invalidation semantics, and what Navi may warm.
 - [Security](./architecture/security.md) — cross-cutting security posture, starting with CSRF
   (the `SameSite=Strict` cookie, the CORS allowlist and the global `OriginGuard`).
+- [Deployment](./deployment.md) — operator guide for releases: deploy variables and rollout notes.
 - [Infra](./architecture/infra.md) — the CircleCI release pipeline's job graph (test/lint jobs,
   the semver-tag-gated release chain, and the base-image publish jobs feeding it).
 

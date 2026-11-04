@@ -125,10 +125,11 @@ push runs the jobs but they fail against unset/placeholder credentials.
 | `DOCKER_HUB_USERNAME` / `DOCKER_HUB_PASSWORD` | Docker Hub login for pushing images. | `bin/image.sh` |
 | `RENDER_API_KEY` | Authenticates Render API calls (trigger/watch deploys). | `scripts/render.sh` |
 | `RENDER_SERVICE_NAME` | Which Render service to deploy (defaults to `ward`). | `scripts/render.sh` |
-| `SSH_PRIVATE_KEY` | SSH key for the proxy/static-asset deploy host. | `bin/deploy_frontend.sh` |
-| `SSH_HOST` / `SSH_PORT` / `SSH_USER` | ditto | `bin/deploy_frontend.sh` |
-| `SSH_REMOTE_DIR` | Live path on the deploy host, atomically swapped on release. | `bin/deploy_frontend.sh` |
-| `SSH_REMOTE_TEMP_DIR` | Workspace-scoped staging path before the atomic swap. | `bin/deploy_frontend.sh` |
+| `SSH_PRIVATE_KEY` | SSH key for the proxy/static-asset deploy host. | `deploy_frontend.sh` (image-provided, `darthjee/scripts:0.12.0`) |
+| `SSH_HOST` / `SSH_PORT` / `SSH_USER` | ditto | `deploy_frontend.sh` (image-provided, `darthjee/scripts:0.12.0`) |
+| `SSH_REMOTE_DIR` | Live path on the deploy host, atomically swapped on release (the previous release is kept as `${SSH_REMOTE_DIR}_old_<epoch>`). | `deploy_frontend.sh` (image-provided, `darthjee/scripts:0.12.0`) |
+| `SSH_REMOTE_TEMP_DIR` | Workspace-scoped staging path before the atomic swap; stale `${SSH_REMOTE_TEMP_DIR}-*` folders are removed by `cleanup`. | `deploy_frontend.sh` (image-provided, `darthjee/scripts:0.12.0`) |
+| `SSH_KNOWN_HOSTS` | Pinned host key(s) of the deploy host (`ssh-keyscan -p <port> <host>` output). Required: the `setup_ssh` CircleCI command fails when it is empty. | `setup_ssh` + `deploy_frontend.sh` (image-provided, `darthjee/scripts:0.12.0`) |
 | `NAVI_URL` | Navi server URL for cache warm-up and wake calls. | `scripts/warm_navi_cache.sh`, `scripts/wake_navi.sh` |
 | `NAVI_API_TOKEN` | Auth token for Navi's `navi-client`. | `scripts/warm_navi_cache.sh` |
 | `WARD_NAMESPACE` | Combined with the CircleCI workspace ID to build a per-build Navi namespace. | Not yet consumed — reserved for a future `warm-up-cache` job (cache warm-up is out of scope for the current release chain; see `docs/agents/cache-warmer.md`). |
