@@ -113,7 +113,7 @@ workflow at all — nothing downstream depends on it being fresh.
 | `proxy_extension_tests` | `darthjee/tent-test:1.1.0` | every push | PHPUnit tests for `proxy/extension/` |
 | `coverage-final` | `darthjee/circleci_ward-base:0.1.0` | every push | Finalizes the aggregated Codacy coverage report once `backend_tests`/`jasmine`'s partial uploads land (best-effort, non-blocking) |
 | `release-image` | machine (multi-arch: amd64 + arm64) | every push (no-op unless tag) | Publishes one of the 4 base images to Docker Hub via `bin/image.sh`; instantiated through a single workflow `matrix` (4 images × 2 archs = 8 jobs) — see below |
-| `build-and-release` | machine | tag only | Triggers the Render deploy of the backend (`scripts/deploy.sh`), blocks until it reports "live" |
+| `build-and-release` | `machine: image: ubuntu-2204:current` | tag only | Triggers the Render deploy of the backend (`scripts/deploy.sh`), blocks until it reports "live" |
 | `upload_proxy_files` | `darthjee/tent:1.1.0` | tag only | Uploads Tent proxy runtime to the SSH deploy host's staging dir |
 | `upload_fe_files` | `darthjee/vite_ward-base:0.1.0` | tag only | Builds the Vite frontend, uploads the static output to the staging dir |
 | `upload_extension` | `darthjee/tent:1.1.0` | tag only | Uploads the proxy PHP extension (test files stripped) |
@@ -227,13 +227,15 @@ docker-compose run --rm circleci config process .circleci/config.yml   # expande
 
 ## Migrations on production boot
 
-`dockerfiles/production_ward/Dockerfile` sets `dockerfiles/production_ward/entrypoint.sh`
-as its `ENTRYPOINT`. On container start, the entrypoint runs `yarn migration:run` first and,
-because it's a `set -e` `/bin/sh` script, any migration failure aborts immediately with a
-non-zero exit — `node dist/main.js` (invoked via `exec`, so it replaces the shell as PID 1) never
-runs against a broken/partial schema. This applies only to the production image; the dev/test
-containers (`ward_app`, `ward_tests`) and `make setup` are unchanged and still run
-migrations manually.
+`dockerfiles/production_ward/Dockerfile` runs `CMD ["bin/server.sh"]` from `/home/node/app`,
+with `ENTRYPOINT []` clearing the node base image's `docker-entrypoint.sh` (Render's Docker
+command is also `bin/server.sh`). `backend/bin/server.sh` runs `yarn migration:run:prod`
+(`typeorm migration:run -d dist/database/data-source.js` — compiled JS, so no ts-node/TypeScript
+is needed after `yarn install --production`) and, because it's a `set -e` `/bin/sh` script, any
+migration failure aborts immediately with a non-zero exit — `node dist/main.js` (invoked via
+`exec`, so it replaces the shell as PID 1) never runs against a broken/partial schema. This
+applies only to the production image; the dev/test containers (`ward_app`, `ward_tests`) and
+`make setup` are unchanged and still run migrations manually with the ts-node `migration:run`.
 
 This issue does not add automated migration-revert tooling. If a deploy that included a new
 migration is rolled back, the newer migration's schema changes remain in the database — reverting
