@@ -10,24 +10,25 @@ The backend deploy to Render. Owned by [#14](https://github.com/darthjee/ward/is
 
 ## Start: `backend/bin/server.sh`
 
-- New `backend/bin/server.sh`:
-  1. runs `migration:run:prod`, a new backend script:
+- `backend/bin/server.sh` (committed executable) `cd`s to the app root, then:
+  1. runs `migration:run:prod`, a backend script:
      `typeorm migration:run -d dist/database/data-source.js` (compiled JS, no `ts-node` in
      production);
   2. then `exec node dist/main.js`.
 - It **fails fast** (`set -e`): a failed migration stops the container, so Render marks the
   deploy failed instead of serving on an unmigrated schema.
-- The image uses `CMD ["bin/server.sh"]` with **no `ENTRYPOINT`** (replacing today's
-  `entrypoint.sh` entrypoint, which runs `yarn migration:run`). The Render Docker command is
-  `bin/server.sh`.
+- The image uses `CMD ["bin/server.sh"]` with an empty `ENTRYPOINT` (`ENTRYPOINT []` clears the
+  `docker-entrypoint.sh` inherited from the node base image), run from `/home/node/app`. The
+  Render Docker command is `bin/server.sh`. The dev `migration:run` / `migration:revert`
+  (ts-node) scripts are unchanged.
 
 ## Deploy: `scripts/deploy.sh`
 
-- `build-and-release` runs `checkLastVersion` **before** `update_deploy_branch`, so a tag older
-  than the one already deployed is not released.
+- `update_deploy_branch` runs `checkLastVersion` **before** repointing the service, so when HEAD
+  is not the tag the job exits 0 without touching Render.
 - It then triggers the deploy and **polls it until `live`**.
 - Failure states: `build_failed`, `update_failed`, `pre_deploy_failed`, `canceled`,
-  `deactivated` all exit 1 and fail the job (`pre_deploy_failed` is new).
+  `deactivated` all exit 1 and fail the job.
 
 ## Executor and hardening
 
@@ -36,7 +37,9 @@ The backend deploy to Render. Owned by [#14](https://github.com/darthjee/ward/is
 - `scripts/render.sh` calls the API with `curl --fail-with-body`, so a Render API error fails the
   job and prints the error body.
 - `scripts/deploy.sh` exits 1 when `service_id` finds no service named `$RENDER_SERVICE_NAME`,
-  instead of sending `PATCH /v1/services/` with an empty id.
+  instead of sending `PATCH /v1/services/` with an empty id (`required_service_id`, used by every
+  caller). Both scripts set `pipefail`, so an API failure inside a `request | jq` pipeline fails
+  the job.
 
 ## Reference
 

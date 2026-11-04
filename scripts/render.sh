@@ -1,12 +1,17 @@
 #!/bin/bash
 
+# Let `request | jq | sed` pipelines (e.g. service_id) report the curl failure
+# instead of the exit status of their last command.
+set -o pipefail
+
 RENDER_SERVICE_NAME="${RENDER_SERVICE_NAME:-ward}"
 
 function request() {
   METHOD=$1
   URL=$2
 
-  curl --request "$METHOD" \
+  curl --fail-with-body \
+    --request "$METHOD" \
     --url "$URL" \
     --header 'Accept: application/json' \
     --header "Authorization: Bearer $RENDER_API_KEY"
@@ -36,6 +41,7 @@ function service_id() {
 }
 
 function last_deployment() {
+  SERVICE_ID=$1
   request \
     GET "https://api.render.com/v1/services/$SERVICE_ID/deploys?limit=1" | jq '.[0]'
 }
@@ -56,7 +62,8 @@ function deployment_status() {
 function update_service_branch() {
   SERVICE_ID=$1
   BRANCH=$2
-  curl --request PATCH \
+  curl --fail-with-body \
+    --request PATCH \
     --url "https://api.render.com/v1/services/$SERVICE_ID" \
     --header 'Accept: application/json' \
     --header 'Content-Type: application/json' \

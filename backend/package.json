@@ -12,6 +12,7 @@
     "start:dev": "nest start --watch",
     "migration:run": "typeorm-ts-node-esm migration:run -d src/database/data-source.ts",
     "migration:revert": "typeorm-ts-node-esm migration:revert -d src/database/data-source.ts",
+    "migration:run:prod": "typeorm migration:run -d dist/database/data-source.js",
     "test": "jest",
     "coverage": "jest --coverage",
     "test:integration": "jest --config jest.integration.config.mjs --runInBand",

@@ -20,6 +20,7 @@ RUN find src -type d -name tests -exec rm -rf {} +
 # FINAL IMAGE
 FROM base
 ENV HOME_DIR /home/node
+WORKDIR /home/node/app
 
 COPY --chown=node:node --from=builder /home/node/yarn/new/ /usr/local/share/.cache/yarn/v6/
 COPY --chown=node:node --from=builder /home/node/app/ /home/node/app/
@@ -28,6 +29,7 @@ USER node
 
 RUN yarn install --production
 
-COPY --chown=node:node ./dockerfiles/production_ward/entrypoint.sh /home/node/app/entrypoint.sh
-
-ENTRYPOINT ["/home/node/app/entrypoint.sh"]
+# Clear the docker-entrypoint.sh inherited from the node base image so the
+# command (bin/server.sh, also Render's Docker command) runs directly.
+ENTRYPOINT []
+CMD ["bin/server.sh"]

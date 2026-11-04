@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# Propagate Render API failures (curl --fail-with-body) through `request | jq` pipelines
+set -o pipefail
+
 source "scripts/render.sh"
 
 function isLatestCommit() {
@@ -21,18 +24,35 @@ function checkLastVersion() {
   fi
 }
 
+# Sets the global SERVICE_ID, failing loudly when the Render API call fails or
+# no service named $RENDER_SERVICE_NAME exists. Runs in the caller's shell (no
+# command substitution around it) so `exit` ends the whole script.
+function required_service_id() {
+  SERVICE_ID=$(service_id) || {
+    echo "Failed to fetch the Render services" >&2
+    exit 1
+  }
+
+  if [ -z "$SERVICE_ID" ]; then
+    echo "No Render service named \"$RENDER_SERVICE_NAME\" found" >&2
+    exit 1
+  fi
+}
+
 function check_deployment_status() {
   SERVICE_ID=$1
   DEPLOYMENT_ID=$2
-  STATUS=$(deployment_status "$SERVICE_ID" "$DEPLOYMENT_ID")
+  STATUS=$(deployment_status "$SERVICE_ID" "$DEPLOYMENT_ID") || exit 1
   echo "DEPLOYMENT STATUS $STATUS"
 
   if [ "$STATUS" == "live" ]; then
     exit 0;
   elif [ "$STATUS" == "build_failed" ] ||
     [ "$STATUS" == "update_failed" ] ||
+    [ "$STATUS" == "pre_deploy_failed" ] ||
     [ "$STATUS" == "canceled" ] ||
     [ "$STATUS" == "deactivated" ]; then
+    echo "Deployment failed with status $STATUS" >&2
     exit 1;
   else
     return 0;
@@ -61,8 +81,8 @@ function watch_deployment() {
 }
 
 function force_deploy() {
-  SERVICE_ID=$(service_id)
-  DEPLOYMENT_ID=$(deploy "$SERVICE_ID" | jq '.id' | sed -e 's/"//g')
+  required_service_id
+  DEPLOYMENT_ID=$(deploy "$SERVICE_ID" | jq '.id' | sed -e 's/"//g') || exit 1
   watch_deployment "$SERVICE_ID" "$DEPLOYMENT_ID"
 }
 
@@ -72,14 +92,15 @@ function run_deploy() {
 }
 
 function update_deploy_branch() {
-  SERVICE_ID=$(service_id)
-  update_service_branch "$SERVICE_ID" "$CIRCLE_TAG"
+  checkLastVersion
+  required_service_id
+  update_service_branch "$SERVICE_ID" "$CIRCLE_TAG" || exit 1
 }
 
 function watch_last_deployment() {
   checkLastVersion
-  SERVICE_ID=$(service_id)
-  DEPLOYMENT_ID=$(last_deployment "$SERVICE_ID" | jq '.deploy.id' | sed -e 's/"//g')
+  required_service_id
+  DEPLOYMENT_ID=$(last_deployment "$SERVICE_ID" | jq '.deploy.id' | sed -e 's/"//g') || exit 1
   watch_deployment "$SERVICE_ID" "$DEPLOYMENT_ID"
 }
 
