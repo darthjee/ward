@@ -6,6 +6,7 @@
     ]
   },
   "git": {
+    "safe_branch": "origin/main",
     "email": "darthjee+{agent}@gmail.com",
     "omit_model_coauthor": true,
     "merge_body_mode": "coauthors",
