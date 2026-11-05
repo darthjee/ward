@@ -9,7 +9,7 @@ The **Bank** menu has these entries:
 
 | Submenu | Shows | Status | Row owner |
 |---|---|---|---|
-| **Accounts** | `regular` accounts only (see [accounts/README.md](../accounts/README.md)) | Decided | [#29](https://github.com/darthjee/ward/issues/29) |
+| **Accounts** | `regular` accounts only: list, detail (with the ledger), create / edit pages ([accounts/regular.md](../accounts/regular.md#accounts-submenu-ui)) | Specified | [#29](https://github.com/darthjee/ward/issues/29) |
 | **Debt accounts** | `debt` accounts ([accounts/debt.md](../accounts/debt.md)) | Place decided; shared with provider-expense or not is open | [#30](https://github.com/darthjee/ward/issues/30) |
 | **Provider-expense accounts** | `provider_expense` accounts ([accounts/provider-expense.md](../accounts/provider-expense.md)) | Place decided; shared with debt or not is open | [#32](https://github.com/darthjee/ward/issues/32) |
 | **Calendar** | Upcoming bills ([calendar.md](calendar.md)) | Decided | [#33](https://github.com/darthjee/ward/issues/33) |
