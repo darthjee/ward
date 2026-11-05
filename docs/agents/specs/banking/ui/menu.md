@@ -10,7 +10,7 @@ The **Bank** menu has these entries:
 | Submenu | Shows | Status | Row owner |
 |---|---|---|---|
 | **Accounts** | `regular` accounts only: list, detail (with the ledger), create / edit pages ([accounts/regular.md](../accounts/regular.md#accounts-submenu-ui)) | Specified | [#29](https://github.com/darthjee/ward/issues/29) |
-| **Debt accounts** | `debt` accounts ([accounts/debt.md](../accounts/debt.md)) | Place decided; shared with provider-expense or not is open | [#30](https://github.com/darthjee/ward/issues/30) |
+| **Debts** | `debt` accounts only: list, detail (with the ledger and the Add payment / Add interest shortcuts), create / edit pages ([accounts/debt.md](../accounts/debt.md#debts-submenu-ui)) | Specified | [#30](https://github.com/darthjee/ward/issues/30) |
 | **Provider-expense accounts** | `provider_expense` accounts ([accounts/provider-expense.md](../accounts/provider-expense.md)) | Place decided; shared with debt or not is open | [#32](https://github.com/darthjee/ward/issues/32) |
 | **Calendar** | Upcoming bills ([calendar.md](calendar.md)) | Decided | [#33](https://github.com/darthjee/ward/issues/33) |
 
@@ -20,8 +20,9 @@ which adds its own row if they get one.
 
 ## Open questions
 
-- [ ] One shared submenu for debt and provider-expense accounts, or one each (#30 / #32). If
-  shared, #30 and #32 merge their two rows into one.
+- [ ] One shared submenu for debt and provider-expense accounts, or one each (#30 / #32). #30
+  decided debts get their own **Debts** submenu; #32 may still propose merging, in which case
+  #30 and #32 merge their two rows into one.
 
 ## Reference
 
