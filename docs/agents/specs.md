@@ -54,7 +54,10 @@ this file changes.
 
 ## Active specs
 
-None.
+| Feature | Folder | Epic |
+|---|---|---|
+| Bank module (`bank`: accounts, business expenses, bills) | [specs/banking/](specs/banking/README.md) | [#26](https://github.com/darthjee/ward/issues/26) |
+| Organizations (`auth` module; a dependency of banking) | [specs/auth/](specs/auth/README.md) | [#26](https://github.com/darthjee/ward/issues/26) |
 
 ## Completed specs
 
