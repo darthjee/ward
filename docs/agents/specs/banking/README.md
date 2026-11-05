@@ -43,8 +43,8 @@ Deferred concerns are collected in [Future epics](#future-epics).
 | File | Concern |
 |---|---|
 | [accounts/README.md](accounts/README.md) | `Account` and its `type`, common concepts, main-list rule |
-| [accounts/regular.md](accounts/regular.md) | Regular accounts and the common account fields |
-| [accounts/transactions.md](accounts/transactions.md) | Ledger and balances |
+| [accounts/regular.md](accounts/regular.md) | Common account fields, regular accounts, name uniqueness, archive vs delete, account routes, Accounts submenu pages |
+| [accounts/transactions.md](accounts/transactions.md) | Ledger, opening anchor, computed balances, `Transaction` entity, currency, transaction and settings routes |
 | [accounts/debt.md](accounts/debt.md) | Debt accounts |
 | [accounts/investment.md](accounts/investment.md) | Investment accounts |
 | [accounts/provider-expense.md](accounts/provider-expense.md) | Provider-expense accounts, incl. business expenses for the accountant |
@@ -58,7 +58,7 @@ Deferred concerns are collected in [Future epics](#future-epics).
 |---|---|
 | [#27](https://github.com/darthjee/ward/issues/27) | this `README.md`, `accounts/README.md`, `ui/menu.md` (each sub-issue edits only its own row), the skeletons of every other file |
 | [#28](https://github.com/darthjee/ward/issues/28) | [auth/organizations.md](../auth/organizations.md) — entities and routes, single owner, roles stored but not enforced, auto-created organization, active organization in the URL, data-ownership rule, security; this `README.md` (`## Future epics` only) |
-| [#29](https://github.com/darthjee/ward/issues/29) | `accounts/regular.md`, `accounts/transactions.md` |
+| [#29](https://github.com/darthjee/ward/issues/29) | [accounts/regular.md](accounts/regular.md) — common account fields, archive vs delete, account routes, Accounts submenu; [accounts/transactions.md](accounts/transactions.md) — ledger, opening anchor, computed balances, `Transaction`, currency, transaction and settings routes; `ui/menu.md` (Accounts row); this `README.md` (index entries and `## Future epics`) |
 | [#30](https://github.com/darthjee/ward/issues/30) | `accounts/debt.md` |
 | [#31](https://github.com/darthjee/ward/issues/31) | `accounts/investment.md` |
 | [#32](https://github.com/darthjee/ward/issues/32) | `accounts/provider-expense.md` |
@@ -100,6 +100,28 @@ deferred concerns to this same list.
    — cap the number of organizations created per user per time window through
    `POST /orgs.json`, configurable through env vars, answering 429 when exceeded. It is a
    volume limit, unlike the existing failure-based lockouts.
+5. **Reconciliation** (from [accounts/transactions.md](accounts/transactions.md#opening-balance-anchor-model))
+   — a per-transaction *cleared* flag to match the ledger against the bank statement,
+   surfacing mismatches (e.g. a wrongly backfilled transaction absorbed by the opening anchor).
+   Transactions stay editable and hard-deletable until it exists; the epic decides what a
+   cleared transaction locks.
+6. **Linked transfers** (from [accounts/transactions.md](accounts/transactions.md#transaction-entity))
+   — a transfer between two accounts of the organization recorded as one linked pair of
+   transactions. Until then: two independent manual transactions. Must respect the
+   one-currency-per-account rule (no conversion without the currency-conversion epic).
+7. **Counterparty / payee** (from [accounts/transactions.md](accounts/transactions.md#transaction-entity))
+   — a field recording who paid or was paid.
+8. **Currency conversion** (from [accounts/transactions.md](accounts/transactions.md#currency))
+   — FX rates and an organization base currency, so totals across accounts in different
+   currencies can be shown together. Until then aggregates are grouped per currency, never
+   summed; amounts stay integer minor units in each account's own currency.
+9. **Categories** (from [accounts/transactions.md](accounts/transactions.md#categories))
+   — categorising transactions: scope, entity, management UI, hierarchy and income/expense kind
+   are decided by the epic. Likely shared with bills ([#33](https://github.com/darthjee/ward/issues/33))
+   and provider expenses ([#32](https://github.com/darthjee/ward/issues/32)). Adds a nullable
+   `categoryId`, so existing transactions stay uncategorised with no backfill.
+10. **Ledger filters** (from [accounts/transactions.md](accounts/transactions.md#ledger))
+    — date range and text search on an account's ledger, keeping the running balance correct.
 
 ## Reference
 
