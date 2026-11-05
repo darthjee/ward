@@ -13,9 +13,11 @@ modules will reuse, so they belong to the `auth` module (next to `User`), not to
 
 ## Purpose
 
-Record the organization decisions already taken in #26, and give
-[#28](https://github.com/darthjee/ward/issues/28) a single file to refine (roles, automatic
-organization, invites, active organization, backfill, data-ownership rule).
+Record the organization decisions taken in #26 and defined by
+[#28](https://github.com/darthjee/ward/issues/28) in a single file,
+[organizations.md](organizations.md). Deferred concerns (permission system, joining, closing,
+creation rate limit) are listed in the banking
+[Future epics](../banking/README.md#future-epics).
 
 ## Scope
 
@@ -38,17 +40,22 @@ Out of scope:
 - **`OrganizationMembership`** links users and organizations many-to-many, with a `role` of
   `owner`, `admin` or `user`. These are **organization roles**, distinct from Ward's global
   admin role (`User.isAdmin` / `@AdminOnly()`).
-- **An organization is created automatically for each new user.**
+- Roles are **stored but not enforced**; every organization has **exactly one owner**.
+- **An organization is created automatically for each new user**, named after their username,
+  in the registration transaction.
+- The **active organization lives in the URL** (`/api/orgs/:orgId/...`, `/orgs/:orgId/...`).
 - **Domain data can be scoped to organizations.** This changes the "every domain record belongs
-  to exactly one user" rule in `product.md`. The change is only **announced** here:
-  [#28](https://github.com/darthjee/ward/issues/28) specifies it in
-  [organizations.md](organizations.md), and the fold issue of #26 applies it to `product.md`.
+  to exactly one user" rule in `product.md`. The rule is **specified** in
+  [organizations.md](organizations.md#data-ownership); the fold issue of #26 applies it to
+  `product.md`.
+- Deferred concerns are recorded in the banking
+  [Future epics](../banking/README.md#future-epics), not opened as issues yet.
 
 ## Index
 
 | File | Concern |
 |---|---|
-| [organizations.md](organizations.md) | `Organization`, `OrganizationMembership`, roles, automatic organization, invites, active organization, backfill, data-ownership rule |
+| [organizations.md](organizations.md) | `Organization` and `OrganizationMembership` entities, roles (stored, not enforced), ownership, auto-created organization, active organization, data ownership, routes, edge cases, security, owning module |
 
 ## Sub-issue map
 
