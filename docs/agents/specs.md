@@ -26,7 +26,11 @@ A spec folder is not a plan and not an issue file:
    updates the spec **in the same PR**.
 3. The feature's **last** sub-issue folds the lasting content into the permanent docs
    (`product.md`, `modules/`, `backend/routes/`, `environment-variables.md`, …).
-4. That last sub-issue then deletes `docs/agents/specs/<feature>/` and moves its entry from
+4. Before the spec folder is removed, that last sub-issue **creates a GitHub epic for each
+   entry in the feature's [Future epics](#conventions) section**, so nothing deferred is lost.
+   The created epics' URLs are recorded where the lasting docs mention the deferred concern,
+   and in the "Follow-up epics" column of the [Completed specs](#completed-specs) entry.
+5. That last sub-issue then deletes `docs/agents/specs/<feature>/` and moves its entry from
    [Active specs](#active-specs) to [Completed specs](#completed-specs), pointing at the permanent
    docs that now hold it.
 
@@ -49,6 +53,11 @@ this file changes.
     (`https://github.com/<owner>/<repo>/blob/main/<path>`, commits and issues by URL), **never** a
     local file-system path;
   - a **Required tests** section, next to the rules it verifies.
+- **Future epics**: a feature's `README.md` may have a `## Future epics` section listing every
+  concern the specs defer, each with enough detail to seed an epic (what it covers, the decisions
+  it must respect, the spec file it comes from). Deferred concerns are recorded there and **not**
+  opened as GitHub issues while the spec is active; the epics are created at fold time (see
+  [Lifecycle](#lifecycle)).
 - Specs describe **decisions**, not code. They name existing code only to point at the file or
   convention to change.
 
@@ -63,7 +72,7 @@ this file changes.
 
 Features whose specs were folded into the permanent docs, and where their definition lives now.
 
-| Feature | Folded into | Epic |
-|---|---|---|
-| Deployment (Render backend, SSH-hosted proxy and frontend, tag-driven CircleCI release); specs were `specs/deploy/`, removed by #16 | [deployment.md](deployment.md), [environment-variables.md](environment-variables.md) §4 | [#10](https://github.com/darthjee/ward/issues/10) |
-| User approval (optional admin approval of new registrations, plus the session-lookup gate it needs); specs were `specs/user-approval/`, removed by #7 | [modules/auth/user-approval.md](modules/auth/user-approval.md) | [#1](https://github.com/darthjee/citadel/issues/1) |
+| Feature | Folded into | Epic | Follow-up epics |
+|---|---|---|---|
+| Deployment (Render backend, SSH-hosted proxy and frontend, tag-driven CircleCI release); specs were `specs/deploy/`, removed by #16 | [deployment.md](deployment.md), [environment-variables.md](environment-variables.md) §4 | [#10](https://github.com/darthjee/ward/issues/10) | — |
+| User approval (optional admin approval of new registrations, plus the session-lookup gate it needs); specs were `specs/user-approval/`, removed by #7 | [modules/auth/user-approval.md](modules/auth/user-approval.md) | [#1](https://github.com/darthjee/citadel/issues/1) | — |
