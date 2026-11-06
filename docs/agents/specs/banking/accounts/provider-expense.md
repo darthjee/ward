@@ -7,7 +7,7 @@
 
 - A provider-expense account is an `Account` with `type` `provider_expense` (see
   [README.md](README.md)).
-- It belongs to an organization.
+- It inherits the owner from its account.
 - It covers **business expenses for the accountant**.
 - Provider-expense accounts are **not** shown in the main accounts list; they are seen in their
   own place in the Bank menu (see [ui/menu.md](../ui/menu.md)).

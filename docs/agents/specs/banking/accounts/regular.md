@@ -9,8 +9,9 @@
 ## Summary
 
 - A regular account is an `Account` with `type` `regular` (see [README.md](README.md)).
-- It belongs to an organization (see
-  [auth/organizations.md](../../auth/organizations.md#data-ownership)), never directly to a user.
+- It has exactly one owner — the user (Personal) or an organization — see the
+  [Bank ownership contract](../README.md#bank-ownership-contract) and
+  [auth/organizations.md](../../auth/organizations.md#data-ownership).
 - Regular accounts are the only ones shown in the main **Accounts** list.
 - A regular account always carries a ledger (see [transactions.md](transactions.md#ledger)).
 
@@ -22,16 +23,16 @@ specific fields.
 | Field | Required | Editable | Notes |
 |---|---|---|---|
 | `id` | — | — | |
-| `organizationId` | yes | no | Taken from the URL's `:orgId`, never from the request body |
+| `userId` | see notes | no | Nullable; set on personal routes from the JWT user. Exactly one of `userId` / `organizationId` is set (DB check constraint). Never from the request body, never returned |
+| `organizationId` | see notes | no | Nullable; set on organization routes from the URL's `:orgId`. Exactly one of `userId` / `organizationId` is set (DB check constraint). Never from the request body, never returned |
 | `type` | yes | no | `regular` / `debt` / `investment` / `provider_expense`; fixed after creation because type-specific fields hang off it |
-| `name` | yes | yes | Trimmed, max 255 characters; **unique within the organization**, case-insensitive, among non-archived accounts (see [Name uniqueness](#name-uniqueness)) |
+| `name` | yes | yes | Trimmed, max 255 characters; **unique within its owner (Personal or an organization)**, case-insensitive, among non-archived accounts (see [Name uniqueness](#name-uniqueness)) |
 | `bankName` | no | yes | Free text (no `Bank` catalogue entity) |
 | `branch` | no | yes | Free text (bank branch / "agência"); optional because not every user wants to record it |
 | `accountNumber` | no | yes | Free text (formats vary, check digits included); optional for the same reason. **Masked in lists** (e.g. `•••• 1234`), shown in full only on the detail page |
 | `currency` | yes | see [Currency](transactions.md#currency) | ISO 4217 code |
 | `archivedAt` | no | via archive / unarchive | `null` = active; see [Archive vs delete](#archive-vs-delete) |
 | `notes` | no | yes | Free text |
-| `createdByUserId` | yes | no | The member who created the account (audit); stored, never returned (see [Data sensitivity](#data-sensitivity--ownership)) |
 | `createdAt` / `updatedAt` | — | — | |
 
 - **Opening anchor** — `openingDate` and `openingBalance` are added to `Account` by
@@ -42,11 +43,17 @@ specific fields.
 
 ## Name uniqueness
 
-- A name is unique within its organization, **case-insensitively**, among **active**
-  (non-archived) accounts of any type. Archived accounts' names are free.
+- A name is unique within its owner (Personal or an organization), **case-insensitively**,
+  among **active** (non-archived) accounts of any type. Archived accounts' names are free. The
+  same name in Personal and in an organization, or in two organizations, is allowed.
 - **Enforced in the DB** — a generated column
-  `active_name_key = IF(archived_at IS NULL, LOWER(name), NULL)` with a unique index on
-  `(organization_id, active_name_key)` (NULLs never clash, so archived names never collide).
+  `active_name_key = IF(archived_at IS NULL, LOWER(name), NULL)` with **two unique indexes**:
+  `(user_id, active_name_key)` for personal accounts and `(organization_id, active_name_key)`
+  for organization accounts. NULLs never clash, so archived names never collide and each index
+  ignores the other owner kind's rows (personal rows have `organization_id = NULL`, organization
+  rows `user_id = NULL`); one index cannot cover both because MySQL has no partial indexes.
+  These two indexes double as the owner lookup indexes the
+  [Bank ownership contract](../README.md#bank-ownership-contract) requires.
 - A duplicate-key error maps to **409** on create, rename and unarchive.
 
 ## Archive vs delete
@@ -78,9 +85,12 @@ Applies to every account type.
 ## Accounts submenu UI
 
 The **Accounts** entry of the Bank menu (see [ui/menu.md](../ui/menu.md)). All pages live under
-the active organization, `/orgs/:orgId/bank/accounts…`.
+the active context, `<ui>/accounts…` (see [Routes and permissions](#routes-and-permissions) for
+`<ui>`); links are built from the active context, so every page works in either context.
 
-### List — `/orgs/:orgId/bank/accounts`
+### List
+
+`<ui>/accounts`
 
 - `regular` accounts only. Columns: name, bank, masked account number (`•••• 1234`), currency,
   current balance (formatted with `Intl` in the account's own currency; **no grand total**,
@@ -90,7 +100,9 @@ the active organization, `/orgs/:orgId/bank/accounts…`.
 - Empty state: "No accounts yet" with a create button.
 - A row opens the detail page.
 
-### Detail — `/orgs/:orgId/bank/accounts/:accountId`
+### Detail
+
+`<ui>/accounts/:accountId`
 
 - Header: all fields (full account number) and the current balance.
 - Actions: Edit, Archive / Unarchive, Delete (shown only when the account has no
@@ -101,7 +113,9 @@ the active organization, `/orgs/:orgId/bank/accounts…`.
 - **Transactions are added and edited inline**, in a form row at the top of the ledger;
   deleting asks for confirmation.
 
-### Create / Edit — `/orgs/:orgId/bank/accounts/new`, `/orgs/:orgId/bank/accounts/:accountId/edit`
+### Create / Edit
+
+`<ui>/accounts/new`, `<ui>/accounts/:accountId/edit`
 
 - Fields: name, bank, branch, account number, currency, opening date, opening balance, notes.
 - Currency: searchable ISO select, defaulting to `BANK_DEFAULT_CURRENCY` (read from
@@ -111,10 +125,17 @@ the active organization, `/orgs/:orgId/bank/accounts…`.
 
 ## Routes and permissions
 
-All bank routes are JWT-protected, live under `/api/orgs/:orgId/bank`, go through
-`@OrgScoped()` and use the `.json` suffix. The account routes below are **generic for every
-account type**; the transaction and settings routes are in
-[transactions.md](transactions.md#routes), which reuses the [Rules](#rules) below.
+All bank routes are JWT-protected and use the `.json` suffix. Following the
+[Bank ownership contract](../README.md#bank-ownership-contract), they are served under **two
+base paths**, defined once here and reused by every bank spec:
+
+- **`<base>`** (API) — `/api/bank` (personal) or `/api/orgs/:orgId/bank` (organization);
+- **`<ui>`** (UI) — `/bank` (personal) or `/orgs/:orgId/bank` (organization).
+
+The same controllers serve both prefixes through **`@OwnerScoped()`**, with the same logic. The
+route tables below are relative to `<base>`. The account routes are **generic for every account
+type**; the transaction and settings routes are in [transactions.md](transactions.md#routes),
+which reuses the [Rules](#rules) below.
 
 ### Accounts
 
@@ -135,17 +156,22 @@ account type**; the transaction and settings routes are in
 
 ### Rules
 
-- **404, never 403** — an account of another organization, an unknown or non-numeric id: all
-  404, indistinguishable.
+- **404, never 403** — every miss is a 404 with an identical body: an unknown or non-numeric
+  id, another user's personal account, another organization's account, a non-member `:orgId`,
+  and the **wrong context** (an organization account on a personal route, or the reverse).
+- **Responses never contain owner fields** (`user_id`, `organization_id`).
 - **The list masks `account_number` server-side** (`•••• 1234`); only the detail returns it in
   full, so the full number never travels when not needed.
-- **Bodies never accept** `organizationId`, `accountId`, `createdByUserId`, `type` (on PATCH)
-  or computed fields; unknown fields are rejected by the whitelist `ValidationPipe`.
-- **Permissions** — every member of the organization can do everything: roles are stored but
-  not enforced (as in [#28](https://github.com/darthjee/ward/issues/28)). The permission-system
+- **Bodies never accept** `userId`, `organizationId`, `accountId`, `type` (on PATCH) or
+  computed fields; the owner always comes from the route. Unknown fields are rejected by the
+  whitelist `ValidationPipe`.
+- **Permissions** — in Personal, only the owner. In an organization context, every member can
+  do everything: roles are stored but not enforced (as in
+  [#28](https://github.com/darthjee/ward/issues/28)). The permission-system
   epic adds the per-role matrix (see [Future epics](../README.md#future-epics)).
 - **Caching** — `GET` routes are `user-scoped` (declared with `@CachePolicy`, sent with
-  `X-Skip-Cache`); writes are `never`. None goes into Navi's warm-up.
+  `X-Skip-Cache`); writes are `never`. Personal routes carry no owner in the URL, so they
+  **must** stay `user-scoped` with `X-Skip-Cache`, no exception. None goes into Navi's warm-up.
 - Responses are `snake_case`, as the organization routes.
 
 ## Data sensitivity & ownership
@@ -153,17 +179,19 @@ account type**; the transaction and settings routes are in
 Accounts and ledgers are **financial data**. These rules apply to the whole `bank` module,
 including [transactions.md](transactions.md).
 
-- **Who sees and edits** — only members of the owning organization (all members equally while
-  roles are not enforced). Ward's global admin gets **no** access (#28). No cross-organization
-  access; every miss is a 404.
+- **Who sees and edits**:
+  - **Personal** — only the owner, taken from the JWT, never from the URL or body. Personal data
+    is never visible to organization members, even of an organization the owner belongs to.
+  - **Organization** — only its members, all with equal rights while roles are not enforced.
+  - Ward's global `is_admin` has access to neither (#28, #40). Every miss is a 404.
 - **Never stored** — bank credentials, card numbers or CVVs; Ward never connects to banks (no
   open-banking / scraping). Stated explicitly so no later issue adds it silently.
 - **Account number at rest** — **not encrypted**: it is not a credential, it is optional, and
   the DB connection is already over TLS ([#11](https://github.com/darthjee/ward/issues/11)).
   Masked in list responses, full only in the detail response.
-- **`createdByUserId`** — stored but **not returned by the API** (organization responses never
-  expose other users' ids, #28). Showing it (as a username) is for the joining / permission
-  epics. A logical reference with no cascade: the data belongs to the organization.
+- **No authorship column** — there is no `created_by` column: a record has a single owner and
+  nothing else references a user. Recording who created or changed a record in an organization
+  is a [Future epic](../README.md#future-epics) (*Authorship / audit trail*).
 - **Logs** — bank request / response bodies (amounts, descriptions, account numbers) are never
   logged; only method, route and status.
 - **XSS** — names, notes and descriptions are user input, always rendered escaped (React
@@ -177,9 +205,9 @@ including [transactions.md](transactions.md).
 - **Lazy loading** — every bank controller goes through
   `LazyModuleLoaderService#loadOnFirstRequest()`; nothing of `bank` is resident before the
   first bank request (`settings.json` loads it too — it is only hit from the bank UI).
-- **Depends on `auth` only through `@OrgScoped()`** (the core guard behind a DI token); `bank`
+- **Depends on `auth` only through `@OwnerScoped()`** (the core guard behind a DI token); `bank`
   never imports `auth` nor queries membership tables.
-- **References** — `organization_id` and `created_by_user_id` are logical (no cross-module FK);
+- **References** — `user_id` and `organization_id` are logical (no cross-module FK);
   `bank_transactions.account_id → bank_accounts.id` is a real FK (same module).
 - **No events** emitted or consumed for now; bills
   ([#33](https://github.com/darthjee/ward/issues/33)) decide whether paying a bill emits an
@@ -204,7 +232,7 @@ No idle cost — `bank` is lazy. No new heavy dependency: currency data comes fr
 - **Delete with transactions** → 409 (DB-enforced by `ON DELETE RESTRICT`).
 - **Non-`regular` `type` on create** → 400 until the other type specs exist.
 - **Over-long fields** → 400, never truncated.
-- **Unknown / foreign / non-numeric ids** → 404, indistinguishable.
+- **Unknown / foreign / wrong-context / non-numeric ids** → 404, indistinguishable.
 - **Concurrent edits** — last write wins; no optimistic locking.
 
 ## Alternatives considered
@@ -223,8 +251,11 @@ The ledger-side alternatives are listed in
 - Epic: https://github.com/darthjee/ward/issues/26
 - Skeleton sub-issue: https://github.com/darthjee/ward/issues/27
 - Owning sub-issue: https://github.com/darthjee/ward/issues/29
-- Organizations, `@OrgScoped()`, data-ownership rule: https://github.com/darthjee/ward/issues/28,
+- Organizations, `@OwnerScoped()`, data-ownership rule: https://github.com/darthjee/ward/issues/28,
+  https://github.com/darthjee/ward/issues/40,
   https://github.com/darthjee/ward/blob/main/docs/agents/specs/auth/organizations.md
+- Bank ownership contract: https://github.com/darthjee/ward/blob/main/docs/agents/specs/banking/README.md#bank-ownership-contract
+- Realignment to the ownership model: https://github.com/darthjee/ward/issues/41
 - DB connection over TLS: https://github.com/darthjee/ward/issues/11
 - Ledger, currency and transactions: https://github.com/darthjee/ward/blob/main/docs/agents/specs/banking/accounts/transactions.md
 - Modular pattern (lazy tier, logical references): https://github.com/darthjee/ward/blob/main/docs/agents/architecture/modular-pattern.md
@@ -239,18 +270,26 @@ The ledger-side alternatives are listed in
   omitted; any other `type` → 400; missing, blank or whitespace-only `name` → 400; `name` is
   trimmed; `name` of 255 characters OK, 256 → 400; `bank_name` / `branch` / `account_number`
   over 64 and `notes` over 2000 → 400 (never truncated); unknown fields → 400;
-  `organizationId` / `createdByUserId` in the body rejected; `organizationId` is taken from the
-  URL and `createdByUserId` from the current user.
+  `userId` / `organizationId` in the body → 400 (whitelist).
+- Owner context: every account route works under both `/api/bank` and
+  `/api/orgs/:orgId/bank`; an account created on a personal route is owned by the current user,
+  one created on an organization route by that organization; owner fields (`user_id`,
+  `organization_id`) never appear in any response.
+- 404 with identical bodies, on every account route, for: unknown and non-numeric ids, another
+  user's personal account, an organization account on a personal route, a personal account on
+  an organization route, another organization's account, a non-member `:orgId`, and a global
+  admin who is not a member.
+- The personal list returns only the current user's personal accounts, never organization
+  accounts (even of the user's own organizations).
 - Name uniqueness: a case-insensitive clash with an active account → 409 on create, rename and
-  unarchive; an archived account's name does not clash; the same name in another organization
-  does not clash.
+  unarchive; an archived account's name does not clash. Per owner: duplicates clash within
+  Personal and within one organization; the same name is allowed in Personal and in an
+  organization, and in two different organizations.
+- DB: a row with both owners or with neither is rejected by the check constraint.
 - List: returns `regular` accounts only by default, sorted by name; archived accounts hidden
   unless `archived=true` (and marked when shown); `account_number` masked (`•••• 1234`);
-  current balance per account computed by a single grouped query (no N+1);
-  `created_by_user_id` absent.
-- Detail: full `account_number` and current balance; `created_by_user_id` absent.
-- Unknown, non-numeric and other-organization `:accountId`, and a non-member `:orgId`, → 404
-  with identical bodies, on every account route; a global admin who is not a member → 404.
+  current balance per account computed by a single grouped query (no N+1).
+- Detail: full `account_number` and current balance.
 - PATCH: `type` rejected; `currency` change → 409 once the account has transactions, allowed
   before; on an archived account only `name` is accepted (any other field → 409).
 - Archive sets `archived_at`; unarchive clears it; unarchive onto an active name → 409.
@@ -271,4 +310,6 @@ The ledger-side alternatives are listed in
 - Create / Edit: currency select is searchable and defaults to the value from `settings.json`;
   currency locked once the account has transactions; opening date defaults to today and opening
   balance to 0; `type` is not shown.
+- Pages render under both `/bank/...` and `/orgs/:orgId/bank/...`, with links built from the
+  active context; a user with zero organizations uses the Accounts pages in Personal.
 - Names, notes and other user input are rendered escaped.

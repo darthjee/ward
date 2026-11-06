@@ -12,8 +12,9 @@
   one; debt, investment and provider-expense accounts decide in their own files
   ([#30](https://github.com/darthjee/ward/issues/30)–[#32](https://github.com/darthjee/ward/issues/32))
   whether they use it.
-- Transactions belong to an `Account` (see [README.md](README.md)), and so to its
-  organization.
+- Transactions belong to an `Account` (see [README.md](README.md)) and inherit its owner
+  (see the [Bank ownership contract](../README.md#bank-ownership-contract)); they never store
+  a copy of it.
 - **Order** — newest first in the UI and API; within a day, by `id` (insertion order); no
   manual reordering. The [virtual opening row](#opening-balance-anchor-model) is always the
   oldest row.
@@ -72,12 +73,10 @@ projected balance) needs no data migration.
 |---|---|---|---|
 | `id` | — | — | |
 | `accountId` | yes | no | From the URL; a transaction never moves between accounts |
-| `organizationId` | yes | no | Copied from the account (data-ownership rule: every bank record carries a logical `organizationId`) |
 | `date` | yes | yes | `DATE`, no time; never after today |
 | `amount` | yes | yes | **Signed**: positive = money in, negative = money out; zero rejected. Storage format: see [Currency](#currency) |
 | `description` | yes | yes | Trimmed, max 255 characters |
 | `notes` | no | yes | Free text, max 2000 characters |
-| `createdByUserId` | yes | no | Audit; stored, never returned (see [regular.md](regular.md#data-sensitivity--ownership)) |
 | `createdAt` / `updatedAt` | — | — | |
 
 - **Editable and hard-deletable** — nothing is locked until reconciliation exists.
@@ -117,10 +116,11 @@ stay uncategorised (adding a nullable `categoryId` later needs no backfill).
 
 ## Routes
 
-Same base path and rules as the account routes: JWT-protected, under `/api/orgs/:orgId/bank`,
-through `@OrgScoped()`, `.json` suffix, and every rule in
-[regular.md → Rules](regular.md#rules) (404 never 403, whitelist `ValidationPipe`, no
-client-supplied ids or computed fields, every member can do everything, `snake_case`).
+Same base path and rules as the account routes: JWT-protected, under `<base>` in both
+contexts (see [regular.md → Routes and permissions](regular.md#routes-and-permissions)), through
+`@OwnerScoped()`, `.json` suffix, and every rule in [regular.md → Rules](regular.md#rules) (404
+never 403, whitelist `ValidationPipe`, no client-supplied ids, owner fields or computed fields,
+owner-based permissions, `snake_case`).
 
 ### Transactions
 
@@ -131,12 +131,12 @@ client-supplied ids or computed fields, every member can do everything, `snake_c
 | PATCH | `/accounts/:accountId/transactions/:transactionId.json` | Edit; 409 on an archived account | `never` |
 | DELETE | `/accounts/:accountId/transactions/:transactionId.json` | Delete; 409 on an archived account | `never` |
 
-- **A transaction of another account** (or of an account of another organization) → 404,
-  indistinguishable from an unknown or non-numeric id.
-- **Bodies never accept** `accountId`, `organizationId`, `createdByUserId` or computed fields
+- **A transaction of another account** (or of an account of another owner, or of the other
+  context) → 404, indistinguishable from an unknown or non-numeric id.
+- **Bodies never accept** `accountId`, `userId`, `organizationId` or computed fields
   (running balance); unknown fields → 400.
 - **UI** — transactions are added and edited **inline**, in a form row at the top of the ledger
-  on the account detail page (see [regular.md](regular.md#detail--orgsorgidbankaccountsaccountid));
+  on the account detail page (see [regular.md](regular.md#detail));
   deleting asks for confirmation. Amounts are formatted with `Intl` in the account's currency.
 
 ### Settings
@@ -145,8 +145,10 @@ client-supplied ids or computed fields, every member can do everything, `snake_c
 |---|---|---|---|
 | GET | `/settings.json` | `{ "default_currency": "BRL" }` from `BANK_DEFAULT_CURRENCY`, for the create form | `user-scoped` |
 
-Kept organization-scoped (rather than a public route) so every bank route follows the
-data-ownership rule with no exception.
+Served under both prefixes (`/api/bank/settings.json` and
+`/api/orgs/:orgId/bank/settings.json`) with the same `default_currency`; a non-member `:orgId` →
+404. Kept owner-scoped (rather than a public route) so every bank route follows the
+[Bank ownership contract](../README.md#bank-ownership-contract) with no exception.
 
 ## Performance & integrity
 
@@ -163,7 +165,7 @@ Household / small-business volumes on the Render free tier.
   RESTRICT` (both tables belong to `bank`); the DB refuses deleting an account with
   transactions → 409 (see [regular.md](regular.md#archive-vs-delete)).
 - **Concurrent edits** — last write wins; no optimistic locking.
-- **No write rate limit** for now (authenticated members of their own organization).
+- **No write rate limit** for now (authenticated users acting in their own context).
 - **Logs and data sensitivity** — bodies are never logged; see
   [regular.md](regular.md#data-sensitivity--ownership). Owning module, backward compatibility
   and memory footprint: see [regular.md](regular.md#owning-module).
@@ -193,7 +195,7 @@ Household / small-business volumes on the Render free tier.
 - **Categories now** — rejected; [deferred](#categories) to a future epic.
 - **Modal or separate-page transaction entry** — rejected in favour of inline entry in the
   ledger ([Routes](#routes)).
-- **Public settings route** — rejected in favour of an organization-scoped
+- **Public settings route** — rejected in favour of an owner-scoped
   [`settings.json`](#settings).
 
 The account-side alternatives are listed in
@@ -204,8 +206,11 @@ The account-side alternatives are listed in
 - Epic: https://github.com/darthjee/ward/issues/26
 - Skeleton sub-issue: https://github.com/darthjee/ward/issues/27
 - Owning sub-issue: https://github.com/darthjee/ward/issues/29
-- Organizations and data-ownership rule: https://github.com/darthjee/ward/issues/28,
+- Organizations, `@OwnerScoped()`, data-ownership rule: https://github.com/darthjee/ward/issues/28,
+  https://github.com/darthjee/ward/issues/40,
   https://github.com/darthjee/ward/blob/main/docs/agents/specs/auth/organizations.md
+- Bank ownership contract: https://github.com/darthjee/ward/blob/main/docs/agents/specs/banking/README.md#bank-ownership-contract
+- Realignment to the ownership model: https://github.com/darthjee/ward/issues/41
 - Bills (upcoming payments): https://github.com/darthjee/ward/issues/33
 - Common account fields, account routes and rules: https://github.com/darthjee/ward/blob/main/docs/agents/specs/banking/accounts/regular.md
 - Cache classes (`user-scoped`, `never`, `X-Skip-Cache`): https://github.com/darthjee/ward/blob/main/docs/agents/architecture/caching.md
@@ -227,18 +232,21 @@ The account-side alternatives are listed in
 - Transaction validation → 400: zero amount; more decimals than the currency allows (BRL 2,
   JPY 0, BHD 3); `|amount|` over 10¹³ minor units; date after UTC today + 1 day (UTC today + 1
   accepted); missing, blank or over-long `description` (255 OK, 256 → 400); `notes` over 2000;
-  unknown fields; `accountId` / `organizationId` / `createdByUserId` in the body rejected.
+  unknown fields; `accountId` / `userId` / `organizationId` in the body rejected.
 - Amounts are stored as integer minor units and serialised as decimal strings in the
   currency's exponent (e.g. `"-1234.56"`, `"500"` for JPY).
 - Archived account: create, edit and delete transaction → 409.
-- A transaction of another account, of another organization, or an unknown / non-numeric id →
-  404 with identical bodies; a non-member `:orgId` → 404.
+- Transaction routes work under both `/api/bank` and `/api/orgs/:orgId/bank`.
+- A transaction of another account, of another owner, through an account of the other context,
+  or an unknown / non-numeric id → 404 with identical bodies; a non-member `:orgId` → 404.
 - Transactions are editable and hard-deletable on an active account.
 - The opening anchor is editable through the account `PATCH` and cannot be deleted.
 - `currency` change → 409 once the account has a transaction.
 - `BANK_DEFAULT_CURRENCY` is validated at boot (an unsupported code fails startup); unset →
-  `BRL`; `settings.json` returns `{ "default_currency": … }`; non-member → 404.
-- `created_by_user_id` absent from every response.
+  `BRL`; `settings.json` returns `{ "default_currency": … }` under both prefixes, with the same
+  value; non-member `:orgId` → 404.
+- Owner fields never appear in any response (covered by the
+  [regular.md owner-context matrix](regular.md#required-tests)).
 - The ledger `GET` and `settings.json` are `user-scoped` and send `X-Skip-Cache`; writes are
   `never`.
 

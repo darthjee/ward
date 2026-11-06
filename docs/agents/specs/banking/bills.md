@@ -6,7 +6,7 @@
 ## Decisions
 
 - This file defines the **bill** entity: bills to pay, their recurrence, and paying them.
-- Bills belong to an organization.
+- Bills inherit the owner from their account.
 - Upcoming bills are shown in the Bank **Calendar** (see [ui/calendar.md](ui/calendar.md)).
 
 ## Open questions

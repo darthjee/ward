@@ -15,6 +15,14 @@ The **Bank** menu has these entries:
 | **Provider-expense accounts** | `provider_expense` accounts ([accounts/provider-expense.md](../accounts/provider-expense.md)) | Place decided; shared with debt or not is open | [#32](https://github.com/darthjee/ward/issues/32) |
 | **Calendar** | Upcoming bills ([calendar.md](calendar.md)) | Decided | [#33](https://github.com/darthjee/ward/issues/33) |
 
+- **Context** — the menu is the same in every context (Personal or an organization); its links
+  resolve under the active context's prefix (`/bank/...` or `/orgs/:orgId/bank/...`). The
+  context switcher itself is specified in
+  [auth/organizations.md](../../auth/organizations.md#active-context).
+  - Switching context from a bank page lands on the **same section's list** in the new context
+    (Accounts, Debts or Investments), never on the same record id (which would 404).
+  - With zero organizations, the bank menu and pages work fully in Personal.
+
 ## Open questions
 
 - [ ] One shared submenu for debt and provider-expense accounts, or one each (#30 / #32). #30
@@ -25,10 +33,15 @@ The **Bank** menu has these entries:
 
 - Epic: https://github.com/darthjee/ward/issues/26
 - This sub-issue: https://github.com/darthjee/ward/issues/27
+- Active context and ownership model: https://github.com/darthjee/ward/issues/40,
+  https://github.com/darthjee/ward/issues/41
 
 ## Required tests
 
 - The Bank menu shows the **Accounts** and **Calendar** entries and a place for debt /
   provider-expense accounts.
 - The **Accounts** entry lists `regular` accounts only.
+- Menu links are built from the active context, in both Personal and an organization context.
+- Switching context from a bank page lands on the same section's list in the new context.
+- A user with zero organizations uses the whole bank module in Personal.
 - The tests for each row's content are defined by that row's owning sub-issue.
