@@ -14,9 +14,20 @@ read it instead of deciding on their own. See [specs.md](../../specs.md) for the
 - business expenses, kept for the accountant;
 - bills to pay.
 
-All bank data is scoped to **organizations**. Organizations belong to the `auth` module and are
-specified in [specs/auth/](../auth/README.md) — a dependency that is implemented before any bank
-entity.
+Bank data belongs to **exactly one owner — either the user (personal) or an organization**.
+Organizations belong to the `auth` module and are specified in [specs/auth/](../auth/README.md) —
+a dependency that is still implemented before any bank entity, because `@OwnerScoped()` and the
+organization routes are needed.
+
+> **Realignment pending.** The specs written by #29–#31 (`accounts/README.md`, `regular.md`,
+> `transactions.md`, `debt.md`, `investment.md`, `ui/menu.md`) still describe organization-only
+> scoping (`/api/orgs/:orgId/bank/...`, `@OrgScoped()`). They are **knowingly inconsistent**
+> with the [Bank ownership contract](#bank-ownership-contract) until the follow-up
+> [#41](https://github.com/darthjee/ward/issues/41) realigns them; where they differ, this
+> README and [auth/organizations.md](../auth/organizations.md) win.
+> [#32](https://github.com/darthjee/ward/issues/32) and
+> [#33](https://github.com/darthjee/ward/issues/33) wait for
+> [#40](https://github.com/darthjee/ward/issues/40).
 
 ## Decisions
 
@@ -27,14 +38,37 @@ entity.
 - **The Bank menu** has **Accounts** (regular only), **Debts** (debt accounts, their own
   submenu), **Investments** (investment accounts, their own submenu), a place for **provider-expense accounts** (decided by #32) and a **Calendar** of
   upcoming bills (see [ui/menu.md](ui/menu.md)).
-- **Bank data is scoped to organizations.** This changes the "every domain record belongs to
-  exactly one user" rule in `product.md`. The rule is **specified** in
-  [auth/organizations.md](../auth/organizations.md#data-ownership) (by
-  [#28](https://github.com/darthjee/ward/issues/28)): every bank record carries a logical
-  `organizationId`, every bank route lives under `/api/orgs/:orgId/bank/...` and applies
-  `@OrgScoped()`. The fold issue of #26 applies the rule to `product.md`.
+- **Bank data is user-or-organization-owned.** This changes the "every domain record belongs
+  to exactly one user" rule in `product.md`. The generic rule is **specified** in
+  [auth/organizations.md](../auth/organizations.md#data-ownership) (defined by
+  [#28](https://github.com/darthjee/ward/issues/28), revised by
+  [#40](https://github.com/darthjee/ward/issues/40), which made organizations optional); the
+  bank-specific part is the [Bank ownership contract](#bank-ownership-contract) below. The fold
+  issue of #26 applies the rule to `product.md`.
 - **No separate `api/` or `security.md` yet.** Each concern file holds its own routes,
   permissions and cache class; they can be split out later.
+
+## Bank ownership contract
+
+- **Only `bank_accounts` stores the owner**: `user_id` and `organization_id` (entity properties
+  `userId` / `organizationId`), both **nullable**, **logical** references to `auth` (no physical
+  FK) and **indexed**. A DB **check constraint** requires **exactly one** of them to be set.
+- **Child records** (transactions, `bank_debt_details`, `bank_investment_details`, and later
+  provider-expense and bill records) **inherit the owner through their account** and never
+  store a copy.
+- **Route prefixes**:
+  - personal: API `/api/bank/...`, UI `/bank/...`;
+  - organization: API `/api/orgs/:orgId/bank/...`, UI `/orgs/:orgId/bank/...`.
+
+  The `bank` controllers are mounted under **both** prefixes, apply `@OwnerScoped()`, and serve
+  the same logic (backend routes keep the `.json` suffix, e.g. `/api/bank/accounts.json`).
+- **Account-name uniqueness is per owner**: the same name in Personal and in an organization is
+  allowed.
+- Moving money between a personal account and an organization account takes **two manual
+  transactions**, as for any two accounts.
+- Responses **never** contain `user_id` / `organization_id`. A wrong context (an organization
+  account on a personal route, or the reverse) returns **404**, like an unknown id.
+- All bank routes are **`user-scoped`** and send `X-Skip-Cache` (writes are `never`).
 
 ## Index
 
@@ -63,13 +97,15 @@ Deferred concerns are collected in [Future epics](#future-epics).
 | [#31](https://github.com/darthjee/ward/issues/31) | [accounts/investment.md](accounts/investment.md) — the investment model (ledger as current value, opening anchor 0, yield as transactions), investment fields (`bank_investment_details`), recording movements, `investment` object on the generic account routes, Investments submenu; `ui/menu.md` (Investments row); this `README.md` (index entry and `## Future epics`) |
 | [#32](https://github.com/darthjee/ward/issues/32) | `accounts/provider-expense.md` |
 | [#33](https://github.com/darthjee/ward/issues/33) | `bills.md`, `ui/calendar.md` |
+| [#40](https://github.com/darthjee/ward/issues/40) | [auth/organizations.md](../auth/organizations.md) — optional organizations, active context, user-or-organization-owned rule, `@OwnerScoped()`; this `README.md` (scope, decision, ownership contract, realignment note, sub-issue map, `## Future epics`); [auth/README.md](../auth/README.md) |
+| [#41](https://github.com/darthjee/ward/issues/41) | per-spec realignment to the ownership contract: `accounts/README.md`, `accounts/regular.md`, `accounts/transactions.md`, `accounts/debt.md`, `accounts/investment.md`, `ui/menu.md` |
 | Implementation / fold / remove sub-issues of #26 (created later by the *Continue* split) | build against this folder; the fold handles both `specs/banking/` and `specs/auth/`, then they are removed |
 
 ## Implementation order
 
 Rough order, refined when the implementation sub-issues are created:
 
-1. Organizations ([specs/auth/](../auth/README.md)).
+1. Organizations and the owner-context guard ([specs/auth/](../auth/README.md)).
 2. Accounts and their types.
 3. Bills and the calendar.
 
@@ -94,8 +130,8 @@ deferred concerns to this same list.
    owner at all times.
 3. **Closing (deleting) organizations** (from [auth/organizations.md](../auth/organizations.md#ownership))
    — owner-only. The epic must decide what happens to the organization's data: hard delete
-   with typed-name confirmation, soft delete or archive, or refusing while data exists. Closing
-   is what makes the zero-organizations state reachable (the UI already handles it).
+   with typed-name confirmation, soft delete or archive, or refusing while data exists. (Zero
+   organizations is already the normal state since #40, so closing adds no new UI state.)
 4. **Organization-creation rate limit** (from [auth/organizations.md](../auth/organizations.md#edge-cases))
    — cap the number of organizations created per user per time window through
    `POST /orgs.json`, configurable through env vars, answering 429 when exceeded. It is a
@@ -134,6 +170,12 @@ deferred concerns to this same list.
     `currentValue` field), one account stays one investment, and the one-currency-per-account
     rule applies. Per-asset tracking (tickers, quantities, prices) stays out of scope unless the
     epic chooses to include it.
+13. **Move an account between owners** (from [Bank ownership contract](#bank-ownership-contract))
+    — reassign an account and its child records from Personal to an organization or back. Must
+    keep the exactly-one-owner check and per-owner name uniqueness.
+14. **Share a personal record with an organization** (from [Bank ownership contract](#bank-ownership-contract))
+    — give organization members access to a personal record without changing its owner. Must
+    keep "personal data is private" as the default, and keep owner fields out of responses.
 
 ## Reference
 
@@ -141,7 +183,8 @@ deferred concerns to this same list.
 - Sub-issues: https://github.com/darthjee/ward/issues/27,
   https://github.com/darthjee/ward/issues/28, https://github.com/darthjee/ward/issues/29,
   https://github.com/darthjee/ward/issues/30, https://github.com/darthjee/ward/issues/31,
-  https://github.com/darthjee/ward/issues/32, https://github.com/darthjee/ward/issues/33
+  https://github.com/darthjee/ward/issues/32, https://github.com/darthjee/ward/issues/33,
+  https://github.com/darthjee/ward/issues/40, https://github.com/darthjee/ward/issues/41
 - Spec lifecycle: https://github.com/darthjee/ward/blob/main/docs/agents/specs.md
 - Product decisions (`bank` module, data ownership): https://github.com/darthjee/ward/blob/main/docs/agents/product.md
 
