@@ -17,8 +17,9 @@
 - **An account belongs to an organization** (see
   [auth/organizations.md](../../auth/organizations.md)), never directly to a user.
 - **The main accounts list shows `regular` accounts only.** Debt and provider-expense accounts
-  are seen in their own place (see [ui/menu.md](../ui/menu.md)). Whether investment accounts
-  appear in the main list is open ([investment.md](investment.md)).
+  are seen in their own place (see [ui/menu.md](../ui/menu.md)). Investment accounts are not in
+  the main list either: they have their own **Investments** submenu
+  ([investment.md](investment.md)).
 - Details specific to a type (fields, routes, permissions, cache class) live in that type's file.
   The fields common to every account are defined in [regular.md](regular.md); the ledger and
   balances in [transactions.md](transactions.md).
