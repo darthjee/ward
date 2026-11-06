@@ -14,8 +14,9 @@
   | `investment` | An investment | [investment.md](investment.md) |
   | `provider_expense` | Expenses with a provider, incl. business expenses for the accountant | [provider-expense.md](provider-expense.md) |
 
-- **An account belongs to an organization** (see
-  [auth/organizations.md](../../auth/organizations.md)), never directly to a user.
+- **An account has exactly one owner** — the user (Personal) or an organization — and every
+  child record inherits it (see the [Bank ownership contract](../README.md#bank-ownership-contract)
+  and [auth/organizations.md](../../auth/organizations.md#data-ownership)).
 - **The main accounts list shows `regular` accounts only.** Debt and provider-expense accounts
   are seen in their own place (see [ui/menu.md](../ui/menu.md)). Investment accounts are not in
   the main list either: they have their own **Investments** submenu
@@ -38,6 +39,8 @@
 
 - Epic: https://github.com/darthjee/ward/issues/26
 - This sub-issue: https://github.com/darthjee/ward/issues/27
+- Optional organizations, user-or-organization ownership: https://github.com/darthjee/ward/issues/40
+- Realignment to the ownership model: https://github.com/darthjee/ward/issues/41
 
 ## Required tests
 

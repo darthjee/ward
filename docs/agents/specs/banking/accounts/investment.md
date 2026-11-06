@@ -14,8 +14,9 @@
   [README.md](README.md)).
 - **One investment account = one investment** (e.g. a specific CDB or fund). A broker holding
   several assets is modelled as several investment accounts.
-- It belongs to an organization (see
-  [auth/organizations.md](../../auth/organizations.md#data-ownership)), never directly to a user.
+- It has exactly one owner — the user (Personal) or an organization — like every account, and
+  its investment details inherit that owner from the account (see
+  [regular.md](regular.md#data-sensitivity--ownership)).
 - Investment accounts are **not** shown in the main **Accounts** list (which stays `regular`
   only); they have their own **Investments** submenu in the Bank menu (see
   [ui/menu.md](../ui/menu.md) and [Investments submenu UI](#investments-submenu-ui)).
@@ -108,7 +109,7 @@ account types carry no investment columns):
     `currentValue − balance` and creates a "Yield" transaction for the difference (positive or
     negative). If the difference is `0`, no transaction is created and the UI shows
     "Value unchanged". No new route — it posts a regular transaction.
-  - The plain inline add of [regular.md](regular.md#detail--orgsorgidbankaccountsaccountid)
+  - The plain inline add of [regular.md](regular.md#detail)
     stays available.
 - **Moving money from a regular account** into an investment (or back) is two independent
   manual transactions, one on each account. Linking them is the *Linked transfers*
@@ -119,12 +120,14 @@ account types carry no investment columns):
 ## Investments submenu UI
 
 Investment accounts get their **own "Investments" submenu** in the Bank menu (see
-[ui/menu.md](../ui/menu.md)). All pages live under the active organization,
-`/orgs/:orgId/bank/investments…`, and mirror the
+[ui/menu.md](../ui/menu.md)). All pages live under the active context, `<ui>/investments…`
+(see [regular.md](regular.md#routes-and-permissions) for `<ui>`), and mirror the
 [Accounts submenu UI](regular.md#accounts-submenu-ui) and the
 [Debts submenu UI](debt.md#debts-submenu-ui).
 
-### List — `/orgs/:orgId/bank/investments`
+### List
+
+`<ui>/investments`
 
 - `investment` accounts only. Columns: name, institution, kind, current value (balance), yield
   rate with its period (e.g. "1.1% / month"), maturity date, currency. Amounts formatted with
@@ -135,16 +138,20 @@ Investment accounts get their **own "Investments" submenu** in the Bank menu (se
 - Empty state: "No investments yet" with a create button.
 - A row opens the detail page.
 
-### Detail — `/orgs/:orgId/bank/investments/:accountId`
+### Detail
 
-- As the [regular account detail](regular.md#detail--orgsorgidbankaccountsaccountid): header,
+`<ui>/investments/:accountId`
+
+- As the [regular account detail](regular.md#detail): header,
   actions, archived banner, paginated ledger with inline add / edit.
 - Plus an **investment info block**: kind, yield rate and period, maturity date, liquidity
   (D+N).
 - **Add application** / **Add withdrawal** / **Update value** shortcuts above the ledger (see
   [Recording movements](#recording-movements)); hidden on an archived investment.
 
-### Create / Edit — `/orgs/:orgId/bank/investments/new`, `/orgs/:orgId/bank/investments/:accountId/edit`
+### Create / Edit
+
+`<ui>/investments/new`, `<ui>/investments/:accountId/edit`
 
 - Common fields, with "Bank" relabelled **Institution** and the opening date labelled
   **Start date**.
@@ -158,7 +165,8 @@ Investment accounts get their **own "Investments" submenu** in the Bank menu (se
 Investments **reuse the generic account routes** of
 [regular.md](regular.md#routes-and-permissions) — no `/investments.json` routes, so archive /
 delete logic is not duplicated. Investment-specific data travels as a nested `investment`
-object. All routes live under `/api/orgs/:orgId/bank`.
+object. All routes live under the same base path as
+[regular.md](regular.md#routes-and-permissions) (`<base>`, both contexts).
 
 | Method | Route | Change for investments | Cache class |
 |---|---|---|---|
@@ -187,12 +195,12 @@ PATCH, `null` clears an optional field.
 
 Same as [regular.md](regular.md#rules):
 
-- **404, never 403** — misses (unknown, non-numeric, other-organization ids, non-member
-  `:orgId`) are indistinguishable.
-- **Permissions** — every member of the organization can do everything; roles are stored but
-  not enforced.
-- **Bodies** are whitelisted; never accepted: `organizationId`, `accountId`, `createdByUserId`,
-  `type` on PATCH, computed fields.
+- **404, never 403** — misses (unknown, non-numeric, another owner's or wrong-context ids,
+  non-member `:orgId`) are indistinguishable.
+- **Permissions** — in Personal, only the owner; in an organization context, every member can
+  do everything (roles are stored but not enforced).
+- **Bodies** are whitelisted; never accepted: `userId`, `organizationId`, `accountId`, `type`
+  on PATCH, computed fields.
 - **Caching** — `GET` routes are `user-scoped` (declared with `@CachePolicy`, sent with
   `X-Skip-Cache`); writes are `never`. Nothing goes into Navi's warm-up.
 
@@ -200,16 +208,16 @@ Same as [regular.md](regular.md#rules):
 
 As [regular.md](regular.md#data-sensitivity--ownership): investment fields are financial data
 but not credentials — no extra masking or encryption; request / response bodies are never
-logged. Investments belong to the organization; every member can see and edit them until the
-permission-system [Future epic](../README.md#future-epics).
+logged. Investments inherit the owner from their account; who sees and edits them follows
+[regular.md](regular.md#data-sensitivity--ownership).
 
 ## Owning module
 
 - **`bank`** (lazy tier), as [regular.md](regular.md#owning-module) — **no new module**.
 - **Table** — one new table, `bank_investment_details`: `account_id` is both PK and real FK to
   `bank_accounts.id` (`ON DELETE CASCADE`, same module), plus the investment fields. It carries
-  no `organization_id` of its own — the organization comes from the account.
-- **Other modules** — only `auth`, through the existing `@OrgScoped()` guard behind its DI
+  no owner columns — the owner comes from the account.
+- **Other modules** — only `auth`, through the existing `@OwnerScoped()` guard behind its DI
   token. No new cross-module access and no events.
 - **Shape (implementation hint)** — an investment-details part inside `bank`, called by the
   generic account service when `type = investment`; no separate controller, since the routes
@@ -230,7 +238,7 @@ Negligible: one small table in the already-lazy `bank` module, no new dependency
 ## Edge cases
 
 1. **Name uniqueness across types** — the [#29 rule](regular.md#name-uniqueness) (unique within
-   the organization, case-insensitive, among active accounts) applies across **all** account
+   its owner — Personal or an organization —, case-insensitive, among active accounts) applies across **all** account
    types: a regular "XP" and an investment "XP" clash (409).
 2. **No `investment` object on POST** — an investment account always gets a
    `bank_investment_details` row (all fields null), so reads never handle a missing row.
@@ -240,8 +248,8 @@ Negligible: one small table in the already-lazy `bank` module, no new dependency
 4. **Archived investment** — read-only as in #29 (only rename and unarchive); the
    **Add application** / **Add withdrawal** / **Update value** shortcuts are hidden.
 5. **Wrong-type deep links** — the frontend redirects an investment opened under
-   `/bank/accounts/:id` or `/bank/debts/:id` to `/bank/investments/:id`, and an account of
-   another type opened under `/bank/investments/:id` to its own type's path.
+   `<ui>/accounts/:id` or `<ui>/debts/:id` to `<ui>/investments/:id`, and an account of
+   another type opened under `<ui>/investments/:id` to its own type's path.
    `GET /accounts/:id.json` returns any type.
 6. **Past `maturityDate`** — allowed; it is just displayed.
 7. **Yield rate 0** — valid; it still requires a period.
@@ -266,8 +274,11 @@ Negligible: one small table in the already-lazy `bank` module, no new dependency
 - Ledger, opening anchor, currency and transactions (#29): https://github.com/darthjee/ward/blob/main/docs/agents/specs/banking/accounts/transactions.md
 - Details-table and nested-object pattern (#30): https://github.com/darthjee/ward/issues/30,
   https://github.com/darthjee/ward/blob/main/docs/agents/specs/banking/accounts/debt.md
-- Organizations, `@OrgScoped()`, data-ownership rule: https://github.com/darthjee/ward/issues/28,
+- Organizations, `@OwnerScoped()`, data-ownership rule: https://github.com/darthjee/ward/issues/28,
+  https://github.com/darthjee/ward/issues/40,
   https://github.com/darthjee/ward/blob/main/docs/agents/specs/auth/organizations.md
+- Bank ownership contract: https://github.com/darthjee/ward/blob/main/docs/agents/specs/banking/README.md#bank-ownership-contract
+- Realignment to the ownership model: https://github.com/darthjee/ward/issues/41
 - Cache classes (`user-scoped`, `never`, `X-Skip-Cache`): https://github.com/darthjee/ward/blob/main/docs/agents/architecture/caching.md
 - Spec lifecycle: https://github.com/darthjee/ward/blob/main/docs/agents/specs.md
 
@@ -301,8 +312,10 @@ Negligible: one small table in the already-lazy `bank` module, no new dependency
   unless `archived=true`; the default (`regular`) list excludes investments; no N+1 for
   balances or details.
 - `GET /accounts/:id.json` returns an investment account with its `investment` object.
-- Unknown, non-numeric and other-organization `:accountId`, and a non-member `:orgId`, → 404
-  with identical bodies on every investment-related call.
+- Unknown, non-numeric, another owner's and wrong-context `:accountId`, and a non-member
+  `:orgId`, → 404 with identical bodies on every investment-related call.
+- Investment routes follow the [regular.md owner-context matrix](regular.md#required-tests) in
+  both contexts (`/api/bank` and `/api/orgs/:orgId/bank`).
 - `GET` routes are `user-scoped` and send `X-Skip-Cache`; writes are `never`.
 - Request / response bodies are not logged.
 
@@ -322,9 +335,11 @@ Negligible: one small table in the already-lazy `bank` module, no new dependency
 - Create / Edit: labels Institution and Start date; no opening-balance field (`opening_balance`
   sent as `0`); the yield period appears only once a rate is entered; optional Kind, Maturity
   date, Liquidity (D+N) and Notes; `type` is not shown.
-- Wrong-type deep links: an investment opened under `/bank/accounts/:id` or `/bank/debts/:id`
-  redirects to `/bank/investments/:id`, and another type opened under
-  `/bank/investments/:id` redirects to its own path.
+- Wrong-type deep links: an investment opened under `<ui>/accounts/:id` or `<ui>/debts/:id`
+  redirects to `<ui>/investments/:id`, and another type opened under
+  `<ui>/investments/:id` redirects to its own path, in both contexts.
+- Investments pages render under both `/bank/investments...` and
+  `/orgs/:orgId/bank/investments...`, with links built from the active context.
 - Investments are absent from the **Accounts** list.
 - The Bank menu shows the **Investments** entry, listing investment accounts only.
 - Names, institution, notes and descriptions are rendered escaped.

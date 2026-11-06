@@ -19,15 +19,9 @@ Organizations belong to the `auth` module and are specified in [specs/auth/](../
 a dependency that is still implemented before any bank entity, because `@OwnerScoped()` and the
 organization routes are needed.
 
-> **Realignment pending.** The specs written by #29–#31 (`accounts/README.md`, `regular.md`,
-> `transactions.md`, `debt.md`, `investment.md`, `ui/menu.md`) still describe organization-only
-> scoping (`/api/orgs/:orgId/bank/...`, `@OrgScoped()`). They are **knowingly inconsistent**
-> with the [Bank ownership contract](#bank-ownership-contract) until the follow-up
-> [#41](https://github.com/darthjee/ward/issues/41) realigns them; where they differ, this
-> README and [auth/organizations.md](../auth/organizations.md) win.
-> [#32](https://github.com/darthjee/ward/issues/32) and
-> [#33](https://github.com/darthjee/ward/issues/33) wait for
-> [#40](https://github.com/darthjee/ward/issues/40).
+[#32](https://github.com/darthjee/ward/issues/32) and
+[#33](https://github.com/darthjee/ward/issues/33) are written against the realigned specs
+(after [#41](https://github.com/darthjee/ward/issues/41)).
 
 ## Decisions
 
@@ -77,8 +71,8 @@ Deferred concerns are collected in [Future epics](#future-epics).
 | File | Concern |
 |---|---|
 | [accounts/README.md](accounts/README.md) | `Account` and its `type`, common concepts, main-list rule |
-| [accounts/regular.md](accounts/regular.md) | Common account fields, regular accounts, name uniqueness, archive vs delete, account routes, Accounts submenu pages |
-| [accounts/transactions.md](accounts/transactions.md) | Ledger, opening anchor, computed balances, `Transaction` entity, currency, transaction and settings routes |
+| [accounts/regular.md](accounts/regular.md) | Common account fields, regular accounts, owner contexts (`<base>` / `<ui>`), per-owner name uniqueness, archive vs delete, account routes, owner-context test matrix, Accounts submenu pages |
+| [accounts/transactions.md](accounts/transactions.md) | Ledger, opening anchor, computed balances, `Transaction` entity, currency, transaction routes, settings routes in both contexts |
 | [accounts/debt.md](accounts/debt.md) | Debt accounts (loans): debt fields in `bank_debt_details`, ledger sign rules, payment / interest shortcuts, `debt` object on the generic account routes, Debts submenu pages |
 | [accounts/investment.md](accounts/investment.md) | Investment accounts (one per investment): plain ledger whose balance is the current value, opening anchor fixed at 0, application / withdrawal / yield movements and the Update value shortcut, informational fields in `bank_investment_details`, `investment` object on the generic account routes, Investments submenu pages |
 | [accounts/provider-expense.md](accounts/provider-expense.md) | Provider-expense accounts, incl. business expenses for the accountant |
@@ -98,7 +92,7 @@ Deferred concerns are collected in [Future epics](#future-epics).
 | [#32](https://github.com/darthjee/ward/issues/32) | `accounts/provider-expense.md` |
 | [#33](https://github.com/darthjee/ward/issues/33) | `bills.md`, `ui/calendar.md` |
 | [#40](https://github.com/darthjee/ward/issues/40) | [auth/organizations.md](../auth/organizations.md) — optional organizations, active context, user-or-organization-owned rule, `@OwnerScoped()`; this `README.md` (scope, decision, ownership contract, realignment note, sub-issue map, `## Future epics`); [auth/README.md](../auth/README.md) |
-| [#41](https://github.com/darthjee/ward/issues/41) | per-spec realignment to the ownership contract: `accounts/README.md`, `accounts/regular.md`, `accounts/transactions.md`, `accounts/debt.md`, `accounts/investment.md`, `ui/menu.md` |
+| [#41](https://github.com/darthjee/ward/issues/41) | per-spec realignment to the ownership contract: `accounts/README.md`, `accounts/regular.md`, `accounts/transactions.md`, `accounts/debt.md`, `accounts/investment.md`, `ui/menu.md`; the one-line owner fix in `accounts/provider-expense.md` and `bills.md`; this `README.md` (realignment note, index entries, sub-issue map row, `## Future epics`) |
 | Implementation / fold / remove sub-issues of #26 (created later by the *Continue* split) | build against this folder; the fold handles both `specs/banking/` and `specs/auth/`, then they are removed |
 
 ## Implementation order
@@ -142,8 +136,9 @@ deferred concerns to this same list.
    Transactions stay editable and hard-deletable until it exists; the epic decides what a
    cleared transaction locks.
 6. **Linked transfers** (from [accounts/transactions.md](accounts/transactions.md#transaction-entity))
-   — a transfer between two accounts of the organization recorded as one linked pair of
-   transactions. Until then: two independent manual transactions. Must respect the
+   — a transfer between two accounts of the **same owner** recorded as one linked pair of
+   transactions; cross-owner transfers stay two manual transactions. Until then: two
+   independent manual transactions. Must respect the
    one-currency-per-account rule (no conversion without the currency-conversion epic).
 7. **Counterparty / payee** (from [accounts/transactions.md](accounts/transactions.md#transaction-entity))
    — a field recording who paid or was paid.
@@ -176,6 +171,10 @@ deferred concerns to this same list.
 14. **Share a personal record with an organization** (from [Bank ownership contract](#bank-ownership-contract))
     — give organization members access to a personal record without changing its owner. Must
     keep "personal data is private" as the default, and keep owner fields out of responses.
+15. **Authorship / audit trail** (from [accounts/regular.md](accounts/regular.md#data-sensitivity--ownership))
+    — record which member created or changed a record in an organization, without changing the
+    single-owner rule (the user reference carries no owner semantics). The `createdByUserId`
+    planned by #29 was dropped by #41, so there is no `created_by` column until this epic.
 
 ## Reference
 
