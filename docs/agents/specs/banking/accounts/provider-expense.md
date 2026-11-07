@@ -38,9 +38,8 @@ routes / permissions / cache class.
 - **Linked transfers** — paying a provider from a regular account as one linked operation stays
   in the *Linked transfers* [Future epic](../README.md#future-epics); until then a payment is
   two manual transactions.
-- **Bill generation** — whether recurring charges create bills is decided by
-  [#33](https://github.com/darthjee/ward/issues/33) in [bills.md](../bills.md); this file only
-  records what a provider-expense account exposes (see [Charges and bills](#charges-and-bills)).
+- **Bill generation** — resolved by [#33](https://github.com/darthjee/ward/issues/33): see
+  [Charges and bills](#charges-and-bills) and [bills.md](../bills.md).
 - **Receipts / attachments** and **PDF accountant export** — deferred to the
   *Receipts / attachments* and *PDF accountant export* [Future epics](../README.md#future-epics)
   (see [Receipts / attachments](#receipts--attachments)).
@@ -90,7 +89,7 @@ Provider-specific fields, stored in a 1:1 table `bank_provider_expense_details` 
 | `forAccountant` | boolean, **required**, default `true` | Whether the account's charges are business expenses; see [Business expenses for the accountant](#business-expenses-for-the-accountant) |
 | `providerTaxId` | free text, max 32, optional | The provider's tax id (e.g. CNPJ); a CSV column; shown in full (a business's public identifier) |
 | `expectedAmount` | `BIGINT` minor units, > 0, optional | Typical recurring charge; within the amount bound (10¹³ minor units) of [transactions.md](transactions.md#currency); suggested by **Add charge**; available to #33 |
-| `dueDay` | int 1–31, optional | Day of the month a charge is due; 29–31 clamp to the month's last day (applied by #33). Available to #33 |
+| `dueDay` | int 1–31, optional | Day of the month a charge is due; 29–31 clamp to the month's last day, see [bills.md](../bills.md#recurrence-model) |
 | `chargeFrequency` | `monthly` \| `yearly` | Defaults to `monthly` |
 | `dueMonth` | int 1–12 | Month a charge is due; required when `chargeFrequency` is `yearly`, unset otherwise |
 
@@ -192,9 +191,9 @@ is one of its use cases), the user reports refunds to the accountant outside War
 
 ## Charges and bills
 
-Whether and how recurring charges become bills on the Calendar is **left entirely to
-[#33](https://github.com/darthjee/ward/issues/33)** ([bills.md](../bills.md)). A
-provider-expense account only exposes, for it:
+Resolved by [#33](https://github.com/darthjee/ward/issues/33) — recurring charges become
+derived Calendar occurrences, and one-off bills reference a provider; see
+[bills.md](../bills.md). A provider-expense account exposes, for it:
 
 - `expectedAmount`, `chargeFrequency` (`monthly` | `yearly`), `dueDay` and `dueMonth` (yearly
   only);
@@ -202,8 +201,9 @@ provider-expense account only exposes, for it:
 - the computed balance, the opening date and the archived state.
 
 No bill rows and no schedule are stored by provider-expense accounts. A balance at or above zero
-is **not** a stop condition for anything. **Flagged for #33:** whether paying a bill records a
-charge, a payment, or both on the provider ledger.
+is **not** a stop condition for anything. **Resolved by #33:** paying a bill records a
+payment plus an optional charge ("Also record the charge"); see
+[bills.md](../bills.md#paying-a-bill).
 
 ## Providers submenu UI
 
@@ -456,8 +456,8 @@ redirect to the account's own type's path (`<ui>/providers/:id` for a provider-e
 - [x] Whether provider-expense and debt accounts share one submenu — **one each**: providers get
   their own **Providers** submenu (see [Providers submenu UI](#providers-submenu-ui) and
   [ui/menu.md](../ui/menu.md)).
-- [x] Whether provider-expense accounts generate bills — left to #33; see
-  [Charges and bills](#charges-and-bills).
+- [x] Whether provider-expense accounts generate bills — yes, decided by #33 in
+  [bills.md](../bills.md); see [Charges and bills](#charges-and-bills).
 - [x] How expenses are collected and handed to the accountant — see
   [Business expenses for the accountant](#business-expenses-for-the-accountant).
 - [x] Fields specific to provider-expense accounts — see [Fields](#fields).

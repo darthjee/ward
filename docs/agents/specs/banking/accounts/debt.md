@@ -30,9 +30,8 @@ for bills.
 - **Linked transfers** — paying a debt from a regular account as one linked operation stays in
   the *Linked transfers* [Future epic](../README.md#future-epics); until then a payment is two
   manual transactions.
-- **Bill generation** — whether instalments create bills is decided by
-  [#33](https://github.com/darthjee/ward/issues/33) in [bills.md](../bills.md); this file only
-  records what a debt exposes (see [Instalments and bills](#instalments-and-bills)).
+- **Bill generation** — resolved by [#33](https://github.com/darthjee/ward/issues/33): see
+  [Instalments and bills](#instalments-and-bills) and [bills.md](../bills.md).
 - **Interest automation** — the interest rate is informational only: no automatic accrual, no
   amortization schedule (Price / SAC) and no projected payoff. Interest is entered as a
   transaction when it is charged.
@@ -73,7 +72,7 @@ Debt-specific fields, **all optional**, stored in a 1:1 table `bank_debt_details
 | `interestRate` | decimal (e.g. `1.99`) | Informational: the rate to apply when entering interest. 0–100, at most 4 decimals |
 | `interestPeriod` | `monthly` \| `yearly` | Required when `interestRate` is set, and only then |
 | `instalmentAmount` | `BIGINT` minor units, > 0 | Expected payment per instalment; within the amount bound (10¹³ minor units) of [transactions.md](transactions.md#currency). Available to #33 for bills |
-| `dueDay` | int 1–31 | Day of the month an instalment is due; 29–31 clamp to the month's last day (applied by #33). Available to #33 |
+| `dueDay` | int 1–31 | Day of the month an instalment is due; 29–31 clamp to the month's last day, see [bills.md](../bills.md#recurrence-model) |
 | `instalmentFrequency` | `monthly` \| `yearly` | Defaults to `monthly` |
 | `dueMonth` | int 1–12 | Month an instalment is due; required when `instalmentFrequency` is `yearly`, unset otherwise |
 | `instalmentCount` | int ≥ 1 | Informational total number of instalments; empty = open-ended |
@@ -109,9 +108,10 @@ balances allowed) but are revolving and start at zero. They are a **separate fut
 
 ## Instalments and bills
 
-Whether and how debt instalments become bills on the Calendar is **left entirely to
-[#33](https://github.com/darthjee/ward/issues/33)** ([bills.md](../bills.md)). A debt only
-exposes, for it:
+Resolved by [#33](https://github.com/darthjee/ward/issues/33) — instalments become derived
+Calendar occurrences, with the `billsFrom`, `showInCalendar` and default paying-account fields;
+see [bills.md](../bills.md#schedule-fields-on-source-accounts) and
+[bills.md](../bills.md#recurrence-model). A debt exposes, for it:
 
 - `instalmentAmount`, `instalmentFrequency` (`monthly` | `yearly`), `dueDay`, `dueMonth`
   (yearly only) and `instalmentCount`;
@@ -263,16 +263,16 @@ Negligible: one small table in the already-lazy `bank` module, no new dependency
    `<ui>/debts/:id` to `<ui>/accounts/:id`. `GET /accounts/:id.json` returns any type.
 8. **Instalment amount larger than the amount owed** — allowed; no cross-field checks (nor
    between `instalment_count × instalment_amount` and the balance).
-9. **`due_day` 29–31** — stored as given; clamping to the month's last day is applied by #33
-   when building bills.
+9. **`due_day` 29–31** — stored as given; the clamp is defined in
+   [bills.md](../bills.md#recurrence-model).
 10. **Interest rate 0** — valid (interest-free loan); it still requires a period.
 
 ## Resolved questions
 
 - [x] Whether debt and provider-expense accounts share one submenu — debts get their **own
   "Debts" submenu**; #32 may still propose merging (see [ui/menu.md](../ui/menu.md)).
-- [x] Whether debts generate bills — decided by #33 in [bills.md](../bills.md); debts only
-  expose the fields listed in [Instalments and bills](#instalments-and-bills).
+- [x] Whether debts generate bills — yes, as derived occurrences; decided by #33 in
+  [bills.md](../bills.md). See [Instalments and bills](#instalments-and-bills).
 - [x] Fields specific to debt accounts — see [Fields](#fields).
 - [x] Routes, permissions and cache class — see [Routes and permissions](#routes-and-permissions).
 
