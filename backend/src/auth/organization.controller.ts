@@ -83,7 +83,10 @@ export class OrganizationController {
   }
 
   /**
-   * `PATCH /orgs/:orgId.json`. Renames an organization the caller is a member of.
+   * `PATCH /orgs/:orgId.json`. Renames an organization the caller is a member of. The body is
+   * validated before `:orgId` or membership is checked, so an invalid body answers 400 even for an
+   * unknown or foreign organization; this is deliberate, as the 400 depends only on the body and
+   * cannot be used to enumerate organizations (owner-scoped routes answer their 404 first instead).
    * @param {AccessTokenPayload} caller - The authenticated user.
    * @param {string} rawOrgId - The raw `:orgId` route parameter.
    * @param {OrganizationNameDto} dto - The new name (only field accepted, required).

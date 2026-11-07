@@ -9,6 +9,7 @@ import {
   useOrganizationTestApp,
   withoutTimestamp,
 } from './organization.controller.e2e-test-support.js';
+import { expectValidationErrorBody } from './support/error-body.js';
 
 const UNIFORM_404 = { error: { code: 'NOT_FOUND', message: 'Not Found' }, statusCode: 404 };
 
@@ -100,6 +101,28 @@ describe('OrganizationController (e2e) — uniform 404', () => {
 
       expect(withoutTimestamp(response)).toEqual(UNIFORM_404);
       expect(ctx.current.organizationRepo.rows[0].name).toBe('Family');
+    });
+
+    // Deliberate: `@StrictBody()` validates the body before the handler parses `:orgId` or checks
+    // membership, so an invalid body answers 400 even where a valid one would get the uniform 404.
+    // The 400 depends only on the body, never on membership, so it cannot be used to enumerate
+    // organizations. `@OwnerScopedController` routes order it the other way (the guard's 404 first).
+    describe('with an invalid body (400 before 404)', () => {
+      it.each([
+        ['a non-member', 'outsider', 1, { name: '' }],
+        ['an unknown id', 'owner', 999, { name: 'x', role: 'admin' }],
+        ['a malformed id', 'owner', 'abc', { name: 'x', color: 'red' }],
+      ] as const)('answers 400 for %s, writing nothing', async (_label, who, orgId, body) => {
+        const cookie = who === 'owner' ? owner : outsider;
+
+        const response = await renameOrganization(ctx.current.app, cookie, orgId, body);
+
+        expectValidationErrorBody(response);
+        expect(ctx.current.organizationRepo.rows).toHaveLength(1);
+        expect(ctx.current.organizationRepo.rows[0].name).toBe('Family');
+        expect(ctx.current.membershipRepo.rows).toHaveLength(1);
+        expect(ctx.current.membershipRepo.rows[0].role).toBe('owner');
+      });
     });
   });
 });
