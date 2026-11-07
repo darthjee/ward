@@ -12,7 +12,7 @@ The **Bank** menu has these entries:
 | **Accounts** | `regular` accounts only: list, detail (with the ledger), create / edit pages ([accounts/regular.md](../accounts/regular.md#accounts-submenu-ui)) | Specified | [#29](https://github.com/darthjee/ward/issues/29) |
 | **Debts** | `debt` accounts only: list, detail (with the ledger and the Add payment / Add interest shortcuts), create / edit pages ([accounts/debt.md](../accounts/debt.md#debts-submenu-ui)) | Specified | [#30](https://github.com/darthjee/ward/issues/30) |
 | **Investments** | `investment` accounts only: list, detail (with the ledger and the Add application / Add withdrawal / Update value shortcuts), create / edit pages ([accounts/investment.md](../accounts/investment.md#investments-submenu-ui)) | Specified | [#31](https://github.com/darthjee/ward/issues/31) |
-| **Provider-expense accounts** | `provider_expense` accounts ([accounts/provider-expense.md](../accounts/provider-expense.md)) | Place decided; shared with debt or not is open | [#32](https://github.com/darthjee/ward/issues/32) |
+| **Providers** | `provider_expense` accounts only: list, detail (with the ledger and the Add charge / Add payment shortcuts), create / edit pages, accountant hand-off ([accounts/provider-expense.md](../accounts/provider-expense.md#providers-submenu-ui)) | Specified | [#32](https://github.com/darthjee/ward/issues/32) |
 | **Calendar** | Upcoming bills ([calendar.md](calendar.md)) | Decided | [#33](https://github.com/darthjee/ward/issues/33) |
 
 - **Context** — the menu is the same in every context (Personal or an organization); its links
@@ -20,26 +20,31 @@ The **Bank** menu has these entries:
   context switcher itself is specified in
   [auth/organizations.md](../../auth/organizations.md#active-context).
   - Switching context from a bank page lands on the **same section's list** in the new context
-    (Accounts, Debts or Investments), never on the same record id (which would 404).
+    (Accounts, Debts, Investments or Providers), never on the same record id (which would 404).
   - With zero organizations, the bank menu and pages work fully in Personal.
 
 ## Open questions
 
-- [ ] One shared submenu for debt and provider-expense accounts, or one each (#30 / #32). #30
-  decided debts get their own **Debts** submenu; #32 may still propose merging, in which case
-  #30 and #32 merge their two rows into one.
+None.
+
+## Resolved questions
+
+- [x] One shared submenu for debt and provider-expense accounts, or one each (#30 / #32) —
+  **one each**: #30 gave debts their own **Debts** submenu and #32 gave provider-expense
+  accounts their own **Providers** submenu.
 
 ## Reference
 
 - Epic: https://github.com/darthjee/ward/issues/26
 - This sub-issue: https://github.com/darthjee/ward/issues/27
+- Providers row (provider-expense accounts): https://github.com/darthjee/ward/issues/32
 - Active context and ownership model: https://github.com/darthjee/ward/issues/40,
   https://github.com/darthjee/ward/issues/41
 
 ## Required tests
 
-- The Bank menu shows the **Accounts** and **Calendar** entries and a place for debt /
-  provider-expense accounts.
+- The Bank menu shows the **Accounts**, **Debts**, **Investments**, **Providers** and
+  **Calendar** entries.
 - The **Accounts** entry lists `regular` accounts only.
 - Menu links are built from the active context, in both Personal and an organization context.
 - Switching context from a bank page lands on the same section's list in the new context.

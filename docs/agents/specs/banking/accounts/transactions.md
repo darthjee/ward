@@ -77,14 +77,15 @@ projected balance) needs no data migration.
 | `amount` | yes | yes | **Signed**: positive = money in, negative = money out; zero rejected. Storage format: see [Currency](#currency) |
 | `description` | yes | yes | Trimmed, max 255 characters |
 | `notes` | no | yes | Free text, max 2000 characters |
+| `sentToAccountantAt` | no | no | Nullable `DATETIME`; provider-expense charges only, set and cleared only by the accountant hand-off routes — see [provider-expense.md](provider-expense.md#business-expenses-for-the-accountant) |
 | `createdAt` / `updatedAt` | — | — | |
 
 - **Editable and hard-deletable** — nothing is locked until reconciliation exists.
 - Transactions of an **archived account are read-only** (see
   [regular.md](regular.md#archive-vs-delete)): create / edit / delete → 409.
 - Over-long fields → 400, never truncated.
-- **Attachments** (receipts) are out of scope for this spec (more relevant to the accountant
-  flow of #32).
+- **Attachments** (receipts) are out of scope for this spec; see the *Receipts / attachments*
+  [Future epic](../README.md#future-epics).
 
 ## Currency
 
@@ -133,8 +134,9 @@ owner-based permissions, `snake_case`).
 
 - **A transaction of another account** (or of an account of another owner, or of the other
   context) → 404, indistinguishable from an unknown or non-numeric id.
-- **Bodies never accept** `accountId`, `userId`, `organizationId` or computed fields
-  (running balance); unknown fields → 400.
+- **Bodies never accept** `accountId`, `userId`, `organizationId`, `sentToAccountantAt` (set
+  only through the hand-off routes of [provider-expense.md](provider-expense.md#hand-off-routes))
+  or computed fields (running balance); unknown fields → 400.
 - **UI** — transactions are added and edited **inline**, in a form row at the top of the ledger
   on the account detail page (see [regular.md](regular.md#detail));
   deleting asks for confirmation. Amounts are formatted with `Intl` in the account's currency.
