@@ -7,6 +7,11 @@ import { Test } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import cookieParser from 'cookie-parser';
 import request from 'supertest';
+import {
+  createInMemoryOrganizationRepos,
+  type InMemoryMembershipRepo,
+  type InMemoryOrganizationRepo,
+} from './in-memory-organization-repos.js';
 import { createInMemoryRepo } from './in-memory-repo.js';
 import { InMemorySessionLookup } from './in-memory-session-lookup.js';
 import { AdminGuard } from '../../../core/admin.guard.js';
@@ -15,16 +20,20 @@ import { HttpExceptionFilter } from '../../../core/http-exception.filter.js';
 import { JwtGuard } from '../../../core/jwt.guard.js';
 import { LoggingModule } from '../../../core/logging.module.js';
 import { OriginGuard } from '../../../core/origin.guard.js';
+import { OwnerContextGuard } from '../../../core/owner-context.guard.js';
 import { SESSION_LOOKUP } from '../../../core/session-lookup.js';
 import { AuthModule } from '../../auth.module.js';
 import { AccountEditLockout } from '../../entities/account-edit-lockout.entity.js';
 import { AuthorizationRequest } from '../../entities/authorization-request.entity.js';
+import { OrganizationMembership } from '../../entities/organization-membership.entity.js';
+import { Organization } from '../../entities/organization.entity.js';
 import { PasswordResetToken } from '../../entities/password-reset-token.entity.js';
 import { RefreshToken } from '../../entities/refresh-token.entity.js';
 import { User } from '../../entities/user.entity.js';
 
 export interface BuildAuthTestAppOptions {
   adminGuard?: boolean;
+  ownerContextGuard?: boolean;
   registerDefaultUser?: boolean;
   configOverrides?: Record<string, string>;
   controllers?: Type<unknown>[];
@@ -37,6 +46,8 @@ export interface BuildAuthTestAppResult {
   passwordResetTokenRepo: ReturnType<typeof createInMemoryRepo<PasswordResetToken>>;
   authorizationRequestRepo: ReturnType<typeof createInMemoryRepo<AuthorizationRequest>>;
   accountEditLockoutRepo: ReturnType<typeof createInMemoryRepo<AccountEditLockout>>;
+  organizationRepo: InMemoryOrganizationRepo;
+  membershipRepo: InMemoryMembershipRepo;
 }
 
 // Builds a fresh app instance wired the same way across every auth e2e spec
@@ -50,7 +61,8 @@ export interface BuildAuthTestAppResult {
 // the standard error body, as under the real `AppModule`);
 // overrides the `User`, `RefreshToken`, `PasswordResetToken`,
 // `AuthorizationRequest`, and `AccountEditLockout` repository tokens with fresh
-// `createInMemoryRepo()` instances; overrides `SESSION_LOOKUP` with an
+// `createInMemoryRepo()` instances, and the `Organization`/`OrganizationMembership`
+// tokens with `createInMemoryOrganizationRepos()` (sharing a fake transaction manager); overrides `SESSION_LOOKUP` with an
 // `InMemorySessionLookup` over the user/refresh-token repos' live rows (the
 // real `SessionService` join cannot run on the in-memory repos), so
 // `JwtGuard`'s session gate sees logouts, revocations and row edits made by
@@ -61,6 +73,9 @@ export interface BuildAuthTestAppResult {
 // - `adminGuard: true` also registers the `APP_GUARD`/`AdminGuard` provider,
 //   after `JwtGuard` (order matters: `JwtGuard` must run first so
 //   `AdminGuard` sees the authenticated user).
+// - `ownerContextGuard: true` also registers the `APP_GUARD`/`OwnerContextGuard`
+//   provider, last (after `JwtGuard`/`AdminGuard`, as in `AppModule`), backed by
+//   the real `OrganizationService` over the in-memory organization repos.
 // - `registerDefaultUser: false` skips registering the `darthjee` user, for
 //   specs that register their own users.
 // - `configOverrides` (non-empty) overrides `ConfigService` with a plain
@@ -71,6 +86,7 @@ export interface BuildAuthTestAppResult {
 // - `controllers` registers extra (throwaway) controllers on the test module.
 export async function buildAuthTestApp({
   adminGuard = false,
+  ownerContextGuard = false,
   registerDefaultUser = true,
   configOverrides = {},
   controllers = [],
@@ -80,6 +96,7 @@ export async function buildAuthTestApp({
   const passwordResetTokenRepo = createInMemoryRepo<PasswordResetToken>();
   const authorizationRequestRepo = createInMemoryRepo<AuthorizationRequest>();
   const accountEditLockoutRepo = createInMemoryRepo<AccountEditLockout>();
+  const { organizationRepo, membershipRepo } = createInMemoryOrganizationRepos();
 
   const moduleBuilder = Test.createTestingModule({
     imports: [
@@ -94,6 +111,7 @@ export async function buildAuthTestApp({
       { provide: APP_GUARD, useClass: OriginGuard },
       { provide: APP_GUARD, useClass: JwtGuard },
       ...(adminGuard ? [{ provide: APP_GUARD, useClass: AdminGuard }] : []),
+      ...(ownerContextGuard ? [{ provide: APP_GUARD, useClass: OwnerContextGuard }] : []),
       { provide: APP_INTERCEPTOR, useClass: CachePolicyInterceptor },
       { provide: APP_FILTER, useClass: HttpExceptionFilter },
     ],
@@ -108,6 +126,10 @@ export async function buildAuthTestApp({
     .useValue(authorizationRequestRepo)
     .overrideProvider(getRepositoryToken(AccountEditLockout))
     .useValue(accountEditLockoutRepo)
+    .overrideProvider(getRepositoryToken(Organization))
+    .useValue(organizationRepo)
+    .overrideProvider(getRepositoryToken(OrganizationMembership))
+    .useValue(membershipRepo)
     .overrideProvider(SESSION_LOOKUP)
     .useValue(new InMemorySessionLookup(userRepo.rows, refreshTokenRepo.rows));
 
@@ -135,5 +157,7 @@ export async function buildAuthTestApp({
     passwordResetTokenRepo,
     authorizationRequestRepo,
     accountEditLockoutRepo,
+    organizationRepo,
+    membershipRepo,
   };
 }

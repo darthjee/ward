@@ -13,16 +13,20 @@ import { AuthorizationRequestService } from './authorization-request.service.js'
 import { MailModule } from '../mail/mail.module.js';
 import { AccountEditLockout } from './entities/account-edit-lockout.entity.js';
 import { AuthorizationRequest } from './entities/authorization-request.entity.js';
+import { OrganizationMembership } from './entities/organization-membership.entity.js';
+import { Organization } from './entities/organization.entity.js';
 import { PasswordResetToken } from './entities/password-reset-token.entity.js';
 import { RefreshToken } from './entities/refresh-token.entity.js';
 import { User } from './entities/user.entity.js';
 import { PasswordRecoveryRequestedListener } from './events/password-recovery-requested.listener.js';
+import { OrganizationService } from './organization.service.js';
 import { PasswordResetService } from './password-reset.service.js';
 import { SessionStatusService } from './session-status.service.js';
 import { SessionService } from './session.service.js';
 import { TokenService } from './token.service.js';
 import { UserApprovalConfig } from './user-approval.config.js';
 import { UserUpdateService } from './user-update.service.js';
+import { ORGANIZATION_MEMBERSHIP_LOOKUP } from '../core/organization-membership-lookup.js';
 import { SESSION_LOOKUP } from '../core/session-lookup.js';
 
 /**
@@ -34,6 +38,11 @@ import { SESSION_LOOKUP } from '../core/session-lookup.js';
  * `SESSION_LOOKUP` port (implemented by `SessionService`, which itself stays
  * unexported) so the global `JwtGuard` can check every access token's
  * session without `core/` importing `auth/`.
+ *
+ * Owns organizations: exports `OrganizationService` (the only way other
+ * modules read memberships) and provides Core's
+ * `ORGANIZATION_MEMBERSHIP_LOOKUP` port with it, so the global
+ * `OwnerContextGuard` checks memberships without `core/` importing `auth/`.
  */
 @Module({
   imports: [
@@ -43,6 +52,8 @@ import { SESSION_LOOKUP } from '../core/session-lookup.js';
       PasswordResetToken,
       AuthorizationRequest,
       AccountEditLockout,
+      Organization,
+      OrganizationMembership,
     ]),
     MailModule,
   ],
@@ -61,6 +72,8 @@ import { SESSION_LOOKUP } from '../core/session-lookup.js';
     SessionService,
     SessionStatusService,
     { provide: SESSION_LOOKUP, useExisting: SessionService },
+    OrganizationService,
+    { provide: ORGANIZATION_MEMBERSHIP_LOOKUP, useExisting: OrganizationService },
     {
       provide: UserApprovalConfig,
       inject: [ConfigService],
@@ -68,7 +81,7 @@ import { SESSION_LOOKUP } from '../core/session-lookup.js';
         UserApprovalConfig.fromConfigService(configService),
     },
   ],
-  exports: [AuthService, SESSION_LOOKUP],
+  exports: [AuthService, SESSION_LOOKUP, OrganizationService, ORGANIZATION_MEMBERSHIP_LOOKUP],
 })
 // NestJS module classes are intentionally empty; all behavior lives in @Module().
 // eslint-disable-next-line @typescript-eslint/no-extraneous-class

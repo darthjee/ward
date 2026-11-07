@@ -2,7 +2,7 @@
 // the TypeORM find operators the auth specs rely on (`IsNull()`, used by
 // `TokenService#revokeUserTokens`; `MoreThan()`; `ILike()`, used by the
 // admin user search; `Not()`, used by `AuthService#assertAvailableForUpdate`'s
-// self-exclusion) in addition to plain equality — real TypeORM/MySQL
+// self-exclusion; `In()`, used by `OrganizationService#listForUser`) in addition to plain equality — real TypeORM/MySQL
 // handles them natively, this in-memory stand-in needs to special-case them.
 export function matchesCondition(rowValue: unknown, conditionValue: unknown): boolean {
   if (conditionValue && typeof conditionValue === 'object' && 'type' in conditionValue) {
@@ -14,6 +14,10 @@ export function matchesCondition(rowValue: unknown, conditionValue: unknown): bo
 
     if (operator.type === 'moreThan') {
       return (rowValue as Date) > (operator.value as Date);
+    }
+
+    if (operator.type === 'in') {
+      return (operator.value as unknown[]).includes(rowValue);
     }
 
     if (operator.type === 'not') {
