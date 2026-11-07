@@ -12,14 +12,21 @@ import {
 const UNIFORM_404 = { error: { code: 'NOT_FOUND', message: 'Not Found' }, statusCode: 404 };
 
 describe('OrganizationController (e2e) — uniform 404', () => {
-  const ctx = useOrganizationTestApp();
+  const ctx = useOrganizationTestApp({ perFile: true });
   let owner: string;
   let outsider: string;
 
-  beforeEach(async () => {
+  // Users and the organization are set up once per app (bcrypt-heavy); the tests that change state
+  // undo it in `afterEach`.
+  beforeAll(async () => {
     owner = await loginCookie(ctx.current.app);
     await createOrganization(ctx.current.app, owner, { name: 'Family' }).expect(201);
     outsider = await registerAndLogin(ctx.current.app, 'leia');
+  });
+
+  afterEach(() => {
+    ctx.current.userRepo.rows.find((user) => user.username === 'leia')!.isAdmin = false;
+    ctx.current.organizationRepo.rows[0].name = 'Family';
   });
 
   describe('GET /orgs/:orgId.json', () => {
@@ -50,14 +57,18 @@ describe('OrganizationController (e2e) — uniform 404', () => {
     });
 
     it('answers the same 404 for a malformed id that would coerce to an existing one', async () => {
-      await createOrganization(ctx.current.app, owner, { name: 'Second' }).expect(201);
       ctx.current.organizationRepo.rows[0].id = 1000;
       ctx.current.membershipRepo.rows[0].organizationId = 1000;
 
-      await showOrganization(ctx.current.app, owner, 1000).expect(200);
-      const response = await showOrganization(ctx.current.app, owner, '1e3').expect(404);
+      try {
+        await showOrganization(ctx.current.app, owner, 1000).expect(200);
+        const response = await showOrganization(ctx.current.app, owner, '1e3').expect(404);
 
-      expect(withoutTimestamp(response)).toEqual(UNIFORM_404);
+        expect(withoutTimestamp(response)).toEqual(UNIFORM_404);
+      } finally {
+        ctx.current.organizationRepo.rows[0].id = 1;
+        ctx.current.membershipRepo.rows[0].organizationId = 1;
+      }
     });
   });
 

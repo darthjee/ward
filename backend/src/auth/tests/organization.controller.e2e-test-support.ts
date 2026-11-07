@@ -10,17 +10,21 @@ export const ORGANIZATION_KEYS = ['created_at', 'id', 'name', 'role', 'updated_a
 // Every malformed `:orgId` the spec lists (plus `0`): each must answer the same 404 as an unknown id.
 export const MALFORMED_ORG_IDS = ['abc', '007', '0', '-1', '1.5', '1e3', '99999999999', '2147483648'];
 
-// Registers the per-test app scaffold for the organization e2e specs (the default `darthjee` user is
-// registered by `buildAuthTestApp`). Must be called synchronously inside a `describe` body; the
-// returned getter object always points at the current test's app.
-export function useOrganizationTestApp(): { readonly current: BuildAuthTestAppResult } {
+// Registers the app scaffold for the organization e2e specs (the default `darthjee` user is
+// registered by `buildAuthTestApp`): a fresh app per test, or one per file with `perFile: true` (for
+// specs whose bcrypt-heavy setup would otherwise exceed the hook timeout; they must undo their own
+// state changes). Must be called synchronously inside a `describe` body; the returned getter object
+// always points at the current app.
+export function useOrganizationTestApp({ perFile = false }: { perFile?: boolean } = {}): {
+  readonly current: BuildAuthTestAppResult;
+} {
   let current: BuildAuthTestAppResult;
 
-  beforeEach(async () => {
+  (perFile ? beforeAll : beforeEach)(async () => {
     current = await buildAuthTestApp();
   });
 
-  afterEach(async () => {
+  (perFile ? afterAll : afterEach)(async () => {
     await current.app.close();
   });
 

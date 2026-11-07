@@ -26,8 +26,10 @@ describe('@OwnerScopedController (e2e)', () => {
   let owner: string;
   let outsider: string;
   let ownerId: number;
+  const removedMemberships: BuildAuthTestAppResult['membershipRepo']['rows'] = [];
 
-  beforeEach(async () => {
+  // Built once per file (bcrypt-heavy setup); the tests that change state undo it in `afterEach`.
+  beforeAll(async () => {
     current = await buildAuthTestApp({ adminGuard: true, ownerContextGuard: true, controllers: [WidgetsTestController] });
     owner = await loginCookie(current.app);
     ownerId = current.userRepo.rows[0].id;
@@ -35,7 +37,15 @@ describe('@OwnerScopedController (e2e)', () => {
     outsider = await registerAndLogin(current.app, 'leia');
   });
 
-  afterEach(async () => {
+  afterEach(() => {
+    current.userRepo.rows[1].isAdmin = false;
+
+    if (current.membershipRepo.rows.length === 0) {
+      current.membershipRepo.rows.push(...removedMemberships);
+    }
+  });
+
+  afterAll(async () => {
     await current.app.close();
   });
 
@@ -80,7 +90,7 @@ describe('@OwnerScopedController (e2e)', () => {
 
     it('checks membership on every request', async () => {
       await getOwner(current.app, owner, '/orgs/1').expect(200);
-      current.membershipRepo.rows.splice(0);
+      removedMemberships.splice(0, removedMemberships.length, ...current.membershipRepo.rows.splice(0));
 
       const response = await getOwner(current.app, owner, '/orgs/1').expect(404);
 
