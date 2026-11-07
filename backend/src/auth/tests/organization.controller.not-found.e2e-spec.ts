@@ -3,6 +3,7 @@ import {
   loginCookie,
   MALFORMED_ORG_IDS,
   registerAndLogin,
+  SETUP_TIMEOUT_MS,
   renameOrganization,
   showOrganization,
   useOrganizationTestApp,
@@ -22,7 +23,7 @@ describe('OrganizationController (e2e) — uniform 404', () => {
     owner = await loginCookie(ctx.current.app);
     await createOrganization(ctx.current.app, owner, { name: 'Family' }).expect(201);
     outsider = await registerAndLogin(ctx.current.app, 'leia');
-  });
+  }, SETUP_TIMEOUT_MS);
 
   afterEach(() => {
     ctx.current.userRepo.rows.find((user) => user.username === 'leia')!.isAdmin = false;

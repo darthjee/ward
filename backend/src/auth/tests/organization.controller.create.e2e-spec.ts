@@ -3,6 +3,7 @@ import {
   createOrganization,
   loginCookie,
   ORGANIZATION_KEYS,
+  SETUP_TIMEOUT_MS,
   registerUser,
   useOrganizationTestApp,
 } from './organization.controller.e2e-test-support.js';
@@ -11,11 +12,17 @@ import { expectValidationErrorBody } from './support/error-body.js';
 const ISO_TIMESTAMP = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
 
 describe('OrganizationController (e2e) — POST /orgs.json', () => {
-  const ctx = useOrganizationTestApp();
+  // One app per file (bcrypt-heavy setup); every test starts with no organization.
+  const ctx = useOrganizationTestApp({ perFile: true });
   let cookie: string;
 
-  beforeEach(async () => {
+  beforeAll(async () => {
     cookie = await loginCookie(ctx.current.app);
+  }, SETUP_TIMEOUT_MS);
+
+  beforeEach(() => {
+    ctx.current.organizationRepo.rows.splice(0);
+    ctx.current.membershipRepo.rows.splice(0);
   });
 
   describe('registration', () => {
@@ -34,14 +41,14 @@ describe('OrganizationController (e2e) — POST /orgs.json', () => {
       const userId = ctx.current.userRepo.rows[0].id;
 
       expect(response.body).toEqual({
-        id: 1,
+        id: expect.any(Number),
         name: 'Family',
         role: 'owner',
         created_at: expect.stringMatching(ISO_TIMESTAMP),
         updated_at: expect.stringMatching(ISO_TIMESTAMP),
       });
       expect(ctx.current.membershipRepo.rows).toEqual([
-        expect.objectContaining({ organizationId: 1, userId, role: 'owner' }),
+        expect.objectContaining({ organizationId: response.body.id, userId, role: 'owner' }),
       ]);
     });
 
@@ -66,10 +73,11 @@ describe('OrganizationController (e2e) — POST /orgs.json', () => {
     });
 
     it('allows duplicate names', async () => {
-      await createOrganization(ctx.current.app, cookie, { name: 'Family' }).expect(201);
-      const response = await createOrganization(ctx.current.app, cookie, { name: 'Family' }).expect(201);
+      const first = await createOrganization(ctx.current.app, cookie, { name: 'Family' }).expect(201);
+      const second = await createOrganization(ctx.current.app, cookie, { name: 'Family' }).expect(201);
 
-      expect(response.body.id).toBe(2);
+      expect(second.body.id).toBe(first.body.id + 1);
+      expect(ctx.current.organizationRepo.rows).toHaveLength(2);
     });
 
     it('is never cached', async () => {

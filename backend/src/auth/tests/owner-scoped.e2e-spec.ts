@@ -4,6 +4,7 @@ import {
   createOrganization,
   MALFORMED_ORG_IDS,
   registerAndLogin,
+  SETUP_TIMEOUT_MS,
   withoutTimestamp,
 } from './organization.controller.e2e-test-support.js';
 import { WidgetsTestController } from './owner-scoped.e2e-test-support.js';
@@ -35,7 +36,7 @@ describe('@OwnerScopedController (e2e)', () => {
     ownerId = current.userRepo.rows[0].id;
     await createOrganization(current.app, owner, { name: 'Family' }).expect(201);
     outsider = await registerAndLogin(current.app, 'leia');
-  });
+  }, SETUP_TIMEOUT_MS);
 
   afterEach(() => {
     current.userRepo.rows[1].isAdmin = false;

@@ -4,6 +4,7 @@ import {
   loginCookie,
   ORGANIZATION_KEYS,
   registerAndLogin,
+  SETUP_TIMEOUT_MS,
   renameOrganization,
   showOrganization,
   useOrganizationTestApp,
@@ -11,20 +12,27 @@ import {
 import { expectValidationErrorBody } from './support/error-body.js';
 
 describe('OrganizationController (e2e) — reading and renaming', () => {
-  const ctx = useOrganizationTestApp();
+  // One app per file (bcrypt-heavy setup): darthjee owns Family (1) and Work (3), leia owns
+  // Rebellion (2), han has none. Renames are undone after each test.
+  const ctx = useOrganizationTestApp({ perFile: true });
   let cookie: string;
+  let han: string;
 
-  beforeEach(async () => {
+  beforeAll(async () => {
     cookie = await loginCookie(ctx.current.app);
+    const leia = await registerAndLogin(ctx.current.app, 'leia');
+    han = await registerAndLogin(ctx.current.app, 'han');
     await createOrganization(ctx.current.app, cookie, { name: 'Family' }).expect(201);
+    await createOrganization(ctx.current.app, leia, { name: 'Rebellion' }).expect(201);
+    await createOrganization(ctx.current.app, cookie, { name: 'Work' }).expect(201);
+  }, SETUP_TIMEOUT_MS);
+
+  afterEach(() => {
+    ctx.current.organizationRepo.rows[0].name = 'Family';
   });
 
   describe('GET /orgs.json', () => {
     it("lists only the caller's organizations, with their role", async () => {
-      const leia = await registerAndLogin(ctx.current.app, 'leia');
-      await createOrganization(ctx.current.app, leia, { name: 'Rebellion' }).expect(201);
-      await createOrganization(ctx.current.app, cookie, { name: 'Work' }).expect(201);
-
       const response = await request(ctx.current.app.getHttpServer())
         .get('/orgs.json')
         .set('Cookie', [cookie])
@@ -40,11 +48,9 @@ describe('OrganizationController (e2e) — reading and renaming', () => {
     });
 
     it('answers an empty list for a user with zero organizations', async () => {
-      const leia = await registerAndLogin(ctx.current.app, 'leia');
-
       const response = await request(ctx.current.app.getHttpServer())
         .get('/orgs.json')
-        .set('Cookie', [leia])
+        .set('Cookie', [han])
         .expect(200);
 
       expect(response.body).toEqual([]);

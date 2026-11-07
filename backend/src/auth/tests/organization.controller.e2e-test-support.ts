@@ -5,6 +5,9 @@ import { buildAuthTestApp, type BuildAuthTestAppResult } from './support/build-a
 
 export { loginCookie, registerUser };
 
+// Timeout for one-time (per-file) setup hooks, which run several bcrypt hashes in a row.
+export const SETUP_TIMEOUT_MS = 30_000;
+
 export const ORGANIZATION_KEYS = ['created_at', 'id', 'name', 'role', 'updated_at'];
 
 // Every malformed `:orgId` the spec lists (plus `0`): each must answer the same 404 as an unknown id.
@@ -22,7 +25,7 @@ export function useOrganizationTestApp({ perFile = false }: { perFile?: boolean 
 
   (perFile ? beforeAll : beforeEach)(async () => {
     current = await buildAuthTestApp();
-  });
+  }, SETUP_TIMEOUT_MS);
 
   (perFile ? afterAll : afterEach)(async () => {
     await current.app.close();
