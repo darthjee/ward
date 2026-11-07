@@ -17,7 +17,13 @@ import { StrictBody } from '../strict-validation.pipe.js';
 // instead of answering 400).
 
 const SRC_ROOT = resolve(__dirname, '..', '..');
-const KNOWN_CONTROLLERS = ['AdminController', 'AuthController', 'AuthorizationRequestController', 'HealthController'];
+const KNOWN_CONTROLLERS = [
+  'AdminController',
+  'AuthController',
+  'AuthorizationRequestController',
+  'HealthController',
+  'OrganizationController',
+];
 
 type ClassConstructor = new (...args: never[]) => unknown;
 

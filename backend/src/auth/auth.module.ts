@@ -19,6 +19,7 @@ import { PasswordResetToken } from './entities/password-reset-token.entity.js';
 import { RefreshToken } from './entities/refresh-token.entity.js';
 import { User } from './entities/user.entity.js';
 import { PasswordRecoveryRequestedListener } from './events/password-recovery-requested.listener.js';
+import { OrganizationController } from './organization.controller.js';
 import { OrganizationService } from './organization.service.js';
 import { PasswordResetService } from './password-reset.service.js';
 import { SessionStatusService } from './session-status.service.js';
@@ -57,7 +58,7 @@ import { SESSION_LOOKUP } from '../core/session-lookup.js';
     ]),
     MailModule,
   ],
-  controllers: [AuthController, AdminController, AuthorizationRequestController],
+  controllers: [AuthController, AdminController, AuthorizationRequestController, OrganizationController],
   providers: [
     AuthService,
     AccountService,
