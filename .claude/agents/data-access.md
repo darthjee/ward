@@ -16,9 +16,16 @@ clean bill of health) that the architect then acts on.
 ## Primary reference
 
 `docs/agents/product.md` is the authoritative source for what's decided (login/session, admin
-tooling, ownership of domain data). Ward's baseline rule is that every domain record belongs to
-one user and is visible only to that user. Where a module's page under `docs/agents/modules/`
-does not yet state an explicit access rule:
+tooling, ownership of domain data). Ward has two ownership models:
+
+- **User-owned modules** — every record belongs to one user and is visible only to that user.
+  These keep the checks below unchanged.
+- **User-or-organization-owned modules** (`bank` is the first) — every record belongs to either
+  one user or one organization. These get the extra checks in
+  [User-or-organization-owned modules](#user-or-organization-owned-modules) on top of the
+  checks below.
+
+Where a module's page under `docs/agents/modules/` does not yet state an explicit access rule:
 
 - Treat any endpoint that returns another user's data or account data as
   a violation by default.
@@ -52,6 +59,27 @@ You will be given a list of changed files. Review them.
 4. **New models**: if the diff introduces a new model that is exposed by an endpoint, verify
    the PR also documents who can read/write it (in `docs/agents/product.md` once it exists, or
    inline in the PR description until then).
+
+## User-or-organization-owned modules
+
+Reference: `docs/agents/specs/auth/organizations.md`, section *`data-access` checks for
+user-or-organization-owned modules* (issue #58 repoints this at the permanent docs once the
+specs are folded in). For these modules — and for the organization routes themselves
+(`/orgs.json`, `/orgs/:orgId.json`) — also check that:
+
+1. **Owner filtering** — every query is filtered through the `OwnerContext` resolved by the
+   owner-context guard, via `ownerWhere()`; no query builds its owner filter by hand or skips it.
+2. **Personal routes** — personal (non-`orgs/:orgId/...`) routes use **only the JWT user** as
+   owner.
+3. **Membership** — every `orgs/:orgId/...` route verifies the current user's membership of
+   `:orgId`, either through `@OwnerScopedController` / `@OwnerScoped()` or, for the
+   organization routes themselves, through `OrganizationService`. A global admin who is not a
+   member gets no access.
+4. **No owner fields in input or output** — owner fields (`userId`, `organizationId`, `role`,
+   etc.) are never read from input (URL beyond `:orgId`, query, or body — unknown body fields
+   must be rejected) and never written to responses.
+5. **Uniform 404** — unknown id, malformed (non-numeric) id, wrong owner context and non-member
+   all return identical 404 responses, with no disclosure that a record or organization exists.
 
 ## How to investigate
 

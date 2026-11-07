@@ -13,6 +13,7 @@ import { JwtGuard } from './core/jwt.guard.js';
 import { LazyModuleLoaderService } from './core/lazy-module-loader.service.js';
 import { LoggingModule } from './core/logging.module.js';
 import { OriginGuard } from './core/origin.guard.js';
+import { OwnerContextGuard } from './core/owner-context.guard.js';
 import { RequestContextMiddleware } from './core/request-context.middleware.js';
 import { buildSecretKeys } from './core/secret-keys.js';
 import { buildMysqlSslOptions } from './database/mysql-ssl.js';
@@ -55,7 +56,10 @@ export function buildJwtSignOptions(configService: ConfigService): { expiresIn: 
  * Global guards run in registration order: `OriginGuard` (CSRF protection
  * for state-changing requests) comes first, so a forged cross-site request
  * is rejected with `403` before `JwtGuard` could answer `401`; then
- * `JwtGuard`, then `AdminGuard` (which needs the authenticated user).
+ * `JwtGuard`, then `AdminGuard` (which needs the authenticated user), then
+ * `OwnerContextGuard` (which also needs the authenticated user, and resolves
+ * the `OwnerContext` of `@OwnerScoped()` routes through the
+ * `ORGANIZATION_MEMBERSHIP_LOOKUP` port exported by `AuthModule`).
  *
  * Implements `NestModule` to wire the global `RequestContextMiddleware`
  * (request-correlation context + per-request access log) ahead of the
@@ -122,6 +126,10 @@ export function buildJwtSignOptions(configService: ConfigService): { expiresIn: 
     {
       provide: APP_GUARD,
       useClass: AdminGuard,
+    },
+    {
+      provide: APP_GUARD,
+      useClass: OwnerContextGuard,
     },
     {
       provide: APP_INTERCEPTOR,
