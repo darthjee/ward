@@ -48,8 +48,8 @@ organization routes are needed.
   `userId` / `organizationId`), both **nullable**, **logical** references to `auth` (no physical
   FK) and **indexed**. A DB **check constraint** requires **exactly one** of them to be set.
 - **Child records** (transactions, `bank_debt_details`, `bank_investment_details`,
-  `bank_provider_expense_details`, and later bill records) **inherit the owner through their account** and never
-  store a copy.
+  `bank_provider_expense_details`, `bank_bills` and `bank_bill_payments`) **inherit the owner
+  through their account** and never store a copy.
 - **Route prefixes**:
   - personal: API `/api/bank/...`, UI `/bank/...`;
   - organization: API `/api/orgs/:orgId/bank/...`, UI `/orgs/:orgId/bank/...`.
@@ -76,9 +76,9 @@ Deferred concerns are collected in [Future epics](#future-epics).
 | [accounts/debt.md](accounts/debt.md) | Debt accounts (loans): debt fields in `bank_debt_details`, ledger sign rules, payment / interest shortcuts, `debt` object on the generic account routes, Debts submenu pages |
 | [accounts/investment.md](accounts/investment.md) | Investment accounts (one per investment): plain ledger whose balance is the current value, opening anchor fixed at 0, application / withdrawal / yield movements and the Update value shortcut, informational fields in `bank_investment_details`, `investment` object on the generic account routes, Investments submenu pages |
 | [accounts/provider-expense.md](accounts/provider-expense.md) | Provider-expense accounts (one per provider): payable ledger (charges negative, payments positive), provider fields in `bank_provider_expense_details`, `provider_expense` object on the generic account routes, `sentToAccountantAt` on transactions, accountant hand-off (preview, client-side CSV, mark sent / unsent), Providers submenu pages |
-| [bills.md](bills.md) | Bill entity, recurrence, paying |
+| [bills.md](bills.md) | Hybrid bill model: derived occurrences from debt / provider-expense accounts plus the one-off `Bill` (`bank_bills`); schedule fields (`billsFrom`, `showInCalendar`, default `payingAccountId`) on the details tables; recurrence (clamp, weekend shift, nominal vs effective date); paying / skipping / undoing (`bank_bill_payments`, atomic ledger writes, optional charge); bill and calendar routes; edge cases |
 | [ui/menu.md](ui/menu.md) | Bank menu and its submenus |
-| [ui/calendar.md](ui/calendar.md) | Calendar of upcoming bills |
+| [ui/calendar.md](ui/calendar.md) | Calendar submenu: list view (Overdue plus a 60-day Upcoming), month view (up to 12 months ahead), entry links and the Pay / Skip / Undo actions, Add / edit bill pages, new Debts / Providers inputs and Bill history |
 
 ## Sub-issue map
 
@@ -90,7 +90,7 @@ Deferred concerns are collected in [Future epics](#future-epics).
 | [#30](https://github.com/darthjee/ward/issues/30) | [accounts/debt.md](accounts/debt.md) — debt fields (`bank_debt_details`), ledger and sign rules, recording payments, what debts expose for bills, `debt` object on the generic account routes, Debts submenu; `ui/menu.md` (Debts row); this `README.md` (index entry and `## Future epics`) |
 | [#31](https://github.com/darthjee/ward/issues/31) | [accounts/investment.md](accounts/investment.md) — the investment model (ledger as current value, opening anchor 0, yield as transactions), investment fields (`bank_investment_details`), recording movements, `investment` object on the generic account routes, Investments submenu; `ui/menu.md` (Investments row); this `README.md` (index entry and `## Future epics`) |
 | [#32](https://github.com/darthjee/ward/issues/32) | [accounts/provider-expense.md](accounts/provider-expense.md) — the provider-expense model (payable ledger per provider), provider fields (`bank_provider_expense_details`), recording charges and payments, business expenses for the accountant (hand-off routes, client-side CSV, mark sent / unsent), what providers expose for bills, `provider_expense` object on the generic account routes, Providers submenu; `accounts/transactions.md` (`sentToAccountantAt` row, body whitelist, attachments pointer); `ui/menu.md` (Providers row, shared-submenu question resolved); this `README.md` (decision bullet, index entry, sub-issue map row, `## Future epics`) |
-| [#33](https://github.com/darthjee/ward/issues/33) | `bills.md`, `ui/calendar.md` |
+| [#33](https://github.com/darthjee/ward/issues/33) | [bills.md](bills.md) — hybrid bill model, schedule fields, recurrence, paying / skipping / undoing, bill and calendar routes; [ui/calendar.md](ui/calendar.md) — list and month views, entries and actions, Add / edit bill, Debts / Providers inputs and Bill history; pointer edits in `accounts/debt.md` (*Instalments and bills*, `dueDay` clamp), `accounts/provider-expense.md` (*Charges and bills*, charge-vs-payment resolved) and `accounts/regular.md` (event vs direct call); this `README.md` (index entries, sub-issue map row, ownership contract wording, "includes bills" notes, `## Future epics`) |
 | [#40](https://github.com/darthjee/ward/issues/40) | [auth/organizations.md](../auth/organizations.md) — optional organizations, active context, user-or-organization-owned rule, `@OwnerScoped()`; this `README.md` (scope, decision, ownership contract, realignment note, sub-issue map, `## Future epics`); [auth/README.md](../auth/README.md) |
 | [#41](https://github.com/darthjee/ward/issues/41) | per-spec realignment to the ownership contract: `accounts/README.md`, `accounts/regular.md`, `accounts/transactions.md`, `accounts/debt.md`, `accounts/investment.md`, `ui/menu.md`; the one-line owner fix in `accounts/provider-expense.md` and `bills.md`; this `README.md` (realignment note, index entries, sub-issue map row, `## Future epics`) |
 | Implementation / fold / remove sub-issues of #26 (created later by the *Continue* split) | build against this folder; the fold handles both `specs/banking/` and `specs/auth/`, then they are removed |
@@ -112,7 +112,7 @@ deferred concerns to this same list.
 
 1. **Organization permission system** (from [auth/organizations.md](../auth/organizations.md#permissions))
    — enforce the `owner` / `admin` / `user` matrix (e.g. a `user` cannot delete bank data),
-   member management and the role checks. Roles are already stored on
+   member management and the role checks. Includes bills: who may create / pay / delete them. Roles are already stored on
    `OrganizationMembership`, so the epic adds only rules, with no data migration. Ward's global
    `is_admin` must keep granting no organization access.
 2. **Joining organizations** (from [auth/organizations.md](../auth/organizations.md#joining-an-organization))
@@ -140,15 +140,18 @@ deferred concerns to this same list.
    transactions; cross-owner transfers stay two manual transactions. Until then: two
    independent manual transactions. Must respect the
    one-currency-per-account rule (no conversion without the currency-conversion epic).
+   Includes bills: paying a bill as one linked operation (today it writes independent
+   transactions, see [bills.md](bills.md#paying-a-bill)).
 7. **Counterparty / payee** (from [accounts/transactions.md](accounts/transactions.md#transaction-entity))
    — a field recording who paid or was paid.
 8. **Currency conversion** (from [accounts/transactions.md](accounts/transactions.md#currency))
    — FX rates and an organization base currency, so totals across accounts in different
    currencies can be shown together. Until then aggregates are grouped per currency, never
-   summed; amounts stay integer minor units in each account's own currency.
+   summed; amounts stay integer minor units in each account's own currency. Includes bills:
+   Calendar totals across currencies.
 9. **Categories** (from [accounts/transactions.md](accounts/transactions.md#categories))
    — categorising transactions: scope, entity, management UI, hierarchy and income/expense kind
-   are decided by the epic. Likely shared with bills ([#33](https://github.com/darthjee/ward/issues/33))
+   are decided by the epic. Includes bills ([#33](https://github.com/darthjee/ward/issues/33))
    and provider expenses ([#32](https://github.com/darthjee/ward/issues/32)). Adds a nullable
    `categoryId`, so existing transactions stay uncategorised with no backfill. One use case
    (from [accounts/provider-expense.md](accounts/provider-expense.md#refunds)): telling a
@@ -160,7 +163,8 @@ deferred concerns to this same list.
     — a separate account `type` (e.g. `credit_card`) for revolving accounts with statement
     cycles. Same ledger mechanics as debts (purchases negative, payments positive, positive
     balances allowed) but starting at zero. The epic decides statement cycles, closing / due
-    dates and how card statements relate to bills ([#33](https://github.com/darthjee/ward/issues/33)).
+    dates, and includes card statements as bills ([#33](https://github.com/darthjee/ward/issues/33),
+    see [bills.md](bills.md)).
     Must respect the one-currency-per-account rule.
 12. **Investment valuation history** (from [accounts/investment.md](accounts/investment.md#alternatives-considered))
     — value snapshots over time and performance charts / returns for investment accounts. The
@@ -182,10 +186,37 @@ deferred concerns to this same list.
     — attach receipt files to transactions (charges) and include them in the accountant
     hand-off. The epic decides storage (Render has no persistent disk on the free tier), size
     limits, allowed types and access (attachments inherit the owner through their
-    transaction's account, like every child record).
+    transaction's account, like every child record). Includes receipts on paid bills.
 17. **PDF accountant export** (from [accounts/provider-expense.md](accounts/provider-expense.md#receipts--attachments))
     — a PDF alongside the CSV accountant hand-off. Deferred because of the heavy library and
     its memory cost on the 512 MB free tier.
+18. **Cross-module calendar** (from [bills.md](bills.md#owning-module))
+    — a global agenda aggregating due dates from several modules (bank bills, later protocol
+    follow-ups, car maintenance…). It reads bank occurrences through an exported service / DI
+    token, **never events** (lazy listeners can miss events, see
+    [modular-pattern.md](https://github.com/darthjee/ward/blob/main/docs/agents/architecture/modular-pattern.md)).
+19. **Bill reminders / notifications** (from [bills.md](bills.md#owning-module))
+    — e.g. email through the `mail` module before a bill is due. The epic decides the trigger
+    (scheduled job vs event) and the opt-in. Kept separate from the cross-module calendar.
+20. **Business-day calendar for bills** (from [bills.md](bills.md#recurrence-model))
+    — national / regional holidays and a per-account non-business-day rule (`keep` / `next` /
+    `previous`). The epic decides where the holiday data comes from and which country / region
+    applies to an owner. Payments stay keyed by the nominal due date.
+21. **Combined calendar across owners** (from [bills.md](bills.md#data-sensitivity--ownership) /
+    [ui/calendar.md](ui/calendar.md#summary))
+    — one view of the bills of Personal and every organization the user belongs to
+    ("everything I pay this month"), the first cross-owner view in `bank`. Must keep per-owner
+    access checks and never expose owner fields.
+22. **Calendar feed (iCal / `.ics`)** (from [ui/calendar.md](ui/calendar.md#summary))
+    — subscribe to bills from an external calendar app. Needs a feed URL with a secret token, a
+    new authentication path outside the JWT session, so the epic must cover token issuance /
+    revocation and what the feed may expose.
+23. **Automatic bill import** (from [bills.md](bills.md#scope))
+    — Open Finance, boleto barcode / PDF reading. External integrations and memory cost on the
+    512 MB free tier; low priority.
+24. **Projected balance** (from [bills.md](bills.md#scope))
+    — current vs projected balance using upcoming bills. Ties to the future-dated transactions
+    note in [accounts/transactions.md](accounts/transactions.md#future-dated-transactions).
 
 ## Reference
 

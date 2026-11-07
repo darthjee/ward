@@ -209,9 +209,8 @@ including [transactions.md](transactions.md).
   never imports `auth` nor queries membership tables.
 - **References** — `user_id` and `organization_id` are logical (no cross-module FK);
   `bank_transactions.account_id → bank_accounts.id` is a real FK (same module).
-- **No events** emitted or consumed for now; bills
-  ([#33](https://github.com/darthjee/ward/issues/33)) decide whether paying a bill emits an
-  event or calls `bank` directly.
+- **No events** emitted or consumed; paying a bill is an in-module service call in one DB
+  transaction (see [bills.md](../bills.md#owning-module)).
 - `modules/bank.md` is created by the fold issue, not here.
 
 ### Backward compatibility
