@@ -12,12 +12,15 @@ import AuthEvents from '../../../../client/AuthEvents.js';
  * {@link module:components/AppController}'s `buildEffect()`.
  *
  * @param {{checkStatus: Function}} controller - Controller exposing a `checkStatus()` method.
- * @param {{setLoggedIn: Function, setIsAdmin: Function, setPending?: Function}} setters - React
- *   state setters for the current auth state; `setPending` is optional, so callers that do not
- *   track the awaiting-approval state keep working.
+ * @param {{setLoggedIn: Function, setIsAdmin: Function, setPending?: Function,
+ *   setUserId?: Function}} setters - React state setters for the current auth state;
+ *   `setPending` and `setUserId` are optional, so callers that do not track the
+ *   awaiting-approval state or the user id keep working.
  * @returns {Function} Effect callback, returning a cleanup function.
  */
-export function buildAuthEffect(controller, { setLoggedIn, setIsAdmin, setPending }) {
+export function buildAuthEffect(controller, {
+  setLoggedIn, setIsAdmin, setPending, setUserId,
+}) {
   return () => {
     let mounted = true;
 
@@ -27,6 +30,7 @@ export function buildAuthEffect(controller, { setLoggedIn, setIsAdmin, setPendin
       setLoggedIn(Boolean(event.detail?.loggedIn));
       setIsAdmin(Boolean(event.detail?.isAdmin));
       setPending?.(Boolean(event.detail?.pending));
+      setUserId?.(event.detail?.userId ?? null);
     };
 
     AuthEvents.subscribe(handleAuthChanged);
@@ -45,8 +49,9 @@ export function buildAuthEffect(controller, { setLoggedIn, setIsAdmin, setPendin
  * behavior.
  *
  * @param {{checkStatus: Function}} controller - Controller exposing a `checkStatus()` method.
- * @param {{setLoggedIn: Function, setIsAdmin: Function, setPending?: Function}} setters - React
- *   state setters for the current auth state (`setPending` optional).
+ * @param {{setLoggedIn: Function, setIsAdmin: Function, setPending?: Function,
+ *   setUserId?: Function}} setters - React state setters for the current auth state
+ *   (`setPending` and `setUserId` optional).
  * @returns {void} Nothing.
  */
 export default function useAuthEffect(controller, setters) {

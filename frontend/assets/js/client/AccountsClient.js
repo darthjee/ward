@@ -84,9 +84,10 @@ const AccountsClient = {
    * a new one, which is the caller's responsibility.
    *
    * @param {string} refreshToken - The refresh token to check.
-   * @returns {Promise<{loggedIn: boolean, isAdmin: boolean}>} Whether the token is still active,
-   *   and whether that session belongs to an admin user (always `false` when `loggedIn` is
-   *   `false`).
+   * @returns {Promise<{loggedIn: boolean, isAdmin: boolean, userId?: number, status?: string}>}
+   *   Whether the token is still active, whether that session belongs to an admin user (always
+   *   `false` when `loggedIn` is `false`), the authenticated user's id (`userId`, present only
+   *   when `loggedIn` is `true`) and `status: 'pending'` for a user awaiting approval.
    */
   async status(refreshToken) {
     return ApiClient.postJson('/auth/status.json', { refreshToken });

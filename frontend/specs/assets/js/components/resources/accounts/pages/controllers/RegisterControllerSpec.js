@@ -84,7 +84,7 @@ describe('RegisterController', () => {
     });
 
     it('clears field errors and redirects home on success', async () => {
-      const fakeWindow = await submitSuccessfully({ loggedIn: true, isAdmin: false });
+      const fakeWindow = await submitSuccessfully({ loggedIn: true, isAdmin: false, userId: 7 });
 
       expect(setFieldErrors).toHaveBeenCalledWith({});
       expect(client.register).toHaveBeenCalledWith(validFields);
@@ -93,10 +93,10 @@ describe('RegisterController', () => {
     });
 
     it('re-checks the status and emits the logged-in auth state from its answer', async () => {
-      await submitSuccessfully({ loggedIn: true, isAdmin: false });
+      await submitSuccessfully({ loggedIn: true, isAdmin: false, userId: 7 });
 
       expect(client.status).toHaveBeenCalledWith('refresh-token');
-      expect(AuthEvents.emit).toHaveBeenCalledOnceWith(true, false, false);
+      expect(AuthEvents.emit).toHaveBeenCalledOnceWith(true, false, false, 7);
     });
 
     it('emits the pending state and keeps the token when the user awaits approval', async () => {

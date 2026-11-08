@@ -108,13 +108,13 @@ describe('HeaderController', () => {
 
     it('emits true and the admin flag, leaving the stored token untouched, when it is still active', async () => {
       AuthSession.set('refresh-token');
-      client.status.and.resolveTo({ loggedIn: true, isAdmin: true });
+      client.status.and.resolveTo({ loggedIn: true, isAdmin: true, userId: 7 });
 
       await controller.checkStatus();
 
       expect(client.status).toHaveBeenCalledWith('refresh-token');
       expect(AuthSession.get()).toBe('refresh-token');
-      expect(AuthEvents.emit).toHaveBeenCalledWith(true, true, false);
+      expect(AuthEvents.emit).toHaveBeenCalledWith(true, true, false, 7);
     });
 
     it('keeps the stored token and emits pending when the user awaits approval', async () => {
