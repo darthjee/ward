@@ -24,6 +24,7 @@ import BankDebtDetail from '../resources/bank/debts/pages/BankDebtDetail.jsx';
 import BankInvestmentList from '../resources/bank/investments/pages/BankInvestmentList.jsx';
 import BankInvestmentNew from '../resources/bank/investments/pages/BankInvestmentNew.jsx';
 import BankInvestmentEdit from '../resources/bank/investments/pages/BankInvestmentEdit.jsx';
+import BankInvestmentDetail from '../resources/bank/investments/pages/BankInvestmentDetail.jsx';
 
 const PAGES = new Map([
   ['register', <ModalRedirect mode="register" />],
@@ -47,6 +48,7 @@ const PAGES = new Map([
   ['bank-investments', <BankInvestmentList />],
   ['bank-investment-new', <BankInvestmentNew />],
   ['bank-investment-edit', <BankInvestmentEdit />],
+  ['bank-investment', <BankInvestmentDetail />],
   ['not-found', <NotFound />],
   ['home', <Home />],
 ]);

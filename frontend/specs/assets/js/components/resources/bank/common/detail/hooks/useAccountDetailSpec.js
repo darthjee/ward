@@ -36,5 +36,8 @@ describe('useAccountDetail', () => {
     expect(result.notFound).toBeFalse();
     expect(result.state).toEqual(jasmine.objectContaining({ accountId: '7', page: 4, data: null }));
     expect(result.handlers.onStartNew).toEqual(jasmine.any(Function));
+    expect(result.reload).toEqual(jasmine.any(Function));
+    expect(result.ledgerForm.form.editing).toBeNull();
+    expect(result.ledgerForm.actions.reset).toEqual(jasmine.any(Function));
   });
 });
