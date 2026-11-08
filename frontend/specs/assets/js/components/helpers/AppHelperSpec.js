@@ -4,6 +4,11 @@ import AppHelper from '../../../../../assets/js/components/helpers/AppHelper.jsx
 import LoginModal from '../../../../../assets/js/components/common/loginModal/LoginModal.jsx';
 import OwnerContextProvider from '../../../../../assets/js/components/common/ownerContext/OwnerContextProvider.jsx';
 import Header from '../../../../../assets/js/components/common/header/Header.jsx';
+import OrganizationNew from '../../../../../assets/js/components/resources/organizations/pages/OrganizationNew.jsx';
+import OrganizationOverview from '../../../../../assets/js/components/resources/organizations/pages/OrganizationOverview.jsx';
+import OrganizationEdit from '../../../../../assets/js/components/resources/organizations/pages/OrganizationEdit.jsx';
+import NotFound from '../../../../../assets/js/components/common/notFound/NotFound.jsx';
+import HashRouteResolver from '../../../../../assets/js/utils/routing/HashRouteResolver.js';
 import ModalRedirect from '../../../../../assets/js/components/common/ModalRedirect.jsx';
 import ResetPasswordLanding from '../../../../../assets/js/components/resources/accounts/pages/ResetPasswordLanding.jsx';
 
@@ -17,8 +22,9 @@ describe('AppHelper', () => {
   const partsOf = (page) => {
     const [provider, loginModal] = AppHelper.render(routeFor(page)).props.children;
     const header = provider.props.children;
+    const keyed = header.props.children;
     return {
-      provider, header, page: header.props.children, loginModal,
+      provider, header, keyed, page: keyed.props.children, loginModal,
     };
   };
 
@@ -47,6 +53,39 @@ describe('AppHelper', () => {
     expect(provider.type).toBe(OwnerContextProvider);
     expect(provider.props.route).toEqual(routeFor('home'));
     expect(header.type).toBe(Header);
+  });
+
+  it('keys the page by the owner context', () => {
+    expect(partsOf('home').keyed.key).toBe('personal');
+    expect(AppHelper.render({ page: 'org-edit', context: { kind: 'organization', orgId: 5 } })
+      .props.children[0].props.children.props.children.key).toBe('org-5');
+  });
+
+  [
+    ['org-new', OrganizationNew],
+    ['org-overview', OrganizationOverview],
+    ['org-edit', OrganizationEdit],
+    ['not-found', NotFound],
+  ].forEach(([key, Page]) => {
+    it(`maps the ${key} key to its page`, () => {
+      expect(partsOf(key).page.type).toBe(Page);
+    });
+  });
+
+  it('renders the Not-found view for a malformed organization id without any request', () => {
+    const originalFetch = globalThis.fetch;
+
+    globalThis.fetch = jasmine.createSpy('fetch');
+
+    try {
+      const route = new HashRouteResolver(() => '#/orgs/abc').resolve();
+      const markup = renderToStaticMarkup(React.createElement('div', null, AppHelper.render(route)));
+
+      expect(markup).toContain('Not found');
+      expect(globalThis.fetch).not.toHaveBeenCalled();
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
   });
 
   it('renders the reset-password landing for the reset-password key', () => {
