@@ -20,6 +20,16 @@ const ACCOUNT_ATTRS = {
   notes: null,
 };
 
+const DEBT_ATTRS = {
+  interest_rate: '1.99',
+  interest_period: 'monthly',
+  instalment_amount: '500.00',
+  instalment_frequency: 'yearly',
+  due_day: 10,
+  due_month: 3,
+  instalment_count: 24,
+};
+
 const TRANSACTION_ATTRS = {
   date: '2026-01-02', amount: '-12.50', description: 'Coffee', notes: null,
 };
@@ -63,6 +73,84 @@ describe('BankClient', () => {
         await BankClient.listAccounts(context, { archived: true });
 
         expect(lastCall().path).toBe(`${prefix}/bank/accounts.json?type=regular&archived=true`);
+      });
+
+      it('lists active debt accounts', async () => {
+        stub([{ id: 7 }]);
+
+        expect(await BankClient.listDebts(context)).toEqual([{ id: 7 }]);
+        expect(lastCall()).toEqual({
+          path: `${prefix}/bank/accounts.json?type=debt&archived=false`, method: 'GET', body: undefined,
+        });
+      });
+
+      it('lists debt accounts including archived ones', async () => {
+        stub([]);
+        await BankClient.listDebts(context, { archived: true });
+
+        expect(lastCall().path).toBe(`${prefix}/bank/accounts.json?type=debt&archived=true`);
+      });
+
+      it('lists accounts of a given type', async () => {
+        stub([]);
+        await BankClient.listAccounts(context, { type: 'debt' });
+
+        expect(lastCall().path).toBe(`${prefix}/bank/accounts.json?type=debt&archived=false`);
+      });
+
+      it('creates a debt with type debt and a whitelisted nested debt object', async () => {
+        stub({ id: 7 }, 201);
+        await BankClient.createDebt(context, {
+          ...ACCOUNT_ATTRS, ...FORBIDDEN, extra: 'x', debt: { ...DEBT_ATTRS, account_id: 7, extra: 'y' },
+        });
+
+        expect(lastCall()).toEqual({
+          path: `${prefix}/bank/accounts.json`, method: 'POST', body: { ...ACCOUNT_ATTRS, type: 'debt', debt: DEBT_ATTRS },
+        });
+      });
+
+      it('creates a debt without a debt object', async () => {
+        stub({ id: 7 }, 201);
+        await BankClient.createDebt(context, { name: 'Loan', debt: undefined });
+
+        expect(lastCall().body).toEqual({ type: 'debt', name: 'Loan' });
+      });
+
+      it('updates a debt with the nested debt object and never the type', async () => {
+        stub({ id: 7 });
+        await BankClient.updateDebt(context, 7, {
+          name: 'Loan', ...FORBIDDEN, debt: { due_day: 5, unknown: 1, instalment_count: undefined },
+        });
+
+        expect(lastCall()).toEqual({
+          path: `${prefix}/bank/accounts/7.json`, method: 'PATCH', body: { name: 'Loan', debt: { due_day: 5 } },
+        });
+      });
+
+      it('keeps null to clear the interest rate and period together', async () => {
+        stub({ id: 7 });
+        await BankClient.updateDebt(context, 7, { debt: { interest_rate: null, interest_period: null } });
+
+        expect(lastCall().body).toEqual({ debt: { interest_rate: null, interest_period: null } });
+      });
+
+      it('updates a debt without a debt object', async () => {
+        stub({ id: 7 });
+        await BankClient.updateDebt(context, 7, { name: 'Loan', debt: null });
+
+        expect(lastCall().body).toEqual({ name: 'Loan' });
+      });
+
+      it('strips type and debt from the generic account calls', async () => {
+        stub({ id: 12 }, 201);
+        await BankClient.createAccount(context, { name: 'Main', type: 'debt', debt: DEBT_ATTRS });
+
+        expect(lastCall().body).toEqual({ name: 'Main' });
+
+        stub({ id: 12 });
+        await BankClient.updateAccount(context, 12, { name: 'Main', type: 'debt', debt: DEBT_ATTRS });
+
+        expect(lastCall().body).toEqual({ name: 'Main' });
       });
 
       it('gets an account', async () => {
