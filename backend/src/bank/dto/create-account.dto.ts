@@ -11,6 +11,7 @@ import {
   NOTES_MAX_LENGTH,
   trimToNull,
 } from './field-validators.js';
+import { InvestmentDetailsDto } from './investment-details.dto.js';
 import { MaxCodePoints, trimString } from '../../core/string-validators.js';
 
 /**
@@ -74,4 +75,11 @@ export class CreateAccountDto {
   @ValidateNested()
   @Type(() => DebtDetailsDto)
     debt?: DebtDetailsDto;
+
+  /** Investment details; only meaningful on an `investment` account (checked by the handler). */
+  @IsOptionalNonNull()
+  @IsObject()
+  @ValidateNested()
+  @Type(() => InvestmentDetailsDto)
+    investment?: InvestmentDetailsDto;
 }

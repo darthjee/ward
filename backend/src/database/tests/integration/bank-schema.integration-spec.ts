@@ -5,6 +5,7 @@ import { createTestDataSource, resetDatabase } from './test-data-source.js';
 const ACCOUNTS = 'bank_accounts';
 const TRANSACTIONS = 'bank_transactions';
 const DEBT_DETAILS = 'bank_debt_details';
+const INVESTMENT_DETAILS = 'bank_investment_details';
 
 interface Owner {
   userId?: number | null;
@@ -29,6 +30,12 @@ function insertTransaction(ds: DataSource, accountId: number): Promise<unknown> 
 
 function insertDebtDetails(ds: DataSource, accountId: number): Promise<unknown> {
   return ds.query(`INSERT INTO ${DEBT_DETAILS} (account_id, interest_rate, instalment_amount) VALUES (?, 1.99, 50000)`, [
+    accountId,
+  ]);
+}
+
+function insertInvestmentDetails(ds: DataSource, accountId: number): Promise<unknown> {
+  return ds.query(`INSERT INTO ${INVESTMENT_DETAILS} (account_id, kind, yield_rate, yield_period) VALUES (?, 'fund', 12.5, 'yearly')`, [
     accountId,
   ]);
 }
@@ -187,8 +194,43 @@ describe('bank schema (MySQL)', () => {
     });
   });
 
+  describe('bank_investment_details', () => {
+    it('creates the columns with their types and nullability', async () => {
+      expect(await columnInfo(ds, INVESTMENT_DETAILS, 'account_id')).toMatchObject({ type: 'int', nullable: false });
+      expect(await columnInfo(ds, INVESTMENT_DETAILS, 'kind')).toMatchObject({ type: 'varchar(16)', nullable: true });
+      expect(await columnInfo(ds, INVESTMENT_DETAILS, 'yield_rate')).toMatchObject({ type: 'decimal(7,4)', nullable: true });
+      expect(await columnInfo(ds, INVESTMENT_DETAILS, 'yield_period')).toMatchObject({ type: 'varchar(16)', nullable: true });
+      expect(await columnInfo(ds, INVESTMENT_DETAILS, 'maturity_date')).toMatchObject({ type: 'date', nullable: true });
+      expect(await columnInfo(ds, INVESTMENT_DETAILS, 'liquidity_days')).toMatchObject({ type: 'int', nullable: true });
+    });
+
+    it('uses account_id as the primary key', async () => {
+      const accountId = await insertAccount(ds, { userId: 1 }, 'CDB');
+      await insertInvestmentDetails(ds, accountId);
+
+      await expect(insertInvestmentDetails(ds, accountId)).rejects.toThrow(/Duplicate entry/);
+    });
+
+    it('rejects details of an unknown account', async () => {
+      await expect(insertInvestmentDetails(ds, 999999)).rejects.toThrow(/foreign key constraint fails/);
+    });
+
+    it('deletes the details with their account (FK ON DELETE CASCADE)', async () => {
+      const accountId = await insertAccount(ds, { userId: 1 }, 'CDB');
+      await insertInvestmentDetails(ds, accountId);
+
+      await ds.query(`DELETE FROM ${ACCOUNTS} WHERE id = ?`, [accountId]);
+
+      expect(await ds.query(`SELECT account_id FROM ${INVESTMENT_DETAILS}`)).toEqual([]);
+    });
+  });
+
   describe('down', () => {
-    it('drops bank_debt_details, then bank_transactions, then bank_accounts', async () => {
+    it('drops bank_investment_details, bank_debt_details, then bank_transactions, then bank_accounts', async () => {
+      await ds.undoLastMigration();
+      expect(await tableNames(ds)).not.toContain(INVESTMENT_DETAILS);
+      expect(await tableNames(ds)).toContain(DEBT_DETAILS);
+
       await ds.undoLastMigration();
       expect(await tableNames(ds)).not.toContain(DEBT_DETAILS);
       expect(await tableNames(ds)).toContain(TRANSACTIONS);

@@ -1,11 +1,8 @@
 import { IsIn, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
-import { IsInterestRate, IsOptionalNonNull } from './field-validators.js';
+import { IsInterestRate, IsOptionalNonNull, MAX_INT_COLUMN, RATE_PERIODS } from './field-validators.js';
 
 /** The periods a debt's interest rate and instalment frequency accept. */
-export const DEBT_PERIODS = ['monthly', 'yearly'] as const;
-
-/** Upper bound of `instalment_count`: the signed MySQL `int` column's maximum. */
-export const MAX_INSTALMENT_COUNT = 2147483647;
+export const DEBT_PERIODS = RATE_PERIODS;
 
 /**
  * The nested `debt` object of an account body (see
@@ -48,6 +45,6 @@ export class DebtDetailsDto {
   @IsOptional()
   @IsInt()
   @Min(1)
-  @Max(MAX_INSTALMENT_COUNT)
+  @Max(MAX_INT_COLUMN)
     instalment_count?: number | null;
 }

@@ -1,4 +1,5 @@
 import { BadRequestException } from '@nestjs/common';
+import { normaliseRate } from './rate.js';
 import { convertAmountInput, parseAmountInput } from '../amount-input.js';
 import { formatAmount } from '../currency.js';
 import type { DebtDetailsDto } from '../dto/debt-details.dto.js';
@@ -156,16 +157,6 @@ export function assertDebtPairs(state: DebtState): void {
   if (state.instalmentFrequency === 'yearly' && state.dueMonth === null) {
     throw new BadRequestException('debt.due_month is required with a yearly instalment_frequency');
   }
-}
-
-/**
- * Normalises a `DECIMAL(7,4)` rate by stripping trailing fractional zeros
- * (`"1.9900"` → `"1.99"`, `"0.0000"` → `"0"`, `"100.0000"` → `"100"`).
- * @param {string} rate - The stored rate.
- * @returns {string} The normalised decimal string.
- */
-export function normaliseRate(rate: string): string {
-  return rate.includes('.') ? rate.replace(/0+$/, '').replace(/\.$/, '') : rate;
 }
 
 /**

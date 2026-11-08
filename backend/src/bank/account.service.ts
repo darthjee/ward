@@ -262,6 +262,7 @@ export class AccountService {
   }
 
   async #saveWithDetails(account: Account, handler: AccountTypeHandler, prepared: unknown): Promise<Account> {
+    handler.validateAccount(account);
     return mapNameClash(() =>
       this.accountRepository.manager.transaction(async (manager) => {
         const saved = await manager.getRepository(Account).save(account);

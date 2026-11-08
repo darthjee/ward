@@ -2,6 +2,7 @@ import { BadRequestException, ValidationPipe } from '@nestjs/common';
 import { StrictValidationPipe } from '../../core/strict-validation.pipe.js';
 import { CreateAccountDto } from '../dto/create-account.dto.js';
 import { DebtDetailsDto } from '../dto/debt-details.dto.js';
+import { INVESTMENT_KINDS, InvestmentDetailsDto } from '../dto/investment-details.dto.js';
 import { ListAccountsQueryDto } from '../dto/list-accounts-query.dto.js';
 import { UpdateAccountDto } from '../dto/update-account.dto.js';
 
@@ -158,6 +159,75 @@ describe('nested debt object', () => {
   ])('rejects %s with a 400', async (_label, debt) => {
     await expect(update({ debt })).rejects.toThrow(BadRequestException);
     await expect(create({ name: 'a', debt })).rejects.toThrow(BadRequestException);
+  });
+});
+
+describe('nested investment object', () => {
+  const FULL_INVESTMENT = {
+    kind: 'fixed_income',
+    yield_rate: '12.5',
+    yield_period: 'yearly',
+    maturity_date: '2030-01-15',
+    liquidity_days: 30,
+  };
+
+  it('transforms investment into an InvestmentDetailsDto on create and update', async () => {
+    const created = await create({ name: 'CDB', type: 'investment', investment: FULL_INVESTMENT });
+    const updated = await update({ investment: { liquidity_days: 1 } });
+
+    expect(created.investment).toBeInstanceOf(InvestmentDetailsDto);
+    expect(created.investment).toMatchObject(FULL_INVESTMENT);
+    expect(updated.investment).toBeInstanceOf(InvestmentDetailsDto);
+    expect(updated.investment?.kind).toBeUndefined();
+  });
+
+  it('lists the seven kinds', () => {
+    expect(INVESTMENT_KINDS).toEqual(['fixed_income', 'fund', 'stocks', 'savings', 'pension', 'crypto', 'other']);
+  });
+
+  it.each([
+    ['an empty object', {}],
+    ['every field cleared', { kind: null, yield_rate: null, yield_period: null, maturity_date: null, liquidity_days: null }],
+    ...INVESTMENT_KINDS.map((kind): [string, object] => [`kind ${kind}`, { kind }]),
+    ['a zero rate', { yield_rate: '0' }],
+    ['a 100% rate', { yield_rate: '100' }],
+    ['a 4-decimal rate', { yield_rate: '12.3456' }],
+    ['a monthly period', { yield_period: 'monthly' }],
+    ['a yearly period', { yield_period: 'yearly' }],
+    ['liquidity_days 0', { liquidity_days: 0 }],
+    ['liquidity_days at the int column bound', { liquidity_days: 2147483647 }],
+    ['a past maturity date', { maturity_date: '2001-01-01' }],
+    ['a far-future maturity date', { maturity_date: '2099-12-31' }],
+    ['a leap-day maturity date', { maturity_date: '2028-02-29' }],
+    ['a maturity date after tomorrow', { maturity_date: isoDay(30) }],
+  ])('accepts %s', async (_label, investment) => {
+    await expect(update({ investment })).resolves.toBeInstanceOf(UpdateAccountDto);
+    await expect(create({ name: 'a', investment })).resolves.toBeInstanceOf(CreateAccountDto);
+  });
+
+  it.each([
+    ['null investment', null],
+    ['a non-object investment', 'cdb'],
+    ['an unknown nested key', { color: 'red' }],
+    ['an owner key inside investment', { account_id: 1 }],
+    ['an unknown kind', { kind: 'bonds' }],
+    ['an upper-case kind', { kind: 'FUND' }],
+    ['a numeric rate', { yield_rate: 12.5 }],
+    ['a negative rate', { yield_rate: '-1' }],
+    ['a rate above 100', { yield_rate: '100.0001' }],
+    ['a 5-decimal rate', { yield_rate: '1.00001' }],
+    ['an unknown yield period', { yield_period: 'daily' }],
+    ['a negative liquidity_days', { liquidity_days: -1 }],
+    ['a fractional liquidity_days', { liquidity_days: 1.5 }],
+    ['a string liquidity_days', { liquidity_days: '1' }],
+    ['liquidity_days over the int column bound', { liquidity_days: 2147483648 }],
+    ['an impossible maturity date', { maturity_date: '2026-02-30' }],
+    ['a malformed maturity date', { maturity_date: '15/01/2030' }],
+    ['a maturity datetime', { maturity_date: '2030-01-15T00:00:00Z' }],
+    ['a numeric maturity date', { maturity_date: 20300115 }],
+  ])('rejects %s with a 400', async (_label, investment) => {
+    await expect(update({ investment })).rejects.toThrow(BadRequestException);
+    await expect(create({ name: 'a', investment })).rejects.toThrow(BadRequestException);
   });
 });
 

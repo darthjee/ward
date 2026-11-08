@@ -1,6 +1,6 @@
 import { buildMessage, ValidateBy, ValidateIf } from 'class-validator';
 import { isSupportedCurrency } from '../currency.js';
-import { isAllowedLedgerDate } from '../ledger-date.js';
+import { isAllowedLedgerDate, isIsoDate } from '../ledger-date.js';
 
 /** Longest accepted account name, in code points (`VARCHAR(255)`). */
 export const ACCOUNT_NAME_MAX_LENGTH = 255;
@@ -12,6 +12,10 @@ export const DESCRIPTION_MAX_LENGTH = 255;
 export const NOTES_MAX_LENGTH = 2000;
 /** Longest accepted `type` value (`VARCHAR(32)`). */
 export const ACCOUNT_TYPE_MAX_LENGTH = 32;
+/** Upper bound of an integer stored in a signed MySQL `int` column. */
+export const MAX_INT_COLUMN = 2147483647;
+/** The periods a rate (debt interest, investment yield) accepts. */
+export const RATE_PERIODS = ['monthly', 'yearly'] as const;
 
 /**
  * Validates the property only when it is present (not `undefined`), so an
@@ -54,6 +58,21 @@ export function IsLedgerDate(): PropertyDecorator {
 }
 
 /**
+ * Validates a `YYYY-MM-DD` string naming a real calendar day, past or future
+ * (no "today + 1" bound, unlike {@link IsLedgerDate}).
+ * @returns {PropertyDecorator} The validation decorator.
+ */
+export function IsCalendarDate(): PropertyDecorator {
+  return ValidateBy({
+    name: 'isCalendarDate',
+    validator: {
+      validate: (value: unknown): boolean => isIsoDate(value),
+      defaultMessage: buildMessage((eachPrefix) => `${eachPrefix}$property must be a valid YYYY-MM-DD date`),
+    },
+  });
+}
+
+/**
  * Trims a string and turns a blank one into `null` (an optional free-text
  * field cleared by the user), leaving any other value untouched so
  * `@IsString()` still rejects it.
@@ -70,7 +89,7 @@ export function trimToNull({ value }: { value: unknown }): unknown {
   return trimmed === '' ? null : trimmed;
 }
 
-/** Highest accepted debt interest rate, in percent. */
+/** Highest accepted rate (debt interest, investment yield), in percent. */
 export const INTEREST_RATE_MAX = 100;
 
 // A non-negative decimal with at most 4 fractional digits (`DECIMAL(7,4)`).
@@ -86,7 +105,7 @@ export function isInterestRate(value: unknown): boolean {
 }
 
 /**
- * Validates a debt interest rate: a decimal string, 0–100, at most 4 decimals.
+ * Validates a rate (debt interest, investment yield): a decimal string, 0–100, at most 4 decimals.
  * @returns {PropertyDecorator} The validation decorator.
  */
 export function IsInterestRate(): PropertyDecorator {
