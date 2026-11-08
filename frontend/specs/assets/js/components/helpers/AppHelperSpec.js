@@ -11,6 +11,7 @@ import NotFound from '../../../../../assets/js/components/common/notFound/NotFou
 import BankAccountList from '../../../../../assets/js/components/resources/bank/accounts/pages/BankAccountList.jsx';
 import BankAccountNew from '../../../../../assets/js/components/resources/bank/accounts/pages/BankAccountNew.jsx';
 import BankAccountEdit from '../../../../../assets/js/components/resources/bank/accounts/pages/BankAccountEdit.jsx';
+import BankAccountDetail from '../../../../../assets/js/components/resources/bank/accounts/pages/BankAccountDetail.jsx';
 import HashRouteResolver from '../../../../../assets/js/utils/routing/HashRouteResolver.js';
 import ModalRedirect from '../../../../../assets/js/components/common/ModalRedirect.jsx';
 import ResetPasswordLanding from '../../../../../assets/js/components/resources/accounts/pages/ResetPasswordLanding.jsx';
@@ -72,6 +73,7 @@ describe('AppHelper', () => {
     ['bank-accounts', BankAccountList],
     ['bank-account-new', BankAccountNew],
     ['bank-account-edit', BankAccountEdit],
+    ['bank-account', BankAccountDetail],
   ].forEach(([key, Page]) => {
     it(`maps the ${key} key to its page`, () => {
       expect(partsOf(key).page.type).toBe(Page);
