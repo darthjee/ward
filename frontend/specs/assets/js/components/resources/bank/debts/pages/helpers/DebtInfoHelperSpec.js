@@ -1,4 +1,5 @@
-import DebtInfoHelper, { monthName } from '../../../../../../../../../assets/js/components/resources/bank/debts/pages/helpers/DebtInfoHelper.jsx';
+import DebtInfoHelper from '../../../../../../../../../assets/js/components/resources/bank/debts/pages/helpers/DebtInfoHelper.jsx';
+import { monthName } from '../../../../../../../../../assets/js/components/resources/bank/common/dates.js';
 import { formatMoney } from '../../../../../../../../../assets/js/components/resources/bank/common/amounts.js';
 import { renderedOutput } from '../../../../../../../../support/renderedOutput.js';
 
@@ -79,11 +80,6 @@ describe('DebtInfoHelper', () => {
 
   it('copes with a missing debt object', () => {
     expect(output({ debt: undefined }).contains('Interest rate')).toBeTrue();
-  });
-
-  it('names months, empty when unset', () => {
-    expect(monthName(1)).toBe(new Intl.DateTimeFormat(undefined, { month: 'long' }).format(new Date(2000, 0, 1)));
-    expect(monthName(null)).toBe('');
   });
 
   it('escapes the creditor and notes', () => {

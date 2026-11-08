@@ -1,26 +1,13 @@
 import DetailEntry from '../../../common/detail/DetailEntry.jsx';
 import { formatMoney, negateAmount } from '../../../common/amounts.js';
 import { formatRate } from '../../../common/rates.js';
+import { monthName } from '../../../common/dates.js';
 
 /** Display labels of the instalment frequency. */
 const FREQUENCY_LABELS = new Map([
   ['monthly', 'Monthly'],
   ['yearly', 'Yearly'],
 ]);
-
-/**
- * Name a month (1–12) in the browser's locale.
- *
- * @param {number|null} month - The 1-based month.
- * @returns {string} The month name, or `''` when unset.
- */
-export function monthName(month) {
-  if (!month) {
-    return '';
-  }
-
-  return new Intl.DateTimeFormat(undefined, { month: 'long' }).format(new Date(2000, month - 1, 1));
-}
 
 /**
  * Render the common fields of a debt: creditor, currency, loan date, amount owed (the opening

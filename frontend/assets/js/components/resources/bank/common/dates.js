@@ -28,3 +28,17 @@ export function localToday(now = new Date()) {
 export function isAfterLocalToday(date, now = new Date()) {
   return String(date) > localToday(now);
 }
+
+/**
+ * Name a month (1–12) in the browser's locale.
+ *
+ * @param {number|null} month - The 1-based month.
+ * @returns {string} The month name, or `''` when unset.
+ */
+export function monthName(month) {
+  if (!month) {
+    return '';
+  }
+
+  return new Intl.DateTimeFormat(undefined, { month: 'long' }).format(new Date(2000, month - 1, 1));
+}

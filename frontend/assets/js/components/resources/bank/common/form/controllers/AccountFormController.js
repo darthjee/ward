@@ -10,7 +10,8 @@ import { changedFields, fieldsFromAccount, validateAccountFields } from './accou
  * @description The section base (`'/bank/accounts'`, `'/bank/debts'`) decides where a saved
  * account is shown. Subclasses adapt the form to their account type by overriding the hooks
  * `validate` (fields → `{ errors, body }`), `fieldsFrom` (account → fields), `changes`
- * (body vs. original → PATCH body) and `createBody` (validated body → POST body). Validates on
+ * (body vs. original → PATCH body), `sendCreate` and `sendUpdate` (the client calls, e.g. the
+ * debt ones that add `type` / `debt`). Validates on
  * the client, sets `pending` while the request runs (so a double click
  * never sends twice), then navigates to the account's detail page — the write response carries a
  * masked account number, so it is never displayed. Errors are classified: `404` → Not-found;
@@ -92,13 +93,24 @@ export default class AccountFormController {
   }
 
   /**
-   * Build the create request body (hook; default: the validated body as-is).
+   * Send the create request (hook; default: a regular account, `createAccount`).
    *
    * @param {object} body - The validated body.
-   * @returns {object} The POST body.
+   * @returns {Promise<object|undefined>} The created account.
    */
-  createBody(body) {
-    return body;
+  sendCreate(body) {
+    return this.client.createAccount(this.context, body);
+  }
+
+  /**
+   * Send the update request (hook; default: `updateAccount`, which never sends `type`).
+   *
+   * @param {number|string} accountId - The account id.
+   * @param {object} body - The PATCH body.
+   * @returns {Promise<object|undefined>} The updated account.
+   */
+  sendUpdate(accountId, body) {
+    return this.client.updateAccount(this.context, accountId, body);
   }
 
   /**
@@ -110,7 +122,7 @@ export default class AccountFormController {
   async create(fields) {
     await this.submit(
       this.validate(fields),
-      (body) => this.client.createAccount(this.context, this.createBody(body)),
+      (body) => this.sendCreate(body),
     );
   }
 
@@ -143,7 +155,7 @@ export default class AccountFormController {
 
     await this.submit(
       validation,
-      (body) => this.client.updateAccount(this.context, accountId, body),
+      (body) => this.sendUpdate(accountId, body),
       accountId,
     );
   }

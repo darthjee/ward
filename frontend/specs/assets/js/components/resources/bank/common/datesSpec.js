@@ -1,4 +1,4 @@
-import { isAfterLocalToday, localToday } from '../../../../../../../assets/js/components/resources/bank/common/dates.js';
+import { isAfterLocalToday, localToday, monthName } from '../../../../../../../assets/js/components/resources/bank/common/dates.js';
 
 describe('dates', () => {
   const now = new Date(2026, 0, 5, 23, 30);
@@ -28,6 +28,18 @@ describe('dates', () => {
 
     it('defaults to the current date', () => {
       expect(isAfterLocalToday('9999-12-31')).toBeTrue();
+    });
+  });
+
+  describe('monthName', () => {
+    it('names a month in the browser locale', () => {
+      expect(monthName(1)).toBe(new Intl.DateTimeFormat(undefined, { month: 'long' }).format(new Date(2000, 0, 1)));
+      expect(monthName(12)).toBe(new Intl.DateTimeFormat(undefined, { month: 'long' }).format(new Date(2000, 11, 1)));
+    });
+
+    it('is empty when unset', () => {
+      expect(monthName(null)).toBe('');
+      expect(monthName(0)).toBe('');
     });
   });
 });

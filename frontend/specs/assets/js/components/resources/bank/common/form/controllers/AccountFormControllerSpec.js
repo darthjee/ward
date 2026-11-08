@@ -32,8 +32,8 @@ class ExtraController extends AccountFormController {
     return { ...super.changes(body, original), touched: true };
   }
 
-  createBody(body) {
-    return { ...body, type: 'debt' };
+  sendCreate(body) {
+    return this.client.createAccount(this.context, { ...body, type: 'debt' });
   }
 }
 
@@ -68,7 +68,7 @@ describe('AccountFormController', () => {
       .toBe('#/orgs/5/bank/debts/7');
   });
 
-  it('creates through the createBody hook and goes to the section detail', async () => {
+  it('creates through the sendCreate hook and goes to the section detail', async () => {
     await build(ExtraController, { base: '/bank/debts' }).create({ ...fieldsFromAccount(ACCOUNT), extra: 'b' });
 
     expect(deps.client.createAccount).toHaveBeenCalledWith(deps.context, jasmine.objectContaining({
