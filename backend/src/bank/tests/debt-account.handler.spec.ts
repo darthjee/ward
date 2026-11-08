@@ -35,6 +35,10 @@ describe('DebtAccountHandler', () => {
     expect(handler.carriesLedger).toBe(true);
   });
 
+  it('has no account-level rule (any opening balance)', () => {
+    expect(() => handler.validateAccount()).not.toThrow();
+  });
+
   describe('validateCreate', () => {
     it('uses the defaults without a debt object', () => {
       expect(handler.validateCreate(undefined, BRL)).toEqual(defaultDebtState());

@@ -2,6 +2,7 @@ import { BadRequestException } from '@nestjs/common';
 import { buildAccount } from './account.test-support.js';
 import { AccountTypeRegistry } from '../account-types/account-type.registry.js';
 import { DebtAccountHandler } from '../account-types/debt-account.handler.js';
+import { InvestmentAccountHandler } from '../account-types/investment-account.handler.js';
 import { RegularAccountHandler } from '../account-types/regular-account.handler.js';
 
 describe('AccountTypeRegistry', () => {
@@ -20,6 +21,29 @@ describe('AccountTypeRegistry', () => {
 
     expect(withDebt.get('debt')).toBeInstanceOf(DebtAccountHandler);
     expect(() => withDebt.get('provider_expense')).toThrow(BadRequestException);
+  });
+
+  it('resolves investment once its handler is registered', () => {
+    const all = new AccountTypeRegistry([new RegularAccountHandler(), new DebtAccountHandler(), new InvestmentAccountHandler()]);
+
+    expect(all.get('investment')).toBeInstanceOf(InvestmentAccountHandler);
+    expect(() => all.get('provider_expense')).toThrow(BadRequestException);
+  });
+
+  describe('assertNoForeignNested with investment registered', () => {
+    const all = new AccountTypeRegistry([new RegularAccountHandler(), new DebtAccountHandler(), new InvestmentAccountHandler()]);
+
+    it.each([
+      ['an investment object on a regular account', { investment: {} }, 'regular'],
+      ['an investment object on a debt account', { investment: { kind: 'fund' } }, 'debt'],
+      ['a debt object on an investment account', { debt: {} }, 'investment'],
+    ])('rejects %s', (_label, dto, type) => {
+      expect(() => all.assertNoForeignNested(dto, type)).toThrow(BadRequestException);
+    });
+
+    it('accepts an investment object on an investment account', () => {
+      expect(() => all.assertNoForeignNested({ investment: {} }, 'investment')).not.toThrow();
+    });
   });
 
   describe('assertNoForeignNested', () => {
@@ -77,6 +101,10 @@ describe('RegularAccountHandler', () => {
     expect(() => handler.validateUpdate(undefined)).not.toThrow();
     expect(() => handler.validateCreate({})).toThrow(BadRequestException);
     expect(() => handler.validateUpdate({ a: 1 })).toThrow(BadRequestException);
+  });
+
+  it('has no account-level rule', () => {
+    expect(() => handler.validateAccount()).not.toThrow();
   });
 
   it('has no details', async () => {

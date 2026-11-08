@@ -4,6 +4,8 @@ import { ErrorCodes } from '../../core/error-codes.js';
 import { AccountTypeRegistry } from '../account-types/account-type.registry.js';
 import { DebtAccountHandler } from '../account-types/debt-account.handler.js';
 import { defaultDebtState } from '../account-types/debt-details.js';
+import { InvestmentAccountHandler } from '../account-types/investment-account.handler.js';
+import { defaultInvestmentState } from '../account-types/investment-details.js';
 import { RegularAccountHandler } from '../account-types/regular-account.handler.js';
 import { AccountService } from '../account.service.js';
 import { buildAccount, ORGANIZATION, PERSONAL } from './account.test-support.js';
@@ -11,6 +13,7 @@ import type { CreateAccountDto } from '../dto/create-account.dto.js';
 import type { UpdateAccountDto } from '../dto/update-account.dto.js';
 import { Account } from '../entities/account.entity.js';
 import { DebtDetails } from '../entities/debt-details.entity.js';
+import { InvestmentDetails } from '../entities/investment-details.entity.js';
 
 function mysqlError(code: string): QueryFailedError {
   return new QueryFailedError('q', [], Object.assign(new Error(code), { code }));
@@ -584,6 +587,188 @@ describe('AccountService with debt accounts', () => {
       const { service, detailsFind } = setupDebt(buildAccount());
 
       expect(await service.find(PERSONAL, 1)).not.toHaveProperty('debt');
+      expect(detailsFind).not.toHaveBeenCalled();
+    });
+  });
+});
+
+const STORED_INVESTMENT = {
+  ...defaultInvestmentState(),
+  accountId: 1,
+  kind: 'fixed_income',
+  yieldRate: '1.1000',
+  yieldPeriod: 'monthly',
+};
+
+function setupInvestment(
+  account: Account = buildAccount({ type: 'investment', openingBalance: 0n }),
+  details: object[] = [STORED_INVESTMENT],
+) {
+  const accountSave = jest.fn(async (saved: Account) => ({ ...saved, id: saved.id ?? 99 }));
+  const detailsSave = jest.fn(async (row: object) => row);
+  const detailsFind = jest.fn(async () => details.map((row) => Object.assign(new InvestmentDetails(), row)));
+  const repositoryFor = (entity: unknown) =>
+    entity === Account ? { save: accountSave } : { save: detailsSave, find: detailsFind };
+  const manager: { getRepository: jest.Mock; transaction: jest.Mock } = {
+    getRepository: jest.fn(repositoryFor),
+    transaction: jest.fn(async (work: (m: unknown) => Promise<unknown>) => work(manager)),
+  };
+  const accountRepository = {
+    find: jest.fn(async (): Promise<Account[]> => [account]),
+    findOneBy: jest.fn(async () => account),
+    create: jest.fn((fields: Partial<Account>) => buildAccount({ id: undefined, ...fields })),
+    save: jest.fn(async (saved: Account) => saved),
+    manager,
+  };
+  const balances = {
+    currentBalances: jest.fn(async () => new Map()),
+    hasTransactions: jest.fn(async () => false),
+  };
+  const investmentHandler = new InvestmentAccountHandler();
+  const registry = new AccountTypeRegistry([new RegularAccountHandler(), new DebtAccountHandler(), investmentHandler]);
+  const service = new AccountService(accountRepository as never, registry, balances as never, { defaultCurrency: 'BRL' });
+
+  return { service, accountRepository, balances, accountSave, detailsSave, detailsFind, investmentHandler, manager };
+}
+
+describe('AccountService with investment accounts', () => {
+  describe('create', () => {
+    it('creates an investment with an all-null details row when no investment object is sent', async () => {
+      const { service, detailsSave } = setupInvestment();
+
+      const result = await service.create(PERSONAL, createDto({ type: 'investment' }));
+
+      expect(detailsSave).toHaveBeenCalledWith({ ...defaultInvestmentState(), accountId: 99 });
+      expect(result.type).toBe('investment');
+      expect(result.opening_balance).toBe('0.00');
+    });
+
+    it('calls validateAccount with the account about to be saved', async () => {
+      const { service, investmentHandler } = setupInvestment();
+      const validateAccount = jest.spyOn(investmentHandler, 'validateAccount');
+
+      await service.create(PERSONAL, createDto({ type: 'investment', opening_balance: '0' }));
+
+      expect(validateAccount).toHaveBeenCalledWith(expect.objectContaining({ type: 'investment', openingBalance: 0n }));
+    });
+
+    it.each(['0', '0.00', '-0'])('accepts the opening balance %p', async (opening) => {
+      const { service, accountSave } = setupInvestment();
+
+      await service.create(PERSONAL, createDto({ type: 'investment', opening_balance: opening }));
+
+      expect(accountSave).toHaveBeenCalledWith(expect.objectContaining({ openingBalance: 0n }));
+    });
+
+    it.each(['0.01', '-5.00', '100'])('rejects the opening balance %p with a 400, before saving', async (opening) => {
+      const { service, manager } = setupInvestment();
+
+      await expect(service.create(PERSONAL, createDto({ type: 'investment', opening_balance: opening }))).rejects.toThrow(
+        BadRequestException,
+      );
+      expect(manager.transaction).not.toHaveBeenCalled();
+    });
+
+    it('rejects an investment object on a regular account with a 400', async () => {
+      const { service, accountSave } = setupInvestment();
+
+      await expect(service.create(PERSONAL, createDto({ investment: {} } as Partial<CreateAccountDto>))).rejects.toThrow(
+        BadRequestException,
+      );
+      expect(accountSave).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('update', () => {
+    it('merges the investment object onto the stored details', async () => {
+      const { service, detailsSave } = setupInvestment();
+
+      await service.update(PERSONAL, 1, updateDto({ investment: { yield_rate: '3' } }));
+
+      expect(detailsSave).toHaveBeenCalledWith(expect.objectContaining({
+        accountId: 1,
+        kind: 'fixed_income',
+        yieldRate: '3',
+        yieldPeriod: 'monthly',
+      }));
+    });
+
+    it('rejects clearing only the period, on the merged state', async () => {
+      const { service, detailsSave } = setupInvestment();
+
+      await expect(service.update(PERSONAL, 1, updateDto({ investment: { yield_period: null } }))).rejects.toThrow(
+        BadRequestException,
+      );
+      expect(detailsSave).not.toHaveBeenCalled();
+    });
+
+    it.each(['0', '0.00'])('accepts the opening balance %p', async (opening) => {
+      const { service } = setupInvestment();
+
+      await expect(service.update(PERSONAL, 1, updateDto({ opening_balance: opening }))).resolves.toBeDefined();
+    });
+
+    it('rejects a non-zero opening balance with a 400, before saving', async () => {
+      const { service, manager } = setupInvestment();
+
+      await expect(service.update(PERSONAL, 1, updateDto({ opening_balance: '1.00' }))).rejects.toThrow(BadRequestException);
+      expect(manager.transaction).not.toHaveBeenCalled();
+    });
+
+    it('calls validateAccount on PATCH too', async () => {
+      const { service, investmentHandler } = setupInvestment();
+      const validateAccount = jest.spyOn(investmentHandler, 'validateAccount');
+
+      await service.update(PERSONAL, 1, updateDto({ notes: 'n' }));
+
+      expect(validateAccount).toHaveBeenCalledTimes(1);
+    });
+
+    it('answers 409 for a non-zero opening balance on an archived investment', async () => {
+      const { service } = setupInvestment(buildAccount({ type: 'investment', openingBalance: 0n, archivedAt: new Date() }));
+
+      expect(await codeOf(service.update(PERSONAL, 1, updateDto({ opening_balance: '5.00' })))).toBe(
+        ErrorCodes.ACCOUNT_ARCHIVED,
+      );
+    });
+
+    it('answers 409 for any investment field on an archived investment', async () => {
+      const { service } = setupInvestment(buildAccount({ type: 'investment', openingBalance: 0n, archivedAt: new Date() }));
+
+      expect(await codeOf(service.update(PERSONAL, 1, updateDto({ investment: { yield_period: null } })))).toBe(
+        ErrorCodes.ACCOUNT_ARCHIVED,
+      );
+    });
+
+    it('keeps a zero opening balance across a currency change', async () => {
+      const { service, accountSave } = setupInvestment();
+
+      await service.update(PERSONAL, 1, updateDto({ currency: 'JPY' }));
+
+      expect(accountSave).toHaveBeenCalledWith(expect.objectContaining({ currency: 'JPY', openingBalance: 0n }));
+    });
+  });
+
+  describe('responses', () => {
+    it('lists investments with their investment object, loading details in one query', async () => {
+      const { service, detailsFind } = setupInvestment();
+
+      const result = await service.list(PERSONAL, { type: 'investment' });
+
+      expect(detailsFind).toHaveBeenCalledTimes(1);
+      expect(result[0].investment).toEqual({
+        kind: 'fixed_income',
+        yield_rate: '1.1',
+        yield_period: 'monthly',
+        maturity_date: null,
+        liquidity_days: null,
+      });
+    });
+
+    it('never adds an investment object to a regular account', async () => {
+      const { service, detailsFind } = setupInvestment(buildAccount());
+
+      expect(await service.find(PERSONAL, 1)).not.toHaveProperty('investment');
       expect(detailsFind).not.toHaveBeenCalled();
     });
   });

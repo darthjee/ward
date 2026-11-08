@@ -1,7 +1,9 @@
 import { maskAccountNumber, serializeAccount } from '../account-response.js';
 import { buildAccount } from './account.test-support.js';
 import { DebtAccountHandler } from '../account-types/debt-account.handler.js';
+import { InvestmentAccountHandler } from '../account-types/investment-account.handler.js';
 import { DebtDetails } from '../entities/debt-details.entity.js';
+import { InvestmentDetails } from '../entities/investment-details.entity.js';
 
 describe('maskAccountNumber', () => {
   it.each([
@@ -96,5 +98,34 @@ describe('serializeAccount', () => {
 
   it('never adds a debt key to a regular account', () => {
     expect(serializeAccount(buildAccount(), { balance: 0n, mask: false })).not.toHaveProperty('debt');
+  });
+
+  it('serializes an investment account\'s investment object in snake_case, with the rate as a decimal string', () => {
+    const investment = buildAccount({ type: 'investment', openingBalance: 0n });
+    const details = Object.assign(new InvestmentDetails(), {
+      accountId: investment.id,
+      kind: 'savings',
+      yieldRate: '1.1000',
+      yieldPeriod: 'monthly',
+      maturityDate: null,
+      liquidityDays: 0,
+    });
+    const nested = new InvestmentAccountHandler().serialize(details);
+
+    const response = serializeAccount(investment, { balance: -500n, mask: false, nested });
+
+    expect(response).toMatchObject({
+      type: 'investment',
+      opening_balance: '0.00',
+      balance: '-5.00',
+      investment: { kind: 'savings', yield_rate: '1.1', yield_period: 'monthly', maturity_date: null, liquidity_days: 0 },
+    });
+    expect(response).not.toHaveProperty('debt');
+  });
+
+  it('never adds an investment key to a regular or debt account', () => {
+    expect(serializeAccount(buildAccount(), { balance: 0n, mask: false })).not.toHaveProperty('investment');
+    expect(serializeAccount(buildAccount({ type: 'debt' }), { balance: 0n, mask: false, nested: {} }))
+      .not.toHaveProperty('investment');
   });
 });
