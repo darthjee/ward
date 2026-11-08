@@ -6,6 +6,7 @@ import {
   OwnerContext,
 } from '../../../../../../../../assets/js/components/common/ownerContext/hooks/useOwnerContext.js';
 import { renderedOutput } from '../../../../../../../support/renderedOutput.js';
+import BankAccountsLoader from '../../../../../../../../assets/js/components/resources/bank/common/list/controllers/BankAccountsLoader.js';
 import { installFakeWindow, uninstallFakeWindow } from '../../../../../../../support/fakeWindow.js';
 
 const ORG = { kind: 'organization', orgId: 5 };
@@ -68,5 +69,16 @@ describe('BankAccountList', () => {
 
     expect(() => handlers.onRetry()).not.toThrow();
     expect(() => handlers.onDismiss()).not.toThrow();
+  });
+
+  it('lists regular accounts only, so investments are absent from the Accounts list', async () => {
+    const client = jasmine.createSpyObj('client', ['listAccounts']);
+    const callbacks = jasmine.createSpyObj('callbacks', ['onLoaded', 'onNotFound', 'onError']);
+
+    client.listAccounts.and.resolveTo([]);
+    await new BankAccountsLoader(client, { type: 'regular' }).load(ORG, true, callbacks);
+
+    expect(client.listAccounts).toHaveBeenCalledWith(ORG, { archived: true, type: 'regular' });
+    expect(client.listAccounts).not.toHaveBeenCalledWith(ORG, jasmine.objectContaining({ type: 'investment' }));
   });
 });

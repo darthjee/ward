@@ -6,6 +6,9 @@ import {
   OwnerContext,
 } from '../../../../../../../../assets/js/components/common/ownerContext/hooks/useOwnerContext.js';
 import { renderedOutput } from '../../../../../../../support/renderedOutput.js';
+import BankAccountLoader, { buildBankAccountLoadEffect } from '../../../../../../../../assets/js/components/resources/bank/common/detail/controllers/BankAccountLoader.js';
+import { guardAccountType } from '../../../../../../../../assets/js/components/resources/bank/common/detail/accountTypeGuard.js';
+import { flushMicrotasks } from '../../../../../../../support/flushMicrotasks.js';
 import { installFakeWindow, uninstallFakeWindow } from '../../../../../../../support/fakeWindow.js';
 
 const ORG = { kind: 'organization', orgId: 5 };
@@ -62,5 +65,26 @@ describe('BankDebtDetail', () => {
       'onStartNew', 'onSubmit', 'onEdit', 'onNavigate', 'onArchive', 'onUnarchive', 'onDeleteAccount', 'onConfirm',
     ]));
     expect(() => handlers.onStartNew({ direction: 'in', description: 'Payment', amount: '' })).not.toThrow();
+  });
+
+  [['Personal', { kind: 'personal' }, ''], ['an organization', ORG, '/orgs/5']].forEach(([label, context, prefix]) => {
+    it(`redirects an investment deep-linked under /bank/debts to the investments detail, in ${label}`, async () => {
+      const client = jasmine.createSpyObj('client', ['getAccount', 'listTransactions']);
+      const callbacks = jasmine.createSpyObj('callbacks', ['onLoaded', 'onNotFound', 'onError']);
+      const navigate = jasmine.createSpy('navigate');
+
+      client.getAccount.and.resolveTo({ id: 3, type: 'investment' });
+      client.listTransactions.and.resolveTo({ transactions: [], opening: null, pagination: { total_count: 0, total_pages: 1 } });
+      buildBankAccountLoadEffect(new BankAccountLoader(client), context, 3, 1, guardAccountType(
+        callbacks,
+        { base: '/bank/debts', context, navigate },
+      ))();
+      await flushMicrotasks();
+      await flushMicrotasks();
+
+      expect(navigate).toHaveBeenCalledWith(`#${prefix}/bank/investments/3`);
+      expect(callbacks.onNotFound).not.toHaveBeenCalled();
+      expect(callbacks.onLoaded).not.toHaveBeenCalled();
+    });
   });
 });
