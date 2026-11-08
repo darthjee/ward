@@ -48,8 +48,9 @@ does not load the module. The specs (`docs/agents/specs/banking/accounts/regular
 }
 ```
 
-- `account_number` is masked (`•••• ` + last 4 characters) in the list, full in every other
-  response.
+- `account_number` is masked (`•••• ` + last 4 characters) in every response (the list and the
+  create, update, archive and unarchive responses) except the detail response
+  (`GET <base>/accounts/:accountId.json`), which returns it in full.
 - `balance` (current balance) = `opening_balance` + SUM(transactions dated on or after
   `opening_date`); on the list it comes from one grouped query.
 - A later account type adds its nested object under its type name (`debt`, `investment`,
