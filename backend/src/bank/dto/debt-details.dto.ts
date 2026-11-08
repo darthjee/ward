@@ -4,6 +4,9 @@ import { IsInterestRate, IsOptionalNonNull } from './field-validators.js';
 /** The periods a debt's interest rate and instalment frequency accept. */
 export const DEBT_PERIODS = ['monthly', 'yearly'] as const;
 
+/** Upper bound of `instalment_count`: the signed MySQL `int` column's maximum. */
+export const MAX_INSTALMENT_COUNT = 2147483647;
+
 /**
  * The nested `debt` object of an account body (see
  * `docs/agents/specs/banking/accounts/debt.md`). Every field is optional, and
@@ -45,5 +48,6 @@ export class DebtDetailsDto {
   @IsOptional()
   @IsInt()
   @Min(1)
+  @Max(MAX_INSTALMENT_COUNT)
     instalment_count?: number | null;
 }

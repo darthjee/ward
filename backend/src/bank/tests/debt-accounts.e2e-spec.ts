@@ -158,6 +158,7 @@ describe('debt accounts (e2e)', () => {
         ['due_month 0', { instalment_frequency: 'yearly', due_month: 0 }],
         ['due_month 13', { instalment_frequency: 'yearly', due_month: 13 }],
         ['instalment_count 0', { instalment_count: 0 }],
+        ['instalment_count over the int column bound', { instalment_count: 2147483648 }],
         ['instalment_amount 0', { instalment_amount: '0' }],
         ['a negative instalment_amount', { instalment_amount: '-5.00' }],
         ['an instalment_amount over the bound', { instalment_amount: '100000000000.01' }],
@@ -175,6 +176,17 @@ describe('debt accounts (e2e)', () => {
         const created = await createDebt(orgId);
         await patch(orgId, created.id, { debt }).expect(400);
         expect(detailsOf(created.id)).toMatchObject({ dueDay: null, instalmentAmount: null, interestRate: null });
+      });
+
+      it('answers an instalment_count over the int column bound with VALIDATION_FAILED, on create and PATCH', async () => {
+        const debt = { instalment_count: 2147483648 };
+        const createRes = await send(app, 'post', `${prefix}/accounts.json`, ALICE, { type: 'debt', name: uniqueName('Big'), debt })
+          .expect(400);
+        expect(createRes.body.error.code).toBe('VALIDATION_FAILED');
+
+        const created = await createDebt(orgId);
+        const patchRes = await patch(orgId, created.id, { debt }).expect(400);
+        expect(patchRes.body.error.code).toBe('VALIDATION_FAILED');
       });
 
       it('rejects a debt object on a regular account, on create and PATCH', async () => {
@@ -198,6 +210,7 @@ describe('debt accounts (e2e)', () => {
         ['interest_rate 100', { interest_rate: '100', interest_period: 'yearly' }, { interest_rate: '100' }],
         ['interest_rate with 4 decimals', { interest_rate: '12.3456', interest_period: 'yearly' }, { interest_rate: '12.3456' }],
         ['the amount bound', { instalment_amount: '100000000000.00' }, { instalment_amount: '100000000000.00' }],
+        ['instalment_count at the int column bound', { instalment_count: 2147483647 }, { instalment_count: 2147483647 }],
       ])('accepts %s', async (_label, debt, expected) => {
         const created = await createDebt(orgId, { debt });
 

@@ -125,6 +125,7 @@ describe('nested debt object', () => {
     ['a yearly interest period', { interest_period: 'yearly' }],
     ['due_day 1', { due_day: 1 }],
     ['due_month 1', { due_month: 1 }],
+    ['instalment_count at the int column bound', { instalment_count: 2147483647 }],
   ])('accepts %s', async (_label, debt) => {
     await expect(update({ debt })).resolves.toBeInstanceOf(UpdateAccountDto);
     await expect(create({ name: 'a', debt })).resolves.toBeInstanceOf(CreateAccountDto);
@@ -153,6 +154,7 @@ describe('nested debt object', () => {
     ['due_month 13', { due_month: 13 }],
     ['instalment_count 0', { instalment_count: 0 }],
     ['a fractional instalment_count', { instalment_count: 2.5 }],
+    ['instalment_count over the int column bound', { instalment_count: 2147483648 }],
   ])('rejects %s with a 400', async (_label, debt) => {
     await expect(update({ debt })).rejects.toThrow(BadRequestException);
     await expect(create({ name: 'a', debt })).rejects.toThrow(BadRequestException);
