@@ -8,6 +8,8 @@ import { AccountService } from './account.service.js';
 import { BankConfigModule } from './bank-config.module.js';
 import { Account } from './entities/account.entity.js';
 import { Transaction } from './entities/transaction.entity.js';
+import { LedgerQuery } from './ledger.query.js';
+import { TransactionService } from './transaction.service.js';
 
 /**
  * The lazy `bank` domain module: every service, query and piece of business
@@ -33,8 +35,10 @@ import { Transaction } from './entities/transaction.entity.js';
     AccountTypeRegistry,
     AccountBalancesQuery,
     AccountService,
+    LedgerQuery,
+    TransactionService,
   ],
-  exports: [AccountService],
+  exports: [AccountService, TransactionService],
 })
 // NestJS module classes are intentionally empty; all behavior lives in @Module().
 // eslint-disable-next-line @typescript-eslint/no-extraneous-class
