@@ -81,6 +81,7 @@ folded, not repeated here.
 | `auth_account_edit_lockouts` | Auth | `user_id` is a logical FK (no physical FK, no cross-module JOIN), unique — one row per user, upserted in place |
 | `bank_accounts` | Bank | Owner columns `user_id` / `organization_id` are logical FKs to `auth` (no physical FK), both nullable; the `bank_accounts_exactly_one_owner` check requires exactly one of them. The generated `active_name_key` column (`IF(archived_at IS NULL, LOWER(name), NULL)`, collation `utf8mb4_0900_as_cs` so it is case- but not accent-insensitive) backs two unique indexes, `(user_id, active_name_key)` and `(organization_id, active_name_key)`, which are also the owner lookup indexes. The key and the check are added with raw SQL (TypeORM's MySQL driver supports neither), and the column is not mapped on the entity. Amounts are `BIGINT` minor units |
 | `bank_transactions` | Bank | `account_id` is a **real** FK to `bank_accounts` (same module) with `ON DELETE RESTRICT`; index `(account_id, date, id)`. No owner columns: the owner is inherited through the account |
+| `bank_debt_details` | Bank | 1:1 with `bank_accounts`: `account_id` is both the PK and a **real** FK to `bank_accounts.id` with `ON DELETE CASCADE` (the details row goes with the account). No owner columns: the owner is inherited through the account. `instalment_amount` is `BIGINT` minor units |
 
 ## Build
 
