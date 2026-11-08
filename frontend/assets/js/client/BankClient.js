@@ -7,6 +7,11 @@ const ACCOUNT_FIELDS = [
   'notes',
 ];
 
+const DEBT_FIELDS = [
+  'interest_rate', 'interest_period', 'instalment_amount', 'instalment_frequency', 'due_day',
+  'due_month', 'instalment_count',
+];
+
 const TRANSACTION_FIELDS = ['date', 'amount', 'description', 'notes'];
 
 /**
@@ -22,6 +27,20 @@ function whitelist(attrs, fields) {
   const source = new Map(Object.entries(attrs ?? {}));
 
   return pickDefined(Object.fromEntries(fields.map((field) => [field, source.get(field)])));
+}
+
+/**
+ * Build a debt account body: the whitelisted common fields plus, when given, the nested `debt`
+ * object whitelisted to the debt fields (`null` kept to clear, `undefined` dropped).
+ *
+ * @param {object} attrs - The caller's attributes (common fields and an optional `debt`).
+ * @returns {object} The body, never carrying `type`.
+ */
+function debtBody(attrs) {
+  const body = whitelist(attrs, ACCOUNT_FIELDS);
+  const debt = attrs?.debt;
+
+  return debt === undefined || debt === null ? body : { ...body, debt: whitelist(debt, DEBT_FIELDS) };
 }
 
 /**
@@ -47,16 +66,28 @@ function accountPath(context, id, suffix = '') {
  */
 const BankClient = {
   /**
-   * List the regular accounts.
+   * List the accounts of one type (regular by default).
    *
    * @param {object} context - The owner context.
-   * @param {{archived: boolean}} [options] - `archived: true` includes archived accounts.
+   * @param {{archived: boolean, type: string}} [options] - `archived: true` includes archived
+   *   accounts; `type` is the account type (`'regular'` or `'debt'`).
    * @returns {Promise<Array<object>|undefined>} The accounts, sorted by name.
    */
-  async listAccounts(context, { archived = false } = {}) {
-    return ApiClient.getJson(
-      contextPath(context, `/bank/accounts.json?type=regular&archived=${Boolean(archived)}`),
-    );
+  async listAccounts(context, { archived = false, type = 'regular' } = {}) {
+    const query = new URLSearchParams({ type, archived: String(Boolean(archived)) });
+
+    return ApiClient.getJson(contextPath(context, `/bank/accounts.json?${query}`));
+  },
+
+  /**
+   * List the debt accounts (each row carries its `debt` object).
+   *
+   * @param {object} context - The owner context.
+   * @param {{archived: boolean}} [options] - `archived: true` includes archived debts.
+   * @returns {Promise<Array<object>|undefined>} The debts, sorted by name.
+   */
+  async listDebts(context, { archived = false } = {}) {
+    return BankClient.listAccounts(context, { archived, type: 'debt' });
   },
 
   /**
@@ -94,6 +125,34 @@ const BankClient = {
    */
   async updateAccount(context, id, attrs) {
     return ApiClient.patchJson(accountPath(context, id), whitelist(attrs, ACCOUNT_FIELDS));
+  },
+
+  /**
+   * Create a debt account: `type: "debt"` with the common fields and the optional nested
+   * `debt` object.
+   *
+   * @param {object} context - The owner context.
+   * @param {object} attrs - The `snake_case` account fields, with an optional `debt` object.
+   * @returns {Promise<object|undefined>} The created debt account.
+   */
+  async createDebt(context, attrs) {
+    return ApiClient.postJson(
+      contextPath(context, '/bank/accounts.json'),
+      { type: 'debt', ...debtBody(attrs) },
+    );
+  },
+
+  /**
+   * Update a debt account: the common fields and the nested `debt` object (merged partially
+   * by the backend); `type` is never sent.
+   *
+   * @param {object} context - The owner context.
+   * @param {number|string} id - The account id.
+   * @param {object} attrs - The `snake_case` fields to change, with an optional `debt` object.
+   * @returns {Promise<object|undefined>} The updated debt account.
+   */
+  async updateDebt(context, id, attrs) {
+    return ApiClient.patchJson(accountPath(context, id), debtBody(attrs));
   },
 
   /**

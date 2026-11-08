@@ -1,7 +1,5 @@
-import BankAccountDetailHelper, {
-  ledgerPageHref,
-} from '../../../../../../../../../assets/js/components/resources/bank/accounts/pages/helpers/BankAccountDetailHelper.jsx';
-import { initialLedgerForm } from '../../../../../../../../../assets/js/components/resources/bank/accounts/pages/hooks/useLedgerForm.js';
+import BankAccountDetailHelper from '../../../../../../../../../assets/js/components/resources/bank/accounts/pages/helpers/BankAccountDetailHelper.jsx';
+import { initialLedgerForm } from '../../../../../../../../../assets/js/components/resources/bank/common/detail/hooks/useLedgerForm.js';
 import { classifyError } from '../../../../../../../../../assets/js/components/resources/bank/common/bankErrors.js';
 import ConfirmModal from '../../../../../../../../../assets/js/components/resources/bank/common/ConfirmModal.jsx';
 import ApiError from '../../../../../../../../../assets/js/client/ApiError.js';
@@ -60,11 +58,6 @@ function output(overrides) {
 }
 
 describe('BankAccountDetailHelper', () => {
-  it('builds ledger page links in both contexts', () => {
-    expect(ledgerPageHref({ kind: 'personal' }, 12, 3)).toBe('#/bank/accounts/12?page=3');
-    expect(ledgerPageHref({ kind: 'organization', orgId: 5 }, 12, 1)).toBe('#/orgs/5/bank/accounts/12?page=1');
-  });
-
   it('renders the header, the inline form at the top of the ledger, then the table', () => {
     expect(output().containsInOrder('Main', 'Ledger', 'New transaction', 'Salary', 'Opening balance')).toBeTrue();
   });

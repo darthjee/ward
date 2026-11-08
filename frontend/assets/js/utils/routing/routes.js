@@ -34,7 +34,7 @@ export const ROUTES_ORG_ONLY = [
  * Context-aware routes, valid both as Personal (`/x`) and under an organization (`/orgs/<id>/x`).
  * Modules register their own paths here (e.g. `['/bank/accounts', 'bank-accounts']`).
  * `Route` matches by equal segment count and the first match wins, so `/bank/accounts/new` is
- * listed before `/bank/accounts/:accountId`.
+ * listed before `/bank/accounts/:accountId` (and `/bank/debts/new` before `/bank/debts/:accountId`).
  *
  * @type {Array<Array<string>>}
  */
@@ -43,6 +43,10 @@ export const ROUTES_CONTEXT = [
   ['/bank/accounts/new', 'bank-account-new'],
   ['/bank/accounts/:accountId/edit', 'bank-account-edit'],
   ['/bank/accounts/:accountId', 'bank-account'],
+  ['/bank/debts', 'bank-debts'],
+  ['/bank/debts/new', 'bank-debt-new'],
+  ['/bank/debts/:accountId/edit', 'bank-debt-edit'],
+  ['/bank/debts/:accountId', 'bank-debt'],
 ];
 
 /**
@@ -55,4 +59,5 @@ export const ROUTES_CONTEXT = [
  */
 export const SECTIONS_CONTEXT = [
   ['/bank/accounts', '/bank/accounts'],
+  ['/bank/debts', '/bank/debts'],
 ];

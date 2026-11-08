@@ -9,6 +9,10 @@ describe('sectionTarget', () => {
     it('registers the bank accounts section', () => {
       expect(SECTIONS_CONTEXT).toContain(['/bank/accounts', '/bank/accounts']);
     });
+
+    it('registers the bank debts section', () => {
+      expect(SECTIONS_CONTEXT).toContain(['/bank/debts', '/bank/debts']);
+    });
   });
 
   describe('sectionListPathFor', () => {
@@ -29,6 +33,21 @@ describe('sectionTarget', () => {
     });
 
     [
+      '#/bank/debts',
+      '#/bank/debts/new',
+      '#/bank/debts/7',
+      '#/bank/debts/7/edit',
+      '#/bank/debts?archived=true',
+      '#/orgs/3/bank/debts/7/edit',
+      '#/orgs/5/bank/debts?archived=true',
+    ].forEach((hash) => {
+      it(`maps ${hash} to the debts list`, () => {
+        expect(sectionListPathFor(hash)).toBe('/bank/debts');
+      });
+    });
+
+    [
+      '#/bank/debtsx',
       '#/bank/accountsx',
       '#/bank/accountsx/12',
       '#/bank',

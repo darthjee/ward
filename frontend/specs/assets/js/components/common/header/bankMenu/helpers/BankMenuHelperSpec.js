@@ -4,14 +4,20 @@ import BankMenuHelper, {
 import { renderedOutput } from '../../../../../../../support/renderedOutput.js';
 
 describe('BankMenuHelper', () => {
-  it('lists only the Accounts entry for now', () => {
-    expect(BANK_MENU_ENTRIES).toEqual([['Accounts', '/bank/accounts']]);
+  it('lists the Accounts then the Debts entry', () => {
+    expect(BANK_MENU_ENTRIES).toEqual([['Accounts', '/bank/accounts'], ['Debts', '/bank/debts']]);
   });
 
   it('builds every entry from the Personal context', () => {
     const page = renderedOutput(BankMenuHelper.render({ context: { kind: 'personal' } }));
 
-    expect(page.containsAttribute('href', '#/bank/accounts')).toBeTrue();
+    expect(page.containsInOrder('href="#/bank/accounts"', 'Accounts', 'href="#/bank/debts"', 'Debts')).toBeTrue();
+  });
+
+  it('builds the default entries from an organization context', () => {
+    const page = renderedOutput(BankMenuHelper.render({ context: { kind: 'organization', orgId: 7 } }));
+
+    expect(page.containsInOrder('href="#/orgs/7/bank/accounts"', 'href="#/orgs/7/bank/debts"')).toBeTrue();
   });
 
   it('builds every entry from an organization context', () => {

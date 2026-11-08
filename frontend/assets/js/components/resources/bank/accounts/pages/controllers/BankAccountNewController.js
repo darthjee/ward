@@ -1,10 +1,19 @@
-import BankAccountFormController from './BankAccountFormController.js';
-import { validateAccountFields } from './accountFormFields.js';
+import AccountFormController from '../../../common/form/controllers/AccountFormController.js';
+import { ACCOUNTS_BASE } from '../../../common/sections.js';
 
 /**
  * Controller for the New account page.
  */
-export default class BankAccountNewController extends BankAccountFormController {
+export default class BankAccountNewController extends AccountFormController {
+  /**
+   * Create the controller under the Accounts section.
+   *
+   * @param {object} options - Controller dependencies (see `AccountFormController`).
+   */
+  constructor(options) {
+    super({ ...options, base: ACCOUNTS_BASE });
+  }
+
   /**
    * Validate and create the account, then go to its detail page.
    *
@@ -12,9 +21,6 @@ export default class BankAccountNewController extends BankAccountFormController 
    * @returns {Promise<void>} Resolves once submission handling finishes.
    */
   async handleSubmit(fields) {
-    await this.submit(
-      validateAccountFields(fields),
-      (body) => this.client.createAccount(this.context, body),
-    );
+    await this.create(fields);
   }
 }
