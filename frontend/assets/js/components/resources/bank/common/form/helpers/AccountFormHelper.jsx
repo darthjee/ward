@@ -55,12 +55,39 @@ function renderSlot(slot, state, handlers) {
 }
 
 /**
+ * Render the opening-balance input, or nothing when the section omits it (e.g. Investments,
+ * which always open at `0`).
+ *
+ * @param {object} state - Form state.
+ * @param {Function} onChange - Change handler.
+ * @param {Map<string, string>} labels - The form labels.
+ * @param {boolean} [omit] - Whether to omit the input.
+ * @returns {React.ReactElement|null} The input, or `null` when omitted.
+ */
+function renderOpeningBalance(state, onChange, labels, omit) {
+  if (omit) {
+    return null;
+  }
+
+  return (
+    <AccountFormInput
+      name="opening_balance"
+      label={labels.get('opening_balance')}
+      extra={{ inputMode: 'decimal' }}
+      state={state}
+      onChange={onChange}
+    />
+  );
+}
+
+/**
  * Render every field of a non-archived account: the common fields, with the section's bank
  * extras right after the bank and its extra fields before the notes.
  *
  * @param {object} state - Form state.
  * @param {object} handlers - Field handlers.
- * @param {object} options - Form options (`labels`, `renderBankExtras`, `renderExtraFields`).
+ * @param {object} options - Form options (`labels`, `omitOpeningBalance`, `renderBankExtras`,
+ *   `renderExtraFields`).
  * @returns {React.ReactElement} The fields.
  */
 function renderFullFields(state, handlers, options) {
@@ -89,13 +116,7 @@ function renderFullFields(state, handlers, options) {
         state={state}
         onChange={onFieldChange}
       />
-      <AccountFormInput
-        name="opening_balance"
-        label={labels.get('opening_balance')}
-        extra={{ inputMode: 'decimal' }}
-        state={state}
-        onChange={onFieldChange}
-      />
+      {renderOpeningBalance(state, onFieldChange, labels, options.omitOpeningBalance)}
       {renderSlot(options.renderExtraFields, state, handlers)}
       <AccountFormInput name="notes" label={labels.get('notes')} type="textarea" state={state} onChange={onFieldChange} />
     </>
@@ -143,7 +164,8 @@ function renderForm(state, handlers, options) {
 }
 
 /**
- * Rendering helper shared by every account form (create and edit, Accounts and Debts).
+ * Rendering helper shared by every account form (create and edit; Accounts, Debts and
+ * Investments).
  */
 const AccountFormHelper = {
   /**
@@ -156,9 +178,10 @@ const AccountFormHelper = {
    * @param {{onSubmit: Function, onFieldChange: Function, onCurrencyChange: Function,
    *   onRetry: Function, onDismiss: Function, onRetryLoad: Function}} handlers - Event handlers.
    * @param {{heading: string, submitLabel: string, cancelHref: string, labels: object,
-   *   renderBankExtras: Function, renderExtraFields: Function}} options - Page heading, submit
-   *   label, cancel link, label overrides (by field name) and the section's optional slots,
-   *   each called with `(state, handlers)`.
+   *   omitOpeningBalance: boolean, renderBankExtras: Function, renderExtraFields: Function}}
+   *   options - Page heading, submit label, cancel link, label overrides (by field name),
+   *   whether to hide the opening-balance input and the section's optional slots, each called
+   *   with `(state, handlers)`.
    * @returns {React.ReactElement} The rendered page.
    */
   render(state, handlers, options) {

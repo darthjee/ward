@@ -4,6 +4,7 @@ import AccountFormHelper, {
 } from '../../../common/form/helpers/AccountFormHelper.jsx';
 import AccountFormInput from '../../../common/form/AccountFormInput.jsx';
 import AccountFormSelect from '../../../common/form/AccountFormSelect.jsx';
+import RatePeriodSelect, { PERIOD_OPTIONS } from '../../../common/form/RatePeriodSelect.jsx';
 import { monthName } from '../../../common/dates.js';
 
 export { ARCHIVED_NOTICE, SETTINGS_WARNING };
@@ -15,33 +16,7 @@ const DEBT_LABELS = {
   opening_balance: 'Amount owed',
 };
 
-const PERIOD_OPTIONS = [['monthly', 'Monthly'], ['yearly', 'Yearly']];
-
 const MONTH_OPTIONS = Array.from({ length: 12 }, (_, index) => [String(index + 1), monthName(index + 1)]);
-
-/**
- * Render the interest period select, shown only once a rate is entered.
- *
- * @param {object} state - Form state.
- * @param {Function} onChange - Change handler.
- * @returns {React.ReactElement|null} The select, or `null` without a rate.
- */
-function renderInterestPeriod(state, onChange) {
-  if (!String(state.fields.interest_rate ?? '').trim()) {
-    return null;
-  }
-
-  return (
-    <AccountFormSelect
-      name="interest_period"
-      label="Interest period"
-      options={PERIOD_OPTIONS}
-      placeholder="Choose…"
-      state={state}
-      onChange={onChange}
-    />
-  );
-}
 
 /**
  * Render the due month select, shown only for a yearly frequency.
@@ -80,7 +55,13 @@ function renderDebtFields(state, { onFieldChange }) {
     <fieldset>
       <legend className="h5">Debt</legend>
       <AccountFormInput name="interest_rate" label="Interest rate (%)" extra={{ inputMode: 'decimal' }} state={state} onChange={onFieldChange} />
-      {renderInterestPeriod(state, onFieldChange)}
+      <RatePeriodSelect
+        rateName="interest_rate"
+        periodName="interest_period"
+        label="Interest period"
+        state={state}
+        onChange={onFieldChange}
+      />
       <AccountFormInput name="instalment_amount" label="Instalment amount" extra={{ inputMode: 'decimal' }} state={state} onChange={onFieldChange} />
       <AccountFormSelect name="instalment_frequency" label="Frequency" options={PERIOD_OPTIONS} state={state} onChange={onFieldChange} />
       <AccountFormInput name="due_day" label="Due day" extra={{ inputMode: 'numeric' }} state={state} onChange={onFieldChange} />

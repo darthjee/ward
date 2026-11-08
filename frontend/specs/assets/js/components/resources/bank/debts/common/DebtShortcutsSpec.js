@@ -1,11 +1,12 @@
 import React from 'react';
 import DebtShortcuts from '../../../../../../../../assets/js/components/resources/bank/debts/common/DebtShortcuts.jsx';
+import AccountShortcuts from '../../../../../../../../assets/js/components/resources/bank/common/detail/AccountShortcuts.jsx';
 import { renderedOutput } from '../../../../../../../support/renderedOutput.js';
 
 const DEBT = { id: 7, archived_at: null, debt: { instalment_amount: '500.00' } };
 
 function buttons(element) {
-  return element.props.children;
+  return AccountShortcuts(element.props).props.children[0];
 }
 
 describe('DebtShortcuts', () => {

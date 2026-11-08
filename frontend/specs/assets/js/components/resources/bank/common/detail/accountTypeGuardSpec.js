@@ -27,12 +27,31 @@ describe('accountTypeGuard', () => {
         expect(accountTypeOutcome({ id: 12, type: 'regular' }, { base: '/bank/debts', context, suffix: '/edit' }))
           .toEqual({ kind: 'redirect', hash: `#${prefix}/bank/accounts/12/edit` });
       });
+
+      ['/bank/accounts', '/bank/debts'].forEach((base) => {
+        it(`redirects an investment opened under ${base} to the investments detail`, () => {
+          expect(accountTypeOutcome({ id: 3, type: 'investment' }, { base, context }))
+            .toEqual({ kind: 'redirect', hash: `#${prefix}/bank/investments/3` });
+          expect(accountTypeOutcome({ id: 3, type: 'investment' }, { base, context, suffix: '/edit' }))
+            .toEqual({ kind: 'redirect', hash: `#${prefix}/bank/investments/3/edit` });
+        });
+      });
+
+      [['regular', '/bank/accounts'], ['debt', '/bank/debts']].forEach(([type, own]) => {
+        it(`redirects a ${type} account opened under the investments section to ${own}`, () => {
+          expect(accountTypeOutcome({ id: 12, type }, { base: '/bank/investments', context }))
+            .toEqual({ kind: 'redirect', hash: `#${prefix}${own}/12` });
+          expect(accountTypeOutcome({ id: 12, type }, { base: '/bank/investments', context, suffix: '/edit' }))
+            .toEqual({ kind: 'redirect', hash: `#${prefix}${own}/12/edit` });
+        });
+      });
     });
   });
 
   it('shows a matching type', () => {
     expect(accountTypeOutcome({ id: 7, type: 'debt' }, { base: '/bank/debts', context: {} })).toEqual({ kind: 'show' });
     expect(accountTypeOutcome({ id: 7, type: 'regular' }, { base: '/bank/accounts', context: {} })).toEqual({ kind: 'show' });
+    expect(accountTypeOutcome({ id: 3, type: 'investment' }, { base: '/bank/investments', context: {} })).toEqual({ kind: 'show' });
   });
 
   it('shows an account without a type, or under an unknown section', () => {
@@ -41,7 +60,7 @@ describe('accountTypeGuard', () => {
   });
 
   it('treats a type without a section as not found', () => {
-    expect(accountTypeOutcome({ id: 7, type: 'investment' }, { base: '/bank/debts', context: {} })).toEqual({ kind: 'notFound' });
+    expect(accountTypeOutcome({ id: 7, type: 'savings_box' }, { base: '/bank/debts', context: {} })).toEqual({ kind: 'notFound' });
   });
 
   describe('guardAccountType', () => {
@@ -74,9 +93,17 @@ describe('accountTypeGuard', () => {
     });
 
     it('reports Not-found for a type without a section', () => {
-      guard('/bank/accounts').onLoaded({ account: { id: 3, type: 'investment' }, ledger: LEDGER });
+      guard('/bank/accounts').onLoaded({ account: { id: 3, type: 'savings_box' }, ledger: LEDGER });
 
       expect(callbacks.onNotFound).toHaveBeenCalled();
+      expect(callbacks.onLoaded).not.toHaveBeenCalled();
+    });
+
+    it('redirects an investment instead of reporting Not-found', () => {
+      guard('/bank/accounts').onLoaded({ account: { id: 3, type: 'investment' }, ledger: LEDGER });
+
+      expect(navigate).toHaveBeenCalledWith('#/bank/investments/3');
+      expect(callbacks.onNotFound).not.toHaveBeenCalled();
       expect(callbacks.onLoaded).not.toHaveBeenCalled();
     });
 

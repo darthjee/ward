@@ -12,18 +12,22 @@ import { pageFromHash } from '../../pageQuery.js';
 
 /**
  * State and handlers of an account detail page (`<ui><base>/:accountId[?page=N]`), shared by
- * the Accounts and Debts sections.
+ * the Accounts, Debts and Investments sections.
  *
  * @description The owner context and the account id are captured on mount (the page is
  * remounted on a context change, see AppHelper); the ledger page lives in the hash query, so
  * reload / back / forward keep it. Deleting the account returns to the section list and a
  * create on another page goes to `<base>/:accountId?page=1`. An account of another type is
- * redirected to its own section (see `guardAccountType`).
- * @param {string} base - The section base path (`'/bank/accounts'` or `'/bank/debts'`).
- * @returns {{context: object, notFound: boolean, state: object, handlers: object}} The owner
- *   context, whether to show Not-found, the helper state (`context`, `accountId`, `page`,
- *   `data`, `loadError`, `error`, `form`, `actionPending`, `confirmation`) and every handler
- *   (see `buildDetailHandlers`).
+ * redirected to its own section (see `guardAccountType`). `reload` and `ledgerForm` let a
+ * section add its own page pieces (e.g. Investments' Update value form, which posts directly,
+ * asks before discarding the inline form's unsaved changes and reloads).
+ * @param {string} base - The section base path (e.g. `'/bank/accounts'`, `'/bank/debts'`).
+ * @returns {{context: object, notFound: boolean, state: object, handlers: object,
+ *   reload: Function, ledgerForm: {form: object, actions: object}}} The owner context, whether
+ *   to show Not-found, the helper state (`context`, `accountId`, `page`, `data`, `loadError`,
+ *   `error`, `form`, `actionPending`, `confirmation`), every handler (see
+ *   `buildDetailHandlers`), the account + ledger reload and the inline form's state and
+ *   actions.
  */
 export default function useAccountDetail(base) {
   const { context: routeContext } = useOwnerContext();
@@ -85,5 +89,7 @@ export default function useAccountDetail(base) {
       confirmation,
     },
     handlers,
+    reload,
+    ledgerForm: { form, actions },
   };
 }

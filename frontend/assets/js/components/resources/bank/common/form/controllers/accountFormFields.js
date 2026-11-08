@@ -78,14 +78,15 @@ function nameError(name) {
  *
  * @param {string} date - The `YYYY-MM-DD` date.
  * @param {Date} now - The current instant.
+ * @param {string} label - The date's label in the messages (e.g. "Start date").
  * @returns {string|null} The error, or `null`.
  */
-function openingDateError(date, now) {
+function openingDateError(date, now, label) {
   if (!date) {
-    return 'Opening date is required';
+    return `${label} is required`;
   }
 
-  return isAfterLocalToday(date, now) ? 'Opening date cannot be in the future' : null;
+  return isAfterLocalToday(date, now) ? `${label} cannot be in the future` : null;
 }
 
 /**
@@ -99,21 +100,32 @@ function collectErrors(entries) {
 }
 
 /**
+ * Validate an archived account's form: only the name, and the body carries only `name`.
+ *
+ * @param {object} fields - The form fields.
+ * @returns {{errors: object, body: (object|null)}} The field errors and, when valid, the body.
+ */
+function validateNameOnly(fields) {
+  const errors = collectErrors([['name', nameError(fields.name)]]);
+
+  return { errors, body: Object.keys(errors).length ? null : { name: fields.name.trim() } };
+}
+
+/**
  * Validate the form and build the `snake_case` request body.
  *
  * @description With `nameOnly` (an archived account: only a rename is allowed) the body carries
  * **only** `name`. Otherwise the currency is required, the opening date must not be after local
  * today, and the opening balance accepts an optional leading `-` and zero, within the currency's
- * decimals.
+ * decimals. `dateLabel` names the opening date in its errors (default "Opening date"; e.g.
+ * Investments' "Start date").
  * @param {object} fields - The form fields.
- * @param {{nameOnly: boolean, now: Date}} [options] - Validation options.
+ * @param {{nameOnly: boolean, now: Date, dateLabel: string}} [options] - Validation options.
  * @returns {{errors: object, body: (object|null)}} The field errors and, when valid, the body.
  */
-export function validateAccountFields(fields, { nameOnly = false, now = new Date() } = {}) {
+export function validateAccountFields(fields, { nameOnly = false, now = new Date(), dateLabel = 'Opening date' } = {}) {
   if (nameOnly) {
-    const errors = collectErrors([['name', nameError(fields.name)]]);
-
-    return { errors, body: Object.keys(errors).length ? null : { name: fields.name.trim() } };
+    return validateNameOnly(fields);
   }
 
   const balance = parseAmount(fields.opening_balance, {
@@ -122,7 +134,7 @@ export function validateAccountFields(fields, { nameOnly = false, now = new Date
   const errors = collectErrors([
     ['name', nameError(fields.name)],
     ['currency', fields.currency ? null : 'Choose a currency'],
-    ['opening_date', openingDateError(fields.opening_date, now)],
+    ['opening_date', openingDateError(fields.opening_date, now, dateLabel)],
     ['opening_balance', balance.error ?? null],
   ]);
 

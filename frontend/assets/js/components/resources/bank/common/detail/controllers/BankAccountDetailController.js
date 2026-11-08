@@ -27,7 +27,8 @@ export default class BankAccountDetailController {
    * @param {Function} options.reload - Reloads the account and the current ledger page.
    * @param {Function} options.onNotFound - Called on an account `404`.
    * @param {string} [options.listPath] - Section base the delete returns to (default
-   *   `'/bank/accounts'`; `'/bank/debts'` for a debt).
+   *   `'/bank/accounts'`; `'/bank/debts'` for a debt, `'/bank/investments'` for an
+   *   investment).
    * @param {Function} [options.navigate] - Navigation override, for testability.
    * @param {typeof BankClient} [options.client] - HTTP client override.
    */

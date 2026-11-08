@@ -46,6 +46,14 @@ describe('AccountFormHelper', () => {
     expect(page.contains('Opening date')).toBeFalse();
   });
 
+  it('omits the opening-balance input with omitOpeningBalance', () => {
+    const page = output({}, { omitOpeningBalance: true });
+
+    expect(page.containsInOrder('Name', 'Bank', 'Currency', 'Opening date', 'Notes')).toBeTrue();
+    expect(page.contains('Opening balance')).toBeFalse();
+    expect(page.contains('name="opening_balance"')).toBeFalse();
+  });
+
   it('renders the bank extras after the bank and the extra fields before the notes', () => {
     const renderBankExtras = jasmine.createSpy('renderBankExtras').and.returnValue(React.createElement('p', null, 'BANK-EXTRA'));
     const renderExtraFields = jasmine.createSpy('renderExtraFields').and.returnValue(React.createElement('p', null, 'DEBT-FIELDS'));

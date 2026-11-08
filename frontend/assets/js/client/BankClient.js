@@ -12,6 +12,8 @@ const DEBT_FIELDS = [
   'due_month', 'instalment_count',
 ];
 
+const INVESTMENT_FIELDS = ['kind', 'yield_rate', 'yield_period', 'maturity_date', 'liquidity_days'];
+
 const TRANSACTION_FIELDS = ['date', 'amount', 'description', 'notes'];
 
 /**
@@ -30,17 +32,20 @@ function whitelist(attrs, fields) {
 }
 
 /**
- * Build a debt account body: the whitelisted common fields plus, when given, the nested `debt`
- * object whitelisted to the debt fields (`null` kept to clear, `undefined` dropped).
+ * Build a typed account body (debt, investment): the whitelisted common fields plus, when
+ * given, the nested `key` object whitelisted to `fields` (`null` kept to clear, `undefined`
+ * dropped).
  *
- * @param {object} attrs - The caller's attributes (common fields and an optional `debt`).
+ * @param {object} attrs - The caller's attributes (common fields and an optional `key` object).
+ * @param {string} key - The nested object's key (`debt`, `investment`).
+ * @param {Array<string>} fields - The nested object's allowed keys.
  * @returns {object} The body, never carrying `type`.
  */
-function debtBody(attrs) {
+function nestedBody(attrs, key, fields) {
   const body = whitelist(attrs, ACCOUNT_FIELDS);
-  const debt = attrs?.debt;
+  const nested = new Map(Object.entries(attrs ?? {})).get(key);
 
-  return debt === undefined || debt === null ? body : { ...body, debt: whitelist(debt, DEBT_FIELDS) };
+  return nested === undefined || nested === null ? body : { ...body, [key]: whitelist(nested, fields) };
 }
 
 /**
@@ -70,7 +75,7 @@ const BankClient = {
    *
    * @param {object} context - The owner context.
    * @param {{archived: boolean, type: string}} [options] - `archived: true` includes archived
-   *   accounts; `type` is the account type (`'regular'` or `'debt'`).
+   *   accounts; `type` is the account type (`'regular'`, `'debt'` or `'investment'`).
    * @returns {Promise<Array<object>|undefined>} The accounts, sorted by name.
    */
   async listAccounts(context, { archived = false, type = 'regular' } = {}) {
@@ -138,7 +143,7 @@ const BankClient = {
   async createDebt(context, attrs) {
     return ApiClient.postJson(
       contextPath(context, '/bank/accounts.json'),
-      { type: 'debt', ...debtBody(attrs) },
+      { type: 'debt', ...nestedBody(attrs, 'debt', DEBT_FIELDS) },
     );
   },
 
@@ -152,7 +157,35 @@ const BankClient = {
    * @returns {Promise<object|undefined>} The updated debt account.
    */
   async updateDebt(context, id, attrs) {
-    return ApiClient.patchJson(accountPath(context, id), debtBody(attrs));
+    return ApiClient.patchJson(accountPath(context, id), nestedBody(attrs, 'debt', DEBT_FIELDS));
+  },
+
+  /**
+   * Create an investment account: `type: "investment"` with the common fields (the form sends
+   * `opening_balance: "0"`) and the optional nested `investment` object.
+   *
+   * @param {object} context - The owner context.
+   * @param {object} attrs - The `snake_case` account fields, with an optional `investment`.
+   * @returns {Promise<object|undefined>} The created investment account.
+   */
+  async createInvestment(context, attrs) {
+    return ApiClient.postJson(
+      contextPath(context, '/bank/accounts.json'),
+      { type: 'investment', ...nestedBody(attrs, 'investment', INVESTMENT_FIELDS) },
+    );
+  },
+
+  /**
+   * Update an investment account: the common fields and the nested `investment` object
+   * (merged partially by the backend, `null` clears); `type` is never sent.
+   *
+   * @param {object} context - The owner context.
+   * @param {number|string} id - The account id.
+   * @param {object} attrs - The `snake_case` fields to change, with an optional `investment`.
+   * @returns {Promise<object|undefined>} The updated investment account.
+   */
+  async updateInvestment(context, id, attrs) {
+    return ApiClient.patchJson(accountPath(context, id), nestedBody(attrs, 'investment', INVESTMENT_FIELDS));
   },
 
   /**

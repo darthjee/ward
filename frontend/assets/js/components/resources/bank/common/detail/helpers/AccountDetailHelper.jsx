@@ -10,13 +10,15 @@ import { ledgerPageHref } from '../ledgerPageHref.js';
 /**
  * Render a section slot, or nothing when the section has none.
  *
- * @param {Function|undefined} slot - Renders the slot from the account and the handlers.
+ * @param {Function|undefined} slot - Renders the slot from the account, the handlers and the
+ *   page state.
  * @param {object} account - The loaded account.
  * @param {object} handlers - Page handlers.
+ * @param {object} state - Page state.
  * @returns {React.ReactNode} The slot content, or `null`.
  */
-function renderSlot(slot, account, handlers) {
-  return slot ? slot(account, handlers) : null;
+function renderSlot(slot, account, handlers, state) {
+  return slot ? slot(account, handlers, state) : null;
 }
 
 /**
@@ -86,7 +88,7 @@ function renderLoaded(state, handlers, options) {
       }, handlers)}
       <BankErrorAlert error={state.error} onRetry={handlers.onRetry} onDismiss={handlers.onDismiss} />
       <h2 className="h4 mt-4">Ledger</h2>
-      {renderSlot(options.renderShortcuts, account, handlers)}
+      {renderSlot(options.renderShortcuts, account, handlers, state)}
       {renderForm(readOnly, state.form, handlers)}
       {LedgerTableHelper.render({
         ledger,
@@ -126,7 +128,7 @@ function renderBody(state, handlers, options) {
 
 /**
  * Rendering helper composing the detail page shared by every account section (Accounts,
- * Debts).
+ * Debts, Investments).
  */
 const AccountDetailHelper = {
   /**
@@ -142,8 +144,8 @@ const AccountDetailHelper = {
    * @param {{base: string, backLabel: string, renderHeader: Function,
    *   renderShortcuts: Function}} options - The section base path, the back link label, the
    *   header renderer (called with `{ account, hasTransactions, actionPending, context }` and
-   *   the handlers) and the optional shortcuts renderer (called with the account and the
-   *   handlers).
+   *   the handlers) and the optional shortcuts renderer (called with the account, the
+   *   handlers and the page state, which may carry section extras).
    * @returns {React.ReactElement} The rendered page.
    */
   render(state, handlers, options) {

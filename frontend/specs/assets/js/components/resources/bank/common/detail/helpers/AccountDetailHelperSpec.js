@@ -57,10 +57,11 @@ describe('AccountDetailHelper', () => {
 
   it('renders the shortcuts slot between the Ledger heading and the inline form', () => {
     const renderShortcuts = jasmine.createSpy('renderShortcuts').and.returnValue(React.createElement('p', null, 'SHORTCUTS'));
-    const page = renderedOutput(AccountDetailHelper.render(state(), HANDLERS, { ...options, renderShortcuts }));
+    const pageState = state({ extra: 'X' });
+    const page = renderedOutput(AccountDetailHelper.render(pageState, HANDLERS, { ...options, renderShortcuts }));
 
     expect(page.containsInOrder('HEADER', 'Ledger', 'SHORTCUTS', 'New transaction')).toBeTrue();
-    expect(renderShortcuts).toHaveBeenCalledWith(ACCOUNT, HANDLERS);
+    expect(renderShortcuts).toHaveBeenCalledWith(ACCOUNT, HANDLERS, pageState);
   });
 
   it('renders without shortcuts', () => {
