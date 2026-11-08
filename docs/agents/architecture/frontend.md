@@ -7,7 +7,7 @@ routing, a `client/` HTTP layer, and a login/register/device-authorization modal
 
 ## Stack
 
-- React 19 (no React Bootstrap/UI kit chosen yet)
+- React 19 + Bootstrap / react-bootstrap (no other UI kit)
 - Vite (dev server on port 8080, `npm run build` outputs to `dist/`, matching the
   `docker_volumes/static` bind mount)
 - Jasmine + c8 (tests/coverage), driven through a custom Node ESM loader
@@ -25,7 +25,8 @@ frontend/assets/js/
     AppController.js          # resolves the current route, renders the matching page
     common/
       header/                 # Header.jsx + controller/helper/hook — Login/Logout nav;
-                              #   contextSwitcher/ — Personal / organization switcher
+                              #   contextSwitcher/ — Personal / organization switcher;
+                              #   bankMenu/ — Bank NavDropdown (BANK_MENU_ENTRIES)
       ownerContext/           # OwnerContextProvider.jsx, hooks/useOwnerContext.js,
                               #   controllers/OrgListController.js (org list per session)
       notFound/NotFound.jsx   # generic Not-found view ("Go to Personal")
@@ -43,15 +44,24 @@ frontend/assets/js/
       home/pages/Home.jsx
       accounts/pages/          # AuthorizationRequests ("My account"), ResetPasswordLanding
       organizations/pages/     # OrganizationNew, OrganizationOverview, OrganizationEdit
+      bank/                    # bank module (#49+); not `accounts/`, which is user accounts
+        common/                #   shared bank pieces: amounts.js (parse/format money),
+                               #   currencies.js, CurrencySelect, BankPagination, pageQuery.js,
+                               #   dates.js, bankErrors.js, BankErrorAlert, ConfirmModal
+        accounts/pages/        #   BankAccountList, BankAccountDetail (+ ledger),
+                               #   BankAccountNew, BankAccountEdit (+ controllers/, helpers/,
+                               #   hooks/)
       admin/pages/             # AdminUsers.jsx (search, status filter, approve/deny via
                                #   users/ApproveUserButton.jsx, users/DenyUserButton.jsx),
                                #   AdminUserEdit.jsx
   client/                      # AccountsClient, AdminClient, ApiClient, ApiError,
-                                #   OrganizationsClient,
+                                #   OrganizationsClient, BankClient (context-aware),
                                 #   AuthSession, AuthEvents, AuthStatus, LoginModalEvents,
                                 #   pickDefined.js (drops undefined keys from request bodies)
   utils/
-    routing/                   # Router, Route, HashRouteResolver, routes.js (route tables)
+    routing/                   # Router, Route, HashRouteResolver, routes.js (route tables
+                               #   + SECTIONS_CONTEXT), sectionTarget.js (switch target),
+                               #   hashQuery.js (read/write the hash query string)
     context/                   # ownerContext.js (contextPath/contextHash/landingFor),
                                #   ContextStorage.js, entryResolution.js
     polling/AuthorizationRequestPoller.js
@@ -219,6 +229,14 @@ works in both contexts.
   organizations (active one checked, names truncated with the full name in `title`) and
   **+ Create organization**. Hidden while logged out or pending; shows an inline error when
   `/orgs.json` fails. Picking Personal stores it before navigating.
+- **Section registry** (`SECTIONS_CONTEXT` in `routes.js`, `utils/routing/sectionTarget.js`):
+  maps context-relative path prefixes to their section's list path. A switch made from a page
+  whose stripped path matches a prefix (on a segment boundary) lands on that section's list in
+  the new context (`switchTargetFor(hash)`); anything else lands on `landingFor`. The query
+  string is dropped, and each switcher item's `href` uses the same target. Each module adds its
+  own row (`/bank/accounts` for #49).
+- **Hash query** (`utils/routing/hashQuery.js`): `hashQuery` / `withHashQuery` read and write
+  the `?...` part of the hash (e.g. the ledger's `?page=`, the list's `?archived=true`).
 - **Pages**: `#/orgs/new`, `#/orgs/:orgId` (overview: name, role, Rename link) and
   `#/orgs/:orgId/edit`. A backend 404 or malformed id renders the generic `NotFound` view, which
   forgets that id if it was remembered. Names are always rendered as React text.

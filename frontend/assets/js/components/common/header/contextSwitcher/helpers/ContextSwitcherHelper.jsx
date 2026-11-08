@@ -47,10 +47,11 @@ function renderTitle(label) {
  * @param {object} itemContext - The item's owner context.
  * @param {string} label - The item text.
  * @param {object} active - The active owner context.
- * @param {Function} onPick - Called with the item's context on click.
+ * @param {{onPick: Function, switchTarget: Function}} handlers - `onPick` is called with the
+ *   item's context on click; `switchTarget` maps it to the item's `href`.
  * @returns {React.ReactElement} The dropdown item.
  */
-function renderContextItem(itemContext, label, active, onPick) {
+function renderContextItem(itemContext, label, active, { onPick, switchTarget }) {
   const checked = isSameContext(itemContext, active);
   const handleClick = (event) => {
     event.preventDefault();
@@ -60,7 +61,7 @@ function renderContextItem(itemContext, label, active, onPick) {
   return (
     <NavDropdown.Item
       key={itemContext.orgId ?? 'personal'}
-      href={landingFor(itemContext)}
+      href={switchTarget(itemContext)}
       onClick={handleClick}
       active={checked}
       className="text-truncate"
@@ -77,10 +78,10 @@ function renderContextItem(itemContext, label, active, onPick) {
  * Render the organization items, or the inline error when the list failed to load.
  *
  * @param {{context: object, orgs: Array<object>, orgsError: (string|null)}} state - Switcher state.
- * @param {Function} onPick - Called with the picked context.
+ * @param {{onPick: Function, switchTarget: Function}} handlers - The item handlers.
  * @returns {React.ReactNode} The organization section (empty without organizations).
  */
-function renderOrganizations({ context, orgs, orgsError }, onPick) {
+function renderOrganizations({ context, orgs, orgsError }, handlers) {
   if (orgsError) {
     return (
       <>
@@ -97,7 +98,7 @@ function renderOrganizations({ context, orgs, orgsError }, onPick) {
   return (
     <>
       <NavDropdown.Divider />
-      {orgs.map((org) => renderContextItem(organizationContext(org.id), org.name, context, onPick))}
+      {orgs.map((org) => renderContextItem(organizationContext(org.id), org.name, context, handlers))}
     </>
   );
 }
@@ -111,16 +112,19 @@ const ContextSwitcherHelper = {
    *
    * @param {{context: object, orgs: Array<object>, orgsError: (string|null)}} state - The active
    *   context, the loaded organizations and the load error.
-   * @param {{onPick: Function}} handlers - `onPick` is called with the picked context.
+   * @param {{onPick: Function, switchTarget: Function}} handlers - `onPick` is called with the
+   *   picked context; `switchTarget` maps a context to its item's `href` (default: the context's
+   *   landing), so the `href` matches the click target.
    * @returns {React.ReactElement} The rendered dropdown.
    */
-  render(state, { onPick }) {
+  render(state, { onPick, switchTarget = landingFor }) {
     const orgs = state.orgs ?? [];
+    const handlers = { onPick, switchTarget };
 
     return (
       <NavDropdown title={renderTitle(titleFor(state.context, orgs))} id="context-switcher" renderMenuOnMount>
-        {renderContextItem(PERSONAL, 'Personal', state.context, onPick)}
-        {renderOrganizations({ ...state, orgs }, onPick)}
+        {renderContextItem(PERSONAL, 'Personal', state.context, handlers)}
+        {renderOrganizations({ ...state, orgs }, handlers)}
         <NavDropdown.Divider />
         <NavDropdown.Item href="#/orgs/new">+ Create organization</NavDropdown.Item>
       </NavDropdown>
