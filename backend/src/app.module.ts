@@ -5,6 +5,7 @@ import { EventEmitterModule } from '@nestjs/event-emitter';
 import { JwtModule } from '@nestjs/jwt';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuthModule } from './auth/auth.module.js';
+import { BankConfigModule } from './bank/bank-config.module.js';
 import { AdminGuard } from './core/admin.guard.js';
 import { CachePolicyInterceptor } from './core/cache-policy.interceptor.js';
 import { CacheTokenService } from './core/cache-token.service.js';
@@ -82,6 +83,7 @@ export function buildJwtSignOptions(configService: ConfigService): { expiresIn: 
     ConfigModule.forRoot({ isGlobal: true }),
     EventEmitterModule.forRoot(),
     AuthModule,
+    BankConfigModule,
     LoggingModule,
     MailModule,
     TypeOrmModule.forRootAsync({
