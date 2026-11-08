@@ -86,8 +86,10 @@ describe('HashRouteResolver', () => {
   describe('context-aware routes', () => {
     const options = { contextRoutes: [['/x', 'x-page'], ['/x/:id', 'x-show']] };
 
-    it('ships an empty app-level context table', () => {
-      expect(ROUTES_CONTEXT).toEqual([]);
+    it('lists bank-account-new before bank-account', () => {
+      const keys = ROUTES_CONTEXT.map(([, key]) => key);
+
+      expect(keys.indexOf('bank-account-new')).toBeLessThan(keys.indexOf('bank-account'));
     });
 
     it('matches a context route as Personal', () => {
@@ -104,6 +106,25 @@ describe('HashRouteResolver', () => {
 
     it('does not use the test-only routes by default', () => {
       expect(resolve('#/orgs/5/x')).toEqual({ page: 'home', context: PERSONAL });
+    });
+  });
+
+  describe('bank routes', () => {
+    [
+      ['/bank/accounts', 'bank-accounts'],
+      ['/bank/accounts?archived=true', 'bank-accounts'],
+      ['/bank/accounts/new', 'bank-account-new'],
+      ['/bank/accounts/12', 'bank-account'],
+      ['/bank/accounts/12?page=3', 'bank-account'],
+      ['/bank/accounts/12/edit', 'bank-account-edit'],
+    ].forEach(([path, page]) => {
+      it(`resolves #${path} to ${page} in the Personal context`, () => {
+        expect(resolve(`#${path}`)).toEqual({ page, context: PERSONAL });
+      });
+
+      it(`resolves #/orgs/5${path} to ${page} in the organization context`, () => {
+        expect(resolve(`#/orgs/5${path}`)).toEqual({ page, context: organization(5) });
+      });
     });
   });
 
