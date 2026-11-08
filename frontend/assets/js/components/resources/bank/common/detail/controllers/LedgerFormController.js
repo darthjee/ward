@@ -1,5 +1,5 @@
 import BankClient from '../../../../../../client/BankClient.js';
-import { classifyError } from '../../../common/bankErrors.js';
+import { classifyError } from '../../bankErrors.js';
 import { validateLedgerValues } from './ledgerFormFields.js';
 
 /**

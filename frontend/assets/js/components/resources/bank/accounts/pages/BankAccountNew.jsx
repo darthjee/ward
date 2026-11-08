@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import NotFound from '../../../../common/notFound/NotFound.jsx';
 import useBankAccountForm from './hooks/useBankAccountForm.js';
-import BankAccountLoader, { buildBankSettingsLoadEffect } from './controllers/BankAccountLoader.js';
+import BankAccountLoader, { buildBankSettingsLoadEffect } from '../../common/detail/controllers/BankAccountLoader.js';
 import BankAccountNewController from './controllers/BankAccountNewController.js';
 import { emptyAccountFields } from './controllers/accountFormFields.js';
 import BankAccountFormHelper from './helpers/BankAccountFormHelper.jsx';

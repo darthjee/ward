@@ -1,4 +1,4 @@
-import LedgerFormController from '../../../../../../../../../assets/js/components/resources/bank/accounts/pages/controllers/LedgerFormController.js';
+import LedgerFormController from '../../../../../../../../../assets/js/components/resources/bank/common/detail/controllers/LedgerFormController.js';
 import ApiError from '../../../../../../../../../assets/js/client/ApiError.js';
 
 const VALUES = {

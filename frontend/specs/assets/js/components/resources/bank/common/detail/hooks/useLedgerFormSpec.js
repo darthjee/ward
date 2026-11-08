@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import useLedgerForm, {
   initialLedgerForm,
   ledgerFormActions,
-} from '../../../../../../../../../assets/js/components/resources/bank/accounts/pages/hooks/useLedgerForm.js';
+} from '../../../../../../../../../assets/js/components/resources/bank/common/detail/hooks/useLedgerForm.js';
 
 describe('useLedgerForm', () => {
   let form;
@@ -69,6 +69,32 @@ describe('useLedgerForm', () => {
 
     expect(form.notesOpen).toBeFalse();
     expect(form.values.direction).toBe('in');
+  });
+
+  it('starts a new transaction from a preset, clean and not editing', () => {
+    actions.startEdit({
+      id: 3, date: '2026-05-01', amount: '2.00', description: 'Pay', notes: 'x',
+    });
+    actions.update({ fieldErrors: { amount: 'bad' }, error: { kind: 'validation' } });
+    actions.startNew({ direction: 'in', description: 'Payment', amount: '500.00' }, '2026-05-10');
+
+    expect(form.editing).toBeNull();
+    expect(form.values).toEqual({
+      date: '2026-05-10', direction: 'in', amount: '500.00', description: 'Payment', notes: '',
+    });
+    expect(form.baseline).toBe(form.values);
+    expect(form.fieldErrors).toEqual({});
+    expect(form.error).toBeNull();
+    expect(form.notesOpen).toBeFalse();
+  });
+
+  it('starts a new empty transaction without a preset', () => {
+    actions.changeValue('amount', '3');
+    actions.startNew();
+
+    expect(form.values.amount).toBe('');
+    expect(form.values.direction).toBe('out');
+    expect(form.baseline).toBe(form.values);
   });
 
   it('resets', () => {

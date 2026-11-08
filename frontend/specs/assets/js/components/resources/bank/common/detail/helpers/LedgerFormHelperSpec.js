@@ -1,5 +1,5 @@
-import LedgerFormHelper from '../../../../../../../../../assets/js/components/resources/bank/accounts/pages/helpers/LedgerFormHelper.jsx';
-import { initialLedgerForm } from '../../../../../../../../../assets/js/components/resources/bank/accounts/pages/hooks/useLedgerForm.js';
+import LedgerFormHelper from '../../../../../../../../../assets/js/components/resources/bank/common/detail/helpers/LedgerFormHelper.jsx';
+import { initialLedgerForm } from '../../../../../../../../../assets/js/components/resources/bank/common/detail/hooks/useLedgerForm.js';
 import { classifyError } from '../../../../../../../../../assets/js/components/resources/bank/common/bankErrors.js';
 import ApiError from '../../../../../../../../../assets/js/client/ApiError.js';
 import { renderedOutput } from '../../../../../../../../support/renderedOutput.js';

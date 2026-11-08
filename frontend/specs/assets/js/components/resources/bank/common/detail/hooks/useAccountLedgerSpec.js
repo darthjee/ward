@@ -1,6 +1,6 @@
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import useAccountLedger from '../../../../../../../../../assets/js/components/resources/bank/accounts/pages/hooks/useAccountLedger.js';
+import useAccountLedger from '../../../../../../../../../assets/js/components/resources/bank/common/detail/hooks/useAccountLedger.js';
 
 describe('useAccountLedger', () => {
   it('starts loading, with a reload function', () => {

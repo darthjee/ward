@@ -1,5 +1,5 @@
 import BankClient from '../../../../../../client/BankClient.js';
-import { buildLoadEffect, runLoad } from '../../../common/runLoad.js';
+import { buildLoadEffect, runLoad } from '../../runLoad.js';
 
 /**
  * Loads one account with a page of its ledger (detail and edit pages), and the bank settings

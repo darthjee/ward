@@ -1,4 +1,4 @@
-import BankAccountDetailController from '../../../../../../../../../assets/js/components/resources/bank/accounts/pages/controllers/BankAccountDetailController.js';
+import BankAccountDetailController from '../../../../../../../../../assets/js/components/resources/bank/common/detail/controllers/BankAccountDetailController.js';
 import ApiError from '../../../../../../../../../assets/js/client/ApiError.js';
 
 describe('BankAccountDetailController', () => {
@@ -51,6 +51,12 @@ describe('BankAccountDetailController', () => {
     await new BankAccountDetailController({ ...deps, context: { kind: 'organization', orgId: 5 } }).deleteAccount();
 
     expect(deps.navigate).toHaveBeenCalledWith('#/orgs/5/bank/accounts');
+  });
+
+  it('deletes the account, then goes to the given section list', async () => {
+    await new BankAccountDetailController({ ...deps, listPath: '/bank/debts' }).deleteAccount();
+
+    expect(deps.navigate).toHaveBeenCalledWith('#/bank/debts');
   });
 
   it('deletes a transaction, then reloads the current page', async () => {

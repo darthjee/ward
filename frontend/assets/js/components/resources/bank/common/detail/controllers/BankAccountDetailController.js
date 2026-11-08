@@ -1,7 +1,7 @@
 import BankClient from '../../../../../../client/BankClient.js';
 import { contextHash } from '../../../../../../utils/context/ownerContext.js';
-import { classifyError } from '../../../common/bankErrors.js';
-import { navigate } from '../../../common/currentHash.js';
+import { classifyError } from '../../bankErrors.js';
+import { navigate } from '../../currentHash.js';
 
 /**
  * Controller for the account detail page's actions: archive, unarchive, delete the account and
@@ -26,12 +26,14 @@ export default class BankAccountDetailController {
    * @param {Function} options.setConfirm - Sets the open confirmation (`null` closes it).
    * @param {Function} options.reload - Reloads the account and the current ledger page.
    * @param {Function} options.onNotFound - Called on an account `404`.
+   * @param {string} [options.listPath] - Section base the delete returns to (default
+   *   `'/bank/accounts'`; `'/bank/debts'` for a debt).
    * @param {Function} [options.navigate] - Navigation override, for testability.
    * @param {typeof BankClient} [options.client] - HTTP client override.
    */
   constructor({
     context, accountId, setPending, setError, setConfirm, reload, onNotFound,
-    navigate: navigateTo = navigate, client = BankClient,
+    listPath = '/bank/accounts', navigate: navigateTo = navigate, client = BankClient,
   }) {
     this.context = context;
     this.accountId = accountId;
@@ -40,6 +42,7 @@ export default class BankAccountDetailController {
     this.setConfirm = setConfirm;
     this.reload = reload;
     this.onNotFound = onNotFound;
+    this.listPath = listPath;
     this.navigate = navigateTo;
     this.client = client;
   }
@@ -71,7 +74,7 @@ export default class BankAccountDetailController {
     return this.run(
       'delete',
       () => this.client.deleteAccount(this.context, this.accountId),
-      () => this.navigate(contextHash(this.context, '/bank/accounts')),
+      () => this.navigate(contextHash(this.context, this.listPath)),
     );
   }
 

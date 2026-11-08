@@ -1,7 +1,7 @@
 import BankAccountLoader, {
   buildBankAccountLoadEffect,
   buildBankSettingsLoadEffect,
-} from '../../../../../../../../../assets/js/components/resources/bank/accounts/pages/controllers/BankAccountLoader.js';
+} from '../../../../../../../../../assets/js/components/resources/bank/common/detail/controllers/BankAccountLoader.js';
 import ApiError from '../../../../../../../../../assets/js/client/ApiError.js';
 import { fetchSequence } from '../../../../../../../../support/fetchSequence.js';
 import { flushMicrotasks } from '../../../../../../../../support/flushMicrotasks.js';

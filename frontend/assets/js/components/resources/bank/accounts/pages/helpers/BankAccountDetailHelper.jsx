@@ -3,22 +3,13 @@ import BankPagination from '../../../common/BankPagination.jsx';
 import ConfirmModal from '../../../common/ConfirmModal.jsx';
 import { localToday } from '../../../common/dates.js';
 import BankAccountHeaderHelper from './BankAccountHeaderHelper.jsx';
-import LedgerFormHelper from './LedgerFormHelper.jsx';
-import LedgerTableHelper from './LedgerTableHelper.jsx';
+import LedgerFormHelper from '../../../common/detail/helpers/LedgerFormHelper.jsx';
+import LedgerTableHelper from '../../../common/detail/helpers/LedgerTableHelper.jsx';
 import { contextHash } from '../../../../../../utils/context/ownerContext.js';
-import { withHashQuery } from '../../../../../../utils/routing/hashQuery.js';
+import { ledgerPageHref } from '../../../common/detail/ledgerPageHref.js';
 
-/**
- * Build the hash of a ledger page.
- *
- * @param {object} context - The owner context.
- * @param {number|string} accountId - The account id.
- * @param {number} page - The page.
- * @returns {string} The detail hash, with `?page=N`.
- */
-export function ledgerPageHref(context, accountId, page) {
-  return withHashQuery(contextHash(context, `/bank/accounts/${accountId}`), { page });
-}
+/** Section base of the Accounts submenu. */
+export const ACCOUNTS_BASE = '/bank/accounts';
 
 /**
  * Render the inline form row, hidden on an archived account.
@@ -73,7 +64,7 @@ function renderConfirm(confirmation, pending, handlers) {
 function renderLoaded(state, handlers) {
   const { account, ledger } = state.data;
   const readOnly = Boolean(account.archived_at);
-  const hrefFor = (page) => ledgerPageHref(state.context, state.accountId, page);
+  const hrefFor = (page) => ledgerPageHref(state.context, ACCOUNTS_BASE, state.accountId, page);
 
   return (
     <>
@@ -139,7 +130,7 @@ const BankAccountDetailHelper = {
     return (
       <div className="container mt-4">
         <p className="mb-2">
-          <a href={contextHash(state.context, '/bank/accounts')}>← Accounts</a>
+          <a href={contextHash(state.context, ACCOUNTS_BASE)}>← Accounts</a>
         </p>
         <BankErrorAlert error={state.loadError} onRetry={handlers.onRetryLoad} />
         {renderBody(state, handlers)}

@@ -25,6 +25,11 @@ function formHandlers(deps) {
         actions.reset();
       }
     },
+    onStartNew: (preset) => {
+      if (canDiscard()) {
+        actions.startNew(preset);
+      }
+    },
     onEdit: (transaction) => {
       if (form.editing?.id !== transaction.id && canDiscard()) {
         actions.startEdit(transaction);
@@ -70,9 +75,9 @@ function actionHandlers(deps) {
 /**
  * Build every handler of the account detail page.
  *
- * @description Switching to another row's Edit, cancelling an edit or changing the ledger page
- * while the inline form has unsaved changes asks for confirmation (`confirm`, default
- * `window.confirm`) before discarding them.
+ * @description Switching to another row's Edit, cancelling an edit, changing the ledger page
+ * or opening a preset (`onStartNew`, the debt shortcuts) while the inline form has unsaved
+ * changes asks for confirmation (`confirm`, default `window.confirm`) before discarding them.
  * @param {object} deps - Handler dependencies.
  * @param {object} deps.form - The inline form state.
  * @param {object} deps.actions - The inline form actions (see `ledgerFormActions`).

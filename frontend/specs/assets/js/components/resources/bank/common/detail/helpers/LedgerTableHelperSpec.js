@@ -1,4 +1,4 @@
-import LedgerTableHelper from '../../../../../../../../../assets/js/components/resources/bank/accounts/pages/helpers/LedgerTableHelper.jsx';
+import LedgerTableHelper from '../../../../../../../../../assets/js/components/resources/bank/common/detail/helpers/LedgerTableHelper.jsx';
 import { formatMoney } from '../../../../../../../../../assets/js/components/resources/bank/common/amounts.js';
 import { renderedOutput } from '../../../../../../../../support/renderedOutput.js';
 

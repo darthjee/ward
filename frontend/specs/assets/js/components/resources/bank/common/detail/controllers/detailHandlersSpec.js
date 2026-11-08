@@ -1,5 +1,5 @@
-import { buildDetailHandlers } from '../../../../../../../../../assets/js/components/resources/bank/accounts/pages/controllers/detailHandlers.js';
-import { emptyLedgerValues } from '../../../../../../../../../assets/js/components/resources/bank/accounts/pages/controllers/ledgerFormFields.js';
+import { buildDetailHandlers } from '../../../../../../../../../assets/js/components/resources/bank/common/detail/controllers/detailHandlers.js';
+import { emptyLedgerValues } from '../../../../../../../../../assets/js/components/resources/bank/common/detail/controllers/ledgerFormFields.js';
 
 const CLEAN = emptyLedgerValues('2026-05-10');
 const DIRTY = { ...CLEAN, amount: '5' };
@@ -15,7 +15,7 @@ describe('buildDetailHandlers', () => {
   beforeEach(() => {
     deps = {
       form: { editing: null, values: CLEAN, baseline: CLEAN },
-      actions: jasmine.createSpyObj('actions', ['changeValue', 'toggleNotes', 'reset', 'startEdit']),
+      actions: jasmine.createSpyObj('actions', ['changeValue', 'toggleNotes', 'reset', 'startEdit', 'startNew']),
       ledgerController: jasmine.createSpyObj('ledgerController', ['submit']),
       detailController: jasmine.createSpyObj('detailController', ['archive', 'unarchive', 'deleteAccount', 'deleteTransaction']),
       currency: 'BRL',
@@ -104,6 +104,34 @@ describe('buildDetailHandlers', () => {
 
       expect(event.preventDefault).not.toHaveBeenCalled();
       expect(deps.actions.reset).toHaveBeenCalled();
+    });
+
+    it('starts a preset without asking when the form is clean', () => {
+      const preset = { direction: 'in', description: 'Payment' };
+
+      build().onStartNew(preset);
+
+      expect(deps.confirm).not.toHaveBeenCalled();
+      expect(deps.actions.startNew).toHaveBeenCalledWith(preset);
+    });
+
+    it('starts a preset over a clean edit without asking', () => {
+      build({ form: { editing: ROW, values: CLEAN, baseline: CLEAN } }).onStartNew({ direction: 'out' });
+
+      expect(deps.confirm).not.toHaveBeenCalled();
+      expect(deps.actions.startNew).toHaveBeenCalledWith({ direction: 'out' });
+    });
+
+    it('asks before replacing unsaved changes with a preset, keeping them when refused', () => {
+      build({ form: { editing: null, values: DIRTY, baseline: CLEAN } }).onStartNew({ direction: 'in' });
+
+      expect(deps.confirm).toHaveBeenCalled();
+      expect(deps.actions.startNew).not.toHaveBeenCalled();
+
+      deps.confirm.and.returnValue(true);
+      build({ form: { editing: ROW, values: DIRTY, baseline: CLEAN } }).onStartNew({ direction: 'in' });
+
+      expect(deps.actions.startNew).toHaveBeenCalledWith({ direction: 'in' });
     });
 
     it('asks before cancelling an edit with unsaved changes', () => {

@@ -1,6 +1,6 @@
 import Table from 'react-bootstrap/cjs/Table.js';
 import Button from 'react-bootstrap/cjs/Button.js';
-import { formatMoney } from '../../../common/amounts.js';
+import { formatMoney } from '../../amounts.js';
 
 /**
  * Render a transaction's notes, read-only, beneath its description.

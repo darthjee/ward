@@ -1,12 +1,13 @@
 import { useMemo, useState } from 'react';
 import useOwnerContext from '../../../../common/ownerContext/hooks/useOwnerContext.js';
 import NotFound from '../../../../common/notFound/NotFound.jsx';
-import useAccountLedger from './hooks/useAccountLedger.js';
-import useLedgerForm from './hooks/useLedgerForm.js';
-import BankAccountDetailController from './controllers/BankAccountDetailController.js';
-import LedgerFormController from './controllers/LedgerFormController.js';
-import { buildDetailHandlers } from './controllers/detailHandlers.js';
-import BankAccountDetailHelper, { ledgerPageHref } from './helpers/BankAccountDetailHelper.jsx';
+import useAccountLedger from '../../common/detail/hooks/useAccountLedger.js';
+import useLedgerForm from '../../common/detail/hooks/useLedgerForm.js';
+import BankAccountDetailController from '../../common/detail/controllers/BankAccountDetailController.js';
+import LedgerFormController from '../../common/detail/controllers/LedgerFormController.js';
+import { buildDetailHandlers } from '../../common/detail/controllers/detailHandlers.js';
+import BankAccountDetailHelper, { ACCOUNTS_BASE } from './helpers/BankAccountDetailHelper.jsx';
+import { ledgerPageHref } from '../../common/detail/ledgerPageHref.js';
 import Router from '../../../../../utils/routing/Router.js';
 import { currentHash, navigate } from '../../common/currentHash.js';
 import { pageFromHash } from '../../common/pageQuery.js';
@@ -37,6 +38,7 @@ export default function BankAccountDetail() {
     setConfirm: setConfirmation,
     reload,
     onNotFound: () => setNotFound(true),
+    listPath: ACCOUNTS_BASE,
   }), [context, accountId, reload, setNotFound]);
   const ledgerController = useMemo(() => new LedgerFormController({
     context,
@@ -45,7 +47,7 @@ export default function BankAccountDetail() {
     reset: actions.reset,
     setError,
     reload,
-    goToFirstPage: () => navigate(ledgerPageHref(context, accountId, 1)),
+    goToFirstPage: () => navigate(ledgerPageHref(context, ACCOUNTS_BASE, accountId, 1)),
   }), [context, accountId, actions, reload]);
 
   if (ledger.notFound) {

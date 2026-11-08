@@ -1,5 +1,5 @@
-import { fromSignedAmount, parseAmount, toSignedAmount } from '../../../common/amounts.js';
-import { isAfterLocalToday, localToday } from '../../../common/dates.js';
+import { fromSignedAmount, parseAmount, toSignedAmount } from '../../amounts.js';
+import { isAfterLocalToday, localToday } from '../../dates.js';
 
 /** Largest transaction description accepted (mirrors the backend). */
 export const DESCRIPTION_MAX_LENGTH = 255;

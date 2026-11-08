@@ -1,5 +1,5 @@
 import Button from 'react-bootstrap/cjs/Button.js';
-import BankErrorAlert from '../../../common/BankErrorAlert.jsx';
+import BankErrorAlert from '../../BankErrorAlert.jsx';
 
 /**
  * Read an own property of a possibly-missing object, without bracket access.

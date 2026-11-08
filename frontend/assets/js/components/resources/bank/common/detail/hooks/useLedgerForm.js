@@ -25,8 +25,11 @@ export function initialLedgerForm(today) {
  * Build the state transitions of the inline form.
  *
  * @param {Function} setForm - React state setter for the form state.
- * @returns {{update: Function, reset: Function, startEdit: Function, changeValue: Function,
- *   toggleNotes: Function}} The actions.
+ * @description `startNew(preset, today)` opens a new transaction prefilled with `preset`
+ * (e.g. a debt shortcut's direction / description / amount); the preset becomes the baseline,
+ * so the form is clean right after it.
+ * @returns {{update: Function, reset: Function, startEdit: Function, startNew: Function,
+ *   changeValue: Function, toggleNotes: Function}} The actions.
  */
 export function ledgerFormActions(setForm) {
   return {
@@ -42,6 +45,11 @@ export function ledgerFormActions(setForm) {
         baseline: values,
         notesOpen: Boolean(transaction.notes),
       });
+    },
+    startNew: (preset = {}, today = undefined) => {
+      const values = { ...emptyLedgerValues(today), ...preset };
+
+      setForm({ ...initialLedgerForm(today), values, baseline: values });
     },
     changeValue: (name, value) => setForm((form) => ({
       ...form, values: { ...form.values, [name]: value },

@@ -6,7 +6,7 @@ import {
   isDirty,
   validateLedgerValues,
   valuesFromTransaction,
-} from '../../../../../../../../../assets/js/components/resources/bank/accounts/pages/controllers/ledgerFormFields.js';
+} from '../../../../../../../../../assets/js/components/resources/bank/common/detail/controllers/ledgerFormFields.js';
 import { installFakeWindow, uninstallFakeWindow } from '../../../../../../../../support/fakeWindow.js';
 
 const NOW = new Date(2026, 4, 10, 12);
