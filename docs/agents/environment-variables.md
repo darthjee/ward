@@ -51,6 +51,7 @@ running `ward_prod_app` locally to sanity-check the production image).
 | `WARD_EMAIL_FROM` | **Consumed** (required when enabled) | Default `From:` address. Must be one the SMTP server is authorized to send as (SPF/DKIM). | `backend/src/mail/mail.config.ts` |
 | `WARD_EMAIL_TIMEOUT_MS` | **Consumed**, optional | Bounds nodemailer's connection/greeting/socket timeouts. Defaults to `10000`. | `backend/src/mail/mail.config.ts` |
 | `WARD_EMAIL_METHOD` | **Consumed**, optional | Selects the `EmailMethod` `MailService#sendEmail` delivers through (currently only `native`, the nodemailer transport). Defaults to `native`. Boot throws if set to an unregistered name. | `backend/src/mail/mail.config.ts` |
+| `BANK_DEFAULT_CURRENCY` | **Consumed**, optional | ISO 4217 code applied when an account create request omits `currency`, and returned by `GET <base>/settings.json` (`default_currency`) for the create form. Trimmed; defaults to `BRL` when unset/blank. Validated at boot against `Intl.supportedValuesOf('currency')` — an unsupported code fails startup. | `backend/src/bank/bank.config.ts`, `backend/src/bank/bank-config.module.ts` |
 | `WARD_LOG_LEVEL` | **Consumed**, optional | Log-level threshold (`debug`/`info`/`warn`/`error`) for the Core logger service; defaults to `info` when unset. | `backend/src/core/logger.service.ts` |
 
 **Device-authorization tuning — undocumented-but-defaulted in dev.** None of the six

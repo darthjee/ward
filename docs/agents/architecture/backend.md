@@ -68,9 +68,10 @@ backend/src/
 ## Owned tables
 
 Each module owns its tables under a distinct prefix (see [Modular Pattern](./modular-pattern.md)
-for the rule) — only Auth owns tables today (Mail has no HTTP surface and no entities, see
+for the rule) — Auth and Bank own tables today (Mail has no HTTP surface and no entities, see
 `docs/agents/modules/mail.md`). Column-level detail lives in `docs/agents/modules/auth.md`'s
-"Entities" section, not repeated here.
+"Entities" section and, for `bank`, in `docs/agents/specs/banking/accounts/` until the specs are
+folded, not repeated here.
 
 | Table | Module | Notes |
 |---|---|---|
@@ -78,6 +79,8 @@ for the rule) — only Auth owns tables today (Mail has no HTTP surface and no e
 | `auth_refresh_tokens` | Auth | |
 | `auth_authorization_requests` | Auth | `user_id` is a logical FK (no physical FK, no cross-module JOIN) — `NULL` when the request's username didn't resolve to a real user |
 | `auth_account_edit_lockouts` | Auth | `user_id` is a logical FK (no physical FK, no cross-module JOIN), unique — one row per user, upserted in place |
+| `bank_accounts` | Bank | Owner columns `user_id` / `organization_id` are logical FKs to `auth` (no physical FK), both nullable; the `bank_accounts_exactly_one_owner` check requires exactly one of them. The generated `active_name_key` column (`IF(archived_at IS NULL, LOWER(name), NULL)`, collation `utf8mb4_0900_as_cs` so it is case- but not accent-insensitive) backs two unique indexes, `(user_id, active_name_key)` and `(organization_id, active_name_key)`, which are also the owner lookup indexes. The key and the check are added with raw SQL (TypeORM's MySQL driver supports neither), and the column is not mapped on the entity. Amounts are `BIGINT` minor units |
+| `bank_transactions` | Bank | `account_id` is a **real** FK to `bank_accounts` (same module) with `ON DELETE RESTRICT`; index `(account_id, date, id)`. No owner columns: the owner is inherited through the account |
 
 ## Build
 
