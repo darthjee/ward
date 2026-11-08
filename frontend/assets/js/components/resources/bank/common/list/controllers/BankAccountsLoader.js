@@ -1,8 +1,8 @@
 import BankClient from '../../../../../../client/BankClient.js';
-import { buildLoadEffect, runLoad } from '../../../common/runLoad.js';
+import { buildLoadEffect, runLoad } from '../../runLoad.js';
 
 /**
- * Loads the regular accounts for the Accounts list page.
+ * Loads the accounts of one type for a list page (regular for Accounts, debt for Debts).
  *
  * @description A `404` (non-member organization) reports Not-found; any other failure reports
  * the classified error. An `undefined` result (session expired) reports nothing. Answers
@@ -11,13 +11,17 @@ import { buildLoadEffect, runLoad } from '../../../common/runLoad.js';
 export default class BankAccountsLoader {
   #client;
 
+  #type;
+
   /**
    * Create a loader.
    *
    * @param {typeof BankClient} [client] - HTTP client override, for testability.
+   * @param {{type: string}} [options] - The account type listed (default `'regular'`).
    */
-  constructor(client = BankClient) {
+  constructor(client = BankClient, { type = 'regular' } = {}) {
     this.#client = client;
+    this.#type = type;
   }
 
   /**
@@ -31,12 +35,12 @@ export default class BankAccountsLoader {
    * @returns {Promise<void>} Resolves once the outcome is reported.
    */
   async load(context, archived, callbacks, isActive = () => true) {
-    await runLoad(() => this.#client.listAccounts(context, { archived }), callbacks, isActive);
+    await runLoad(() => this.#client.listAccounts(context, { archived, type: this.#type }), callbacks, isActive);
   }
 }
 
 /**
- * Build the load-on-visit effect of the Accounts list. Exported so specs can run it without a
+ * Build the load-on-visit effect of an accounts list. Exported so specs can run it without a
  * React renderer.
  *
  * @param {BankAccountsLoader} loader - The loader.

@@ -12,10 +12,10 @@ import BankAccountList from '../../../../../assets/js/components/resources/bank/
 import BankAccountNew from '../../../../../assets/js/components/resources/bank/accounts/pages/BankAccountNew.jsx';
 import BankAccountEdit from '../../../../../assets/js/components/resources/bank/accounts/pages/BankAccountEdit.jsx';
 import BankAccountDetail from '../../../../../assets/js/components/resources/bank/accounts/pages/BankAccountDetail.jsx';
-import DebtList from '../../../../../assets/js/components/resources/bank/debts/pages/DebtList.jsx';
-import DebtNew from '../../../../../assets/js/components/resources/bank/debts/pages/DebtNew.jsx';
-import DebtEdit from '../../../../../assets/js/components/resources/bank/debts/pages/DebtEdit.jsx';
-import DebtDetail from '../../../../../assets/js/components/resources/bank/debts/pages/DebtDetail.jsx';
+import BankDebtList from '../../../../../assets/js/components/resources/bank/debts/pages/BankDebtList.jsx';
+import BankDebtNew from '../../../../../assets/js/components/resources/bank/debts/pages/BankDebtNew.jsx';
+import BankDebtEdit from '../../../../../assets/js/components/resources/bank/debts/pages/BankDebtEdit.jsx';
+import BankDebtDetail from '../../../../../assets/js/components/resources/bank/debts/pages/BankDebtDetail.jsx';
 import HashRouteResolver from '../../../../../assets/js/utils/routing/HashRouteResolver.js';
 import ModalRedirect from '../../../../../assets/js/components/common/ModalRedirect.jsx';
 import ResetPasswordLanding from '../../../../../assets/js/components/resources/accounts/pages/ResetPasswordLanding.jsx';
@@ -78,10 +78,10 @@ describe('AppHelper', () => {
     ['bank-account-new', BankAccountNew],
     ['bank-account-edit', BankAccountEdit],
     ['bank-account', BankAccountDetail],
-    ['bank-debts', DebtList],
-    ['bank-debt-new', DebtNew],
-    ['bank-debt-edit', DebtEdit],
-    ['bank-debt', DebtDetail],
+    ['bank-debts', BankDebtList],
+    ['bank-debt-new', BankDebtNew],
+    ['bank-debt-edit', BankDebtEdit],
+    ['bank-debt', BankDebtDetail],
   ].forEach(([key, Page]) => {
     it(`maps the ${key} key to its page`, () => {
       expect(partsOf(key).page.type).toBe(Page);

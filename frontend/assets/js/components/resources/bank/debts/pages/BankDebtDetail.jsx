@@ -3,7 +3,7 @@
  *
  * @returns {React.ReactElement} The rendered page.
  */
-export default function DebtDetail() {
+export default function BankDebtDetail() {
   return (
     <div className="container mt-4">
       <h1>Debt</h1>

@@ -1,6 +1,6 @@
 import BankAccountsLoader, {
   buildBankAccountsLoadEffect,
-} from '../../../../../../../../../assets/js/components/resources/bank/accounts/pages/controllers/BankAccountsLoader.js';
+} from '../../../../../../../../../assets/js/components/resources/bank/common/list/controllers/BankAccountsLoader.js';
 import ApiError from '../../../../../../../../../assets/js/client/ApiError.js';
 import { fetchSequence } from '../../../../../../../../support/fetchSequence.js';
 import { flushMicrotasks } from '../../../../../../../../support/flushMicrotasks.js';
@@ -23,8 +23,14 @@ describe('BankAccountsLoader', () => {
   it('lists the accounts with the archived filter and reports them', async () => {
     await loader.load(PERSONAL, true, callbacks);
 
-    expect(client.listAccounts).toHaveBeenCalledWith(PERSONAL, { archived: true });
+    expect(client.listAccounts).toHaveBeenCalledWith(PERSONAL, { archived: true, type: 'regular' });
     expect(callbacks.onLoaded).toHaveBeenCalledWith(ACCOUNTS);
+  });
+
+  it('lists the accounts of the given type (debts only)', async () => {
+    await new BankAccountsLoader(client, { type: 'debt' }).load(PERSONAL, false, callbacks);
+
+    expect(client.listAccounts).toHaveBeenCalledWith(PERSONAL, { archived: false, type: 'debt' });
   });
 
   it('reports Not-found on a 404', async () => {
