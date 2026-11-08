@@ -89,6 +89,10 @@ describe('HeaderHelper', () => {
       expect(markup.indexOf('Login')).toBeLessThan(markup.indexOf('ms-auto'));
     });
 
+    it('does not render the Bank menu', () => {
+      expect(markupOf(false, false)).not.toContain('bank-menu');
+    });
+
     it('does not render the My account dropdown', () => {
       expect(markupOf(false, false)).not.toContain('My account');
     });
@@ -126,6 +130,15 @@ describe('HeaderHelper', () => {
       expect(markup.indexOf('ms-auto')).toBeLessThan(markup.indexOf('My account'));
     });
 
+    it('renders the Bank menu in the left nav, after the context switcher', () => {
+      const markup = markupOf(true, false);
+
+      expect(markup).toContain('id="bank-menu"');
+      expect(markup.indexOf('context-switcher')).toBeLessThan(markup.indexOf('bank-menu'));
+      expect(markup.indexOf('bank-menu')).toBeLessThan(markup.indexOf('ms-auto'));
+      expect(markup).toContain('href="#/bank/accounts"');
+    });
+
     it('renders the My account dropdown with an Authorizations item', () => {
       const markup = markupOf(true, false);
 
@@ -156,6 +169,7 @@ describe('HeaderHelper', () => {
       const markup = pendingMarkup(true);
 
       expect(markup).not.toContain('context-switcher');
+      expect(markup).not.toContain('bank-menu');
       expect(markup).not.toContain('Logout');
       expect(markup).not.toContain('My account');
     });

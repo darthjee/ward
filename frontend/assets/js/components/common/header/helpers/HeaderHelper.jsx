@@ -3,6 +3,7 @@ import Nav from 'react-bootstrap/cjs/Nav.js';
 import Container from 'react-bootstrap/cjs/Container.js';
 import NavDropdown from 'react-bootstrap/cjs/NavDropdown.js';
 import ContextSwitcher from '../contextSwitcher/ContextSwitcher.jsx';
+import BankMenu from '../bankMenu/BankMenu.jsx';
 
 /**
  * Render a single link that opens the login modal in a given mode instead of navigating.
@@ -106,7 +107,7 @@ function renderLoginLinks(isLoggedIn, onOpenLogin, pending) {
  */
 const HeaderHelper = {
   /**
-   * Render the application navigation bar: the brand and the context switcher (or, logged out,
+   * Render the application navigation bar: the brand, the context switcher and the Bank menu (or, logged out,
    * the login links) on the left, the logged-in menu right-aligned.
    *
    * @param {boolean} isLoggedIn - Whether a session is currently active.
@@ -128,6 +129,7 @@ const HeaderHelper = {
           <Navbar.Collapse id="header-navbar">
             <Nav className="me-auto">
               <ContextSwitcher loggedIn={isLoggedIn} pending={pending} />
+              <BankMenu loggedIn={isLoggedIn} pending={pending} />
               {renderLoginLinks(isLoggedIn, onOpenLogin, pending)}
             </Nav>
             <Nav className="ms-auto">
