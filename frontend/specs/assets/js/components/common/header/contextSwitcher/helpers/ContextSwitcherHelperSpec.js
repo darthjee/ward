@@ -116,6 +116,22 @@ describe('ContextSwitcherHelper', () => {
     });
   });
 
+  describe('with a switch target', () => {
+    const switchTarget = (context) => (context.orgId ? `#/orgs/${context.orgId}/bank/accounts` : '#/bank/accounts');
+
+    it('builds every item href from the target', () => {
+      const page = renderedOutput(React.createElement('div', null, ContextSwitcherHelper.render(
+        { context: PERSONAL, orgs: ORGS, orgsError: null },
+        { onPick, switchTarget },
+      )));
+
+      expect(page.containsAttribute('href', '#/bank/accounts')).toBeTrue();
+      expect(page.containsAttribute('href', '#/orgs/5/bank/accounts')).toBeTrue();
+      expect(page.containsAttribute('href', '#/orgs/6/bank/accounts')).toBeTrue();
+      expect(page.containsAttribute('href', '#/orgs/5')).toBeFalse();
+    });
+  });
+
   describe('when the org list failed to load', () => {
     it('keeps Personal and Create organization and shows an inline error', () => {
       const page = output({ context: PERSONAL, orgs: [], orgsError: 'boom' });

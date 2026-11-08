@@ -8,6 +8,7 @@ import {
 } from '../../../../../../../assets/js/components/common/ownerContext/hooks/useOwnerContext.js';
 import { renderedOutput } from '../../../../../../support/renderedOutput.js';
 import { renderCapturingHandlers } from '../../../../../../support/renderCapturingHandlers.js';
+import { installFakeWindow, uninstallFakeWindow } from '../../../../../../support/fakeWindow.js';
 
 const ORGS = [{ id: 5, name: 'Acme', role: 'owner' }];
 
@@ -41,6 +42,64 @@ describe('ContextSwitcher', () => {
 
     handlers.onPick({ kind: 'organization', orgId: 5 });
 
-    expect(ContextSwitcherController.prototype.pick).toHaveBeenCalledWith({ kind: 'organization', orgId: 5 }, 1);
+    expect(ContextSwitcherController.prototype.pick)
+      .toHaveBeenCalledWith({ kind: 'organization', orgId: 5 }, 1, jasmine.any(Function));
+  });
+
+  describe('switch target', () => {
+    const PERSONAL = { kind: 'personal' };
+    const ORG_5 = { kind: 'organization', orgId: 5 };
+
+    let navigated;
+
+    beforeEach(() => {
+      navigated = [];
+      spyOn(ContextSwitcherController.prototype, 'pick').and.callFake((picked, _userId, switchTarget) => {
+        navigated.push(switchTarget(picked));
+      });
+    });
+
+    afterEach(() => {
+      uninstallFakeWindow();
+    });
+
+    function render(hash, context) {
+      installFakeWindow({ location: { hash } });
+
+      return renderCapturingHandlers(
+        () => withValue({ loggedIn: true }, { context, orgs: ORGS }),
+        ContextSwitcherHelper,
+      );
+    }
+
+    [
+      ['#/orgs/3/bank/accounts/12/edit', { kind: 'organization', orgId: 3 }, PERSONAL, '#/bank/accounts'],
+      ['#/bank/accounts?archived=true', PERSONAL, ORG_5, '#/orgs/5/bank/accounts'],
+      ['#/account/my-account', PERSONAL, ORG_5, '#/orgs/5'],
+    ].forEach(([hash, context, picked, expected]) => {
+      it(`lands on ${expected} when picking from ${hash}, with a matching href`, () => {
+        const handlers = render(hash, context);
+
+        handlers.onPick(picked);
+
+        expect(navigated).toEqual([expected]);
+        expect(handlers.switchTarget(picked)).toBe(expected);
+      });
+    });
+
+    it('renders the item href from the same target', () => {
+      installFakeWindow({ location: { hash: '#/bank/accounts/12' } });
+
+      const page = renderedOutput(withValue({ loggedIn: true }, { orgs: ORGS }));
+
+      expect(page.containsAttribute('href', '#/orgs/5/bank/accounts')).toBeTrue();
+      expect(page.containsAttribute('href', '#/bank/accounts')).toBeTrue();
+    });
+
+    it('falls back to landings outside the browser', () => {
+      const page = renderedOutput(withValue({ loggedIn: true }, { orgs: ORGS }));
+
+      expect(page.containsAttribute('href', '#/orgs/5')).toBeTrue();
+    });
   });
 });
