@@ -1,6 +1,7 @@
 import Header from '../common/header/Header.jsx';
 import LoginModal from '../common/loginModal/LoginModal.jsx';
 import ModalRedirect from '../common/ModalRedirect.jsx';
+import OwnerContextProvider from '../common/ownerContext/OwnerContextProvider.jsx';
 import Home from '../resources/home/pages/Home.jsx';
 import ResetPasswordLanding from '../resources/accounts/pages/ResetPasswordLanding.jsx';
 import AdminUsers from '../resources/admin/pages/AdminUsers.jsx';
@@ -27,17 +28,20 @@ const PAGES = new Map([
 const AppHelper = {
   /**
    * Render the app shell wrapping the page matching the given route, plus the route-independent
-   * login modal. Unknown page keys fall back to the home page.
+   * login modal. The header and page are wrapped in the {@link OwnerContextProvider}, fed with
+   * the route. Unknown page keys fall back to the home page.
    *
    * @param {{page: string, context: object}} route - Current route (page key and owner context).
    * @returns {React.ReactElement} The rendered app shell.
    */
-  render({ page }) {
+  render(route) {
     return (
       <>
-        <Header>
-          {PAGES.get(page) ?? PAGES.get('home')}
-        </Header>
+        <OwnerContextProvider route={route}>
+          <Header>
+            {PAGES.get(route.page) ?? PAGES.get('home')}
+          </Header>
+        </OwnerContextProvider>
         <LoginModal />
       </>
     );

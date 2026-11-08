@@ -2,6 +2,8 @@ import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import AppHelper from '../../../../../assets/js/components/helpers/AppHelper.jsx';
 import LoginModal from '../../../../../assets/js/components/common/loginModal/LoginModal.jsx';
+import OwnerContextProvider from '../../../../../assets/js/components/common/ownerContext/OwnerContextProvider.jsx';
+import Header from '../../../../../assets/js/components/common/header/Header.jsx';
 import ModalRedirect from '../../../../../assets/js/components/common/ModalRedirect.jsx';
 import ResetPasswordLanding from '../../../../../assets/js/components/resources/accounts/pages/ResetPasswordLanding.jsx';
 
@@ -13,8 +15,11 @@ describe('AppHelper', () => {
   );
 
   const partsOf = (page) => {
-    const [header, loginModal] = AppHelper.render(routeFor(page)).props.children;
-    return { page: header.props.children, loginModal };
+    const [provider, loginModal] = AppHelper.render(routeFor(page)).props.children;
+    const header = provider.props.children;
+    return {
+      provider, header, page: header.props.children, loginModal,
+    };
   };
 
   it('redirects the register key into the register-mode modal', () => {
@@ -34,6 +39,14 @@ describe('AppHelper', () => {
   it('mounts the login modal alongside the header, route-independent', () => {
     expect(partsOf('home').loginModal.type).toBe(LoginModal);
     expect(partsOf('reset-password').loginModal.type).toBe(LoginModal);
+  });
+
+  it('wraps the header in the owner-context provider fed with the route', () => {
+    const { provider, header } = partsOf('home');
+
+    expect(provider.type).toBe(OwnerContextProvider);
+    expect(provider.props.route).toEqual(routeFor('home'));
+    expect(header.type).toBe(Header);
   });
 
   it('renders the reset-password landing for the reset-password key', () => {
