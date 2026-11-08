@@ -95,6 +95,13 @@ describe('accountFormFields', () => {
         .toContain('future');
     });
 
+    it('names the date with the given label in its errors', () => {
+      expect(validateAccountFields({ ...FIELDS, opening_date: '' }, { now: NOW, dateLabel: 'Start date' }).errors.opening_date)
+        .toBe('Start date is required');
+      expect(validateAccountFields({ ...FIELDS, opening_date: '2026-05-11' }, { now: NOW, dateLabel: 'Start date' }).errors.opening_date)
+        .toBe('Start date cannot be in the future');
+    });
+
     it('rejects too many decimals for the currency', () => {
       expect(validateAccountFields({ ...FIELDS, currency: 'JPY', opening_balance: '1.5' }, { now: NOW }).errors.opening_balance)
         .toEqual(jasmine.any(String));

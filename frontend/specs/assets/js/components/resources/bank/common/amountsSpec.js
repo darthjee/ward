@@ -3,8 +3,10 @@ import {
   currencyDigits,
   formatMoney,
   fromSignedAmount,
+  isZeroAmount,
   negateAmount,
   parseAmount,
+  subtractAmounts,
   toSignedAmount,
 } from '../../../../../../../assets/js/components/resources/bank/common/amounts.js';
 
@@ -212,6 +214,57 @@ describe('amounts', () => {
       expect(formatMoney(null, 'BRL')).toBe('');
       expect(formatMoney(undefined, 'BRL')).toBe('');
       expect(formatMoney('', 'BRL')).toBe('');
+    });
+  });
+
+  describe('subtractAmounts', () => {
+    it('subtracts exactly in minor units', () => {
+      expect(subtractAmounts('0.3', '0.1', 'BRL')).toBe('0.20');
+    });
+
+    it('returns a negative difference', () => {
+      expect(subtractAmounts('950', '1000.00', 'BRL')).toBe('-50.00');
+    });
+
+    it('pads small differences with leading zeros', () => {
+      expect(subtractAmounts('1000.05', '1000.00', 'BRL')).toBe('0.05');
+      expect(subtractAmounts('1000.00', '1000.05', 'BRL')).toBe('-0.05');
+    });
+
+    it('returns zero without a sign', () => {
+      expect(subtractAmounts('10,00', '10.00', 'BRL')).toBe('0.00');
+    });
+
+    it('handles negative operands', () => {
+      expect(subtractAmounts('5', '-2.5', 'BRL')).toBe('7.50');
+    });
+
+    it('uses the currency decimals', () => {
+      expect(subtractAmounts('1500', '1000', 'JPY')).toBe('500');
+      expect(subtractAmounts('1.5', '0.25', 'BHD')).toBe('1.250');
+    });
+
+    it('stays exact at the cap', () => {
+      expect(subtractAmounts('100000000000.00', '0.01', 'BRL')).toBe('99999999999.99');
+    });
+
+    it('reads a blank or malformed operand as zero', () => {
+      expect(subtractAmounts('10', null, 'BRL')).toBe('10.00');
+      expect(subtractAmounts('abc', '1', 'BRL')).toBe('-1.00');
+    });
+  });
+
+  describe('isZeroAmount', () => {
+    ['0', '0.00', '-0.0', '00,0'].forEach((value) => {
+      it(`is true for ${value}`, () => {
+        expect(isZeroAmount(value)).toBeTrue();
+      });
+    });
+
+    ['0.01', '-1', '', null, 'abc'].forEach((value) => {
+      it(`is false for ${value}`, () => {
+        expect(isZeroAmount(value)).toBeFalse();
+      });
     });
   });
 });

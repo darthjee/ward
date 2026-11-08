@@ -143,3 +143,70 @@ export function formatMoney(decimalString, currency) {
   return new Intl.NumberFormat(undefined, { style: 'currency', currency })
     .format(Number(decimalString));
 }
+
+/**
+ * Read a decimal string as signed minor units of a currency (no float arithmetic).
+ *
+ * @param {string} amount - The decimal string (e.g. `'-12.5'`, `'1000.00'`).
+ * @param {number} digits - The currency's decimal places.
+ * @returns {bigint} The signed amount in minor units (fraction digits beyond `digits` are
+ *   truncated; `0n` for a blank or malformed value).
+ */
+function toMinorUnits(amount, digits) {
+  const match = AMOUNT_PATTERN.exec(String(amount ?? '').trim());
+
+  if (!match) {
+    return 0n;
+  }
+
+  const [, sign, integer, fraction = ''] = match;
+  const minor = minorUnits(integer, fraction.slice(0, digits), digits);
+
+  return sign ? -minor : minor;
+}
+
+/**
+ * Format signed minor units as a decimal string with the currency's decimal places.
+ *
+ * @param {bigint} minor - The signed amount in minor units.
+ * @param {number} digits - The currency's decimal places.
+ * @returns {string} The decimal string (e.g. `-12.50`), never `-0`.
+ */
+function fromMinorUnits(minor, digits) {
+  const sign = minor < 0n ? '-' : '';
+  const absolute = String(minor < 0n ? -minor : minor).padStart(digits + 1, '0');
+
+  if (digits === 0) {
+    return `${sign}${absolute}`;
+  }
+
+  return `${sign}${absolute.slice(0, -digits)}.${absolute.slice(-digits)}`;
+}
+
+/**
+ * Subtract two decimal strings in a currency, exactly: `a − b`.
+ *
+ * @description Both amounts are read as BigInt minor units with the currency's decimals
+ * (`currencyDigits`), so no float rounding happens. Used by Investments' Update value
+ * (current value − balance).
+ * @param {string} a - The minuend decimal string.
+ * @param {string} b - The subtrahend decimal string.
+ * @param {string} currency - ISO 4217 code.
+ * @returns {string} The difference as a decimal string with the currency's decimals (e.g.
+ *   `'-12.50'`, `'0.00'`).
+ */
+export function subtractAmounts(a, b, currency) {
+  const digits = currencyDigits(currency);
+
+  return fromMinorUnits(toMinorUnits(a, digits) - toMinorUnits(b, digits), digits);
+}
+
+/**
+ * Whether a decimal string is zero (`'0'`, `'0.00'`, `'-0.0'`).
+ *
+ * @param {string} amount - The decimal string.
+ * @returns {boolean} `true` for a zero amount.
+ */
+export function isZeroAmount(amount) {
+  return /^-?0+(?:[.,]0*)?$/.test(String(amount ?? '').trim());
+}

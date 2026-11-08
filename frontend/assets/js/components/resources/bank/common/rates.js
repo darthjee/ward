@@ -1,6 +1,6 @@
 import { formatMoney } from './amounts.js';
 
-/** Unit label of a debt period / frequency (`monthly` → "month"). */
+/** Unit label of a rate period / frequency (`monthly` → "month"). */
 const PERIOD_UNITS = new Map([
   ['monthly', 'month'],
   ['yearly', 'year'],
@@ -20,11 +20,12 @@ function withPeriod(value, period) {
 }
 
 /**
- * Format a debt's interest rate with its period, e.g. "1.99% / month".
+ * Format a rate with its period, e.g. "1.99% / month" (a debt's interest rate, an
+ * investment's yield rate).
  *
  * @description The API's decimal string is shown as-is (no trailing zeros, no rounding).
- * @param {string|null} rate - The `interest_rate` decimal string.
- * @param {string|null} period - The `interest_period` (`monthly` | `yearly`).
+ * @param {string|null} rate - The `interest_rate` / `yield_rate` decimal string.
+ * @param {string|null} period - The `interest_period` / `yield_period` (`monthly` | `yearly`).
  * @returns {string} The formatted rate, or `''` when no rate is set.
  */
 export function formatRate(rate, period) {

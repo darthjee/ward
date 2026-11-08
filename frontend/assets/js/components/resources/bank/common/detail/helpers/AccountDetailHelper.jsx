@@ -126,7 +126,7 @@ function renderBody(state, handlers, options) {
 
 /**
  * Rendering helper composing the detail page shared by every account section (Accounts,
- * Debts).
+ * Debts, Investments).
  */
 const AccountDetailHelper = {
   /**
