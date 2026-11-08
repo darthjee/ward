@@ -11,6 +11,11 @@ import { Transaction } from './entities/transaction.entity.js';
 import { LedgerQuery } from './ledger.query.js';
 import { TransactionService } from './transaction.service.js';
 
+// Re-exported so the resident `BankModuleLoader` reaches the service classes
+// only through its dynamic `import()` of this file.
+export { AccountService } from './account.service.js';
+export { TransactionService } from './transaction.service.js';
+
 /**
  * The lazy `bank` domain module: every service, query and piece of business
  * logic of the bank. **Never imported by `AppModule`** — the resident

@@ -209,7 +209,7 @@ describe('TransactionService', () => {
     it('returns an empty ledger with only the opening row on page 1', async () => {
       const { service, ledgerQuery } = setup();
 
-      const result = await service.ledger(PERSONAL, 1, undefined);
+      const result = await service.ledger(PERSONAL, 1, 1);
 
       expect(ledgerQuery.page).toHaveBeenCalledWith(expect.objectContaining({ id: 1 }), 1, 50);
       expect(result).toEqual({
@@ -224,7 +224,7 @@ describe('TransactionService', () => {
       ledgerQuery.count.mockResolvedValue(120);
       ledgerQuery.page.mockResolvedValue([row(120, 5000n)]);
 
-      const result = await service.ledger(PERSONAL, 1, '2');
+      const result = await service.ledger(PERSONAL, 1, 2);
 
       expect(ledgerQuery.page).toHaveBeenCalledWith(expect.anything(), 2, 50);
       expect(ledgerQuery.openingEffective).not.toHaveBeenCalled();
@@ -240,7 +240,7 @@ describe('TransactionService', () => {
       ledgerQuery.count.mockResolvedValue(120);
       ledgerQuery.openingEffective.mockResolvedValue(-5n);
 
-      const result = await service.ledger(PERSONAL, 1, '3');
+      const result = await service.ledger(PERSONAL, 1, 3);
 
       expect(result.opening).toEqual({ date: '2026-01-01', amount: '-0.05', balance: '-0.05' });
     });
@@ -249,7 +249,7 @@ describe('TransactionService', () => {
       const { service, ledgerQuery } = setup();
       ledgerQuery.count.mockResolvedValue(10);
 
-      const result = await service.ledger(PERSONAL, 1, '4');
+      const result = await service.ledger(PERSONAL, 1, 4);
 
       expect(ledgerQuery.page).not.toHaveBeenCalled();
       expect(result).toEqual({
@@ -259,22 +259,16 @@ describe('TransactionService', () => {
       });
     });
 
-    it.each(['0', '-1', 'abc', '1.5'])('rejects the page %p with a 400', async (page) => {
-      const { service } = setup();
-
-      await expect(service.ledger(PERSONAL, 1, page)).rejects.toThrow(BadRequestException);
-    });
-
     it('answers 404 for an account that is not owned', async () => {
       const { service } = setup(null);
 
-      await expect(service.ledger(PERSONAL, 1, undefined)).rejects.toThrow(NotFoundException);
+      await expect(service.ledger(PERSONAL, 1, 1)).rejects.toThrow(NotFoundException);
     });
 
     it('works on an archived account (read-only, still reachable)', async () => {
       const { service } = setup(buildAccount({ archivedAt: new Date() }));
 
-      await expect(service.ledger(PERSONAL, 1, undefined)).resolves.toMatchObject({ transactions: [] });
+      await expect(service.ledger(PERSONAL, 1, 1)).resolves.toMatchObject({ transactions: [] });
     });
   });
 });

@@ -12,7 +12,7 @@ import type { UpdateTransactionDto } from './dto/update-transaction.dto.js';
 import type { Account } from './entities/account.entity.js';
 import { Transaction } from './entities/transaction.entity.js';
 import { LedgerQuery } from './ledger.query.js';
-import { buildPagination, LEDGER_PER_PAGE, parsePage } from './pagination.js';
+import { buildPagination, LEDGER_PER_PAGE } from './pagination.js';
 import {
   serializeLedger,
   serializeTransaction,
@@ -60,13 +60,11 @@ export class TransactionService {
    * balances; the virtual opening row is on the last page only.
    * @param {OwnerContext} owner - The resolved owner.
    * @param {number} accountId - The account id.
-   * @param {unknown} rawPage - The raw `page` query value.
-   * @returns {Promise<LedgerResponse>} The ledger envelope.
-   * @throws {BadRequestException} For a non-numeric or `< 1` page.
+   * @param {number} page - The 1-based page (parsed by `parsePage`).
+   * @returns {Promise<LedgerResponse>} The ledger envelope (empty past the last page).
    * @throws {NotFoundException} The uniform 404 when the account is not owned.
    */
-  async ledger(owner: OwnerContext, accountId: number, rawPage: unknown): Promise<LedgerResponse> {
-    const page = parsePage(rawPage);
+  async ledger(owner: OwnerContext, accountId: number, page: number): Promise<LedgerResponse> {
     const account = await this.#ledgerAccount(owner, accountId);
     const pagination = buildPagination(page, LEDGER_PER_PAGE, await this.ledgerQuery.count(account.id));
     const rows = page > pagination.total_pages ? [] : await this.ledgerQuery.page(account, page, LEDGER_PER_PAGE);
