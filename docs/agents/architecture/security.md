@@ -130,7 +130,8 @@ demotion therefore take effect on the **next request**, not after the access-tok
   correct password** (`403 USER_DENIED`). A wrong password keeps the `401`, so the status cannot
   be probed without the password.
 - `status.json` reveals only `pending`, and only to the holder of that user's own valid session.
-  A denied user's `status.json` is byte-for-byte the anonymous answer.
+  A denied user's `status.json` is byte-for-byte the anonymous answer. Its logged-in answer
+  returns `userId`, and only to the holder of that user's own active session.
 - Password recovery gives the same response and caller-visible side effects for every status:
   `recover.json` always answers `200 { sent: true }` (a denied user is treated like an unknown
   email), and a denied user's reset token fails with the same `400` as an unknown one, checked

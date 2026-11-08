@@ -100,12 +100,12 @@ for every status.
 | Controller | `AuthController` (delegates to `SessionStatusService`) |
 | Auth | `@Public()` |
 | Request body | `RefreshTokenDto` — `{ refreshToken: string }` |
-| Success response | `{ loggedIn, isAdmin }`, plus `status: 'pending'` for a pending user only |
+| Success response | `{ loggedIn, isAdmin }`, plus `userId` for a logged-in (`approved`) user and `status: 'pending'` for a pending user only |
 | HTTP status | `200` (default), always |
 
 | Caller | Response body | Session |
 | --- | --- | --- |
-| Active session, `approved` | `{ "loggedIn": true, "isAdmin": <bool> }` | kept |
+| Active session, `approved` | `{ "loggedIn": true, "isAdmin": <bool>, "userId": <number> }` | kept |
 | Active session, `pending` | `{ "loggedIn": false, "isAdmin": false, "status": "pending" }` | **kept** |
 | Active session, `denied` | `{ "loggedIn": false, "isAdmin": false }` — byte-for-byte the anonymous answer | the presented token is revoked with `admin_denied` |
 | Unknown, revoked or expired token | `{ "loggedIn": false, "isAdmin": false }` | — |

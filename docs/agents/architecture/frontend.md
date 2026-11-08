@@ -24,7 +24,11 @@ frontend/assets/js/
   components/
     AppController.js          # resolves the current route, renders the matching page
     common/
-      header/                 # Header.jsx + controller/helper/hook — Login/Logout nav
+      header/                 # Header.jsx + controller/helper/hook — Login/Logout nav;
+                              #   contextSwitcher/ — Personal / organization switcher
+      ownerContext/           # OwnerContextProvider.jsx, hooks/useOwnerContext.js,
+                              #   controllers/OrgListController.js (org list per session)
+      notFound/NotFound.jsx   # generic Not-found view ("Go to Personal")
       awaitingApproval/       # AwaitingApprovalGate.jsx, AwaitingApproval.jsx + controllers/,
                               #   helpers/, hooks/useWindowFocusRecheck.js — pending-account view
       loginModal/             # LoginModal.jsx — route-independent, opened via LoginModalEvents
@@ -38,14 +42,18 @@ frontend/assets/js/
     resources/
       home/pages/Home.jsx
       accounts/pages/          # AuthorizationRequests ("My account"), ResetPasswordLanding
+      organizations/pages/     # OrganizationNew, OrganizationOverview, OrganizationEdit
       admin/pages/             # AdminUsers.jsx (search, status filter, approve/deny via
                                #   users/ApproveUserButton.jsx, users/DenyUserButton.jsx),
                                #   AdminUserEdit.jsx
   client/                      # AccountsClient, AdminClient, ApiClient, ApiError,
+                                #   OrganizationsClient,
                                 #   AuthSession, AuthEvents, AuthStatus, LoginModalEvents,
                                 #   pickDefined.js (drops undefined keys from request bodies)
   utils/
-    routing/                   # Router, Route, HashRouteResolver
+    routing/                   # Router, Route, HashRouteResolver, routes.js (route tables)
+    context/                   # ownerContext.js (contextPath/contextHash/landingFor),
+                               #   ContextStorage.js, entryResolution.js
     polling/AuthorizationRequestPoller.js
     validation/                # fieldValidators, formValidators (shared client-side form rules)
 
@@ -134,8 +142,8 @@ session is pending approval. Logging out calls
 
 The frontend side of [User approval](../modules/auth/user-approval.md):
 
-- **`pending` on the auth bus**: `AuthEvents.emit(loggedIn, isAdmin = false, pending = false)`;
-  the event `detail` carries `pending`. While pending, `loggedIn` and `isAdmin` are `false`, and
+- **`pending` on the auth bus**: `AuthEvents.emit(loggedIn, isAdmin = false, pending = false,
+  userId = null)`; the event `detail` carries `pending` and `userId` (set only when logged in). While pending, `loggedIn` and `isAdmin` are `false`, and
   the header (`HeaderHelper`) renders **no auth links at all** (neither Login nor the logged-in
   menu); Log out is reachable from the awaiting-approval view.
 - **`client/AuthStatus.js`**: `AuthStatus.refresh(client = AccountsClient)` is the single place
@@ -144,7 +152,7 @@ The frontend side of [User approval](../modules/auth/user-approval.md):
 
   | `status.json` answer | Stored refresh token | Emitted |
   |---|---|---|
-  | `{ loggedIn: true, … }` | kept | `(true, isAdmin, false)` |
+  | `{ loggedIn: true, … }` | kept | `(true, isAdmin, false, userId)` |
   | `{ loggedIn: false, …, status: "pending" }` | **kept**, so an approval is picked up without a new login | `(false, false, true)` |
   | anything else (denied, revoked, expired, unknown) | cleared (`AuthSession.clear()`) | `(false, false, false)` |
   | — (no stored token) | — (no request) | `(false, false, false)` |
@@ -176,6 +184,44 @@ The frontend side of [User approval](../modules/auth/user-approval.md):
   row with the returned user. A `403` (e.g. a demoted admin) redirects home; any other error
   (`422`, `404`, …) shows its `error.message` in the row's result area (`rowResults`); the existing per-row recovery and
   edit actions stay available for every status.
+
+## Owner context (organizations)
+
+The frontend side of [Organizations](../specs/auth/organizations.md) (#47). Every
+user-or-organization-owned module (starting with `bank`, #49) registers its routes once and
+works in both contexts.
+
+- **UI paths**: Personal `#/<module>/...`, organization `#/orgs/:orgId/<module>/...`.
+- **Router** (`utils/routing/`): `routes.js` holds three tables — `ROUTES_PERSONAL`
+  (Personal-only, includes `/orgs/new`), `ROUTES_ORG_ONLY` (`/` overview, `/edit` rename) and
+  `ROUTES_CONTEXT` (context-aware; modules add their own paths here, never mentioning `orgs`).
+  `HashRouteResolver.resolve()` matches Personal-only routes first, then strips an
+  `/orgs/<seg>` prefix (a malformed `<seg>` — outside `^[1-9][0-9]*$` or above 2147483647 —
+  resolves to `not-found` with no request), then matches the rest against the org-only and
+  context-aware tables; otherwise context-aware routes match as Personal; unknown paths fall
+  back to `home`. It returns `{ page, context }`, `context` being `{ kind: 'personal' }` or
+  `{ kind: 'organization', orgId }`. Pages read params with
+  `Router.extractContextParams(pattern, hash)`, against the **stripped** path.
+- **Helpers** (`utils/context/ownerContext.js`): `contextPath(context, '/x.json')` for API
+  paths, `contextHash(context, '/x')` for hash links, `landingFor(context)` for the switch
+  target (`#/` or `#/orgs/:orgId`). API clients take the context as an argument, never from
+  global state.
+- **Provider**: `AppHelper` wraps the header and page in `OwnerContextProvider`; read it with
+  `useOwnerContext()`. `GET /orgs.json` is loaded once per session (after login or on load),
+  refetched after a create or rename, and cleared on logout. Pages are keyed by context so
+  moving between organizations remounts them.
+- **Last used context** (`ContextStorage.js`, `entryResolution.js`): stored per user under
+  `ward.context.<userId>` (org id only; every access in try/catch, unavailable storage means
+  Personal). Applied only at the entry point (`''` or `#/`), after the org list loads, and only
+  if the id is in the list — otherwise it is forgotten. Context-aware page visits and switcher
+  picks update it; context-neutral pages do not. Logout does not clear it.
+- **Switcher** (`header/contextSwitcher/`): left of the header after the brand; Personal, the
+  organizations (active one checked, names truncated with the full name in `title`) and
+  **+ Create organization**. Hidden while logged out or pending; shows an inline error when
+  `/orgs.json` fails. Picking Personal stores it before navigating.
+- **Pages**: `#/orgs/new`, `#/orgs/:orgId` (overview: name, role, Rename link) and
+  `#/orgs/:orgId/edit`. A backend 404 or malformed id renders the generic `NotFound` view, which
+  forgets that id if it was remembered. Names are always rendered as React text.
 
 ## API errors
 
