@@ -75,7 +75,7 @@ Debt-specific fields, **all optional**, stored in a 1:1 table `bank_debt_details
 | `dueDay` | int 1–31 | Day of the month an instalment is due; 29–31 clamp to the month's last day, see [bills.md](../bills.md#recurrence-model) |
 | `instalmentFrequency` | `monthly` \| `yearly` | Defaults to `monthly` |
 | `dueMonth` | int 1–12 | Month an instalment is due; required when `instalmentFrequency` is `yearly`, unset otherwise |
-| `instalmentCount` | int ≥ 1 | Informational total number of instalments; empty = open-ended |
+| `instalmentCount` | int 1–2 147 483 647 (the `int` column range) | Informational total number of instalments; empty = open-ended |
 
 ### Credit cards
 
@@ -194,7 +194,7 @@ are returned as `null`. `interest_rate` is returned without trailing zeros (stor
 - `interest_rate` and `interest_period` go together: one without the other → 400.
 - `due_month` is required when `instalment_frequency` is `yearly` and rejected (400) when it is
   `monthly`.
-- Ranges → 400 when outside: `due_day` 1–31, `due_month` 1–12, `instalment_count` ≥ 1,
+- Ranges → 400 when outside: `due_day` 1–31, `due_month` 1–12, `instalment_count` 1–2147483647,
   `instalment_amount` > 0 (and within the amount bound and currency decimals of
   [transactions.md](transactions.md#currency)), `interest_rate` 0–100 with at most 4
   decimals.
@@ -320,7 +320,7 @@ Negligible: one small table in the already-lazy `bank` module, no new dependency
 - Validation → 400: a `debt` object on a non-debt account (create and PATCH);
   `interest_rate` without `interest_period` and vice versa; `instalment_frequency` `yearly`
   without `due_month`; `due_month` with `monthly`; `due_day` 0 / 32; `due_month` 0 / 13;
-  `instalment_count` 0; `instalment_amount` 0, negative, over the amount bound or with more
+  `instalment_count` 0 or 2147483648; `instalment_amount` 0, negative, over the amount bound or with more
   decimals than the currency allows; `interest_rate` negative, over 100 or with 5 decimals;
   unknown fields inside `debt`. Boundaries accepted: `due_day` 1 / 31, `due_month` 1 / 12,
   `instalment_count` 1, `interest_rate` 0 and 100, 4 decimals.

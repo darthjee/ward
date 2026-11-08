@@ -111,7 +111,7 @@ spec is `docs/agents/specs/banking/accounts/debt.md`.
 - **`400`** — `debt: null`, unknown fields inside it, `debt` on a non-debt account;
   `interest_rate` without `interest_period` (or the reverse); `due_month` missing with
   `yearly` or set with `monthly`; `due_day` outside 1–31, `due_month` outside 1–12,
-  `instalment_count` < 1; `instalment_amount` ≤ 0, over the amount bound or with too many
+  `instalment_count` outside 1–2147483647; `instalment_amount` ≤ 0, over the amount bound or with too many
   decimals; `interest_rate` outside 0–100 or with more than 4 decimals.
 - **`409 ACCOUNT_ARCHIVED`** — any `debt` field on an archived debt (a field failing the
   format checks above is still a `400`, rejected by the validation pipe first).
