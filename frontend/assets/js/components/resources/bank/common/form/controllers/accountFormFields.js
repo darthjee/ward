@@ -100,6 +100,18 @@ function collectErrors(entries) {
 }
 
 /**
+ * Validate an archived account's form: only the name, and the body carries only `name`.
+ *
+ * @param {object} fields - The form fields.
+ * @returns {{errors: object, body: (object|null)}} The field errors and, when valid, the body.
+ */
+function validateNameOnly(fields) {
+  const errors = collectErrors([['name', nameError(fields.name)]]);
+
+  return { errors, body: Object.keys(errors).length ? null : { name: fields.name.trim() } };
+}
+
+/**
  * Validate the form and build the `snake_case` request body.
  *
  * @description With `nameOnly` (an archived account: only a rename is allowed) the body carries
@@ -113,9 +125,7 @@ function collectErrors(entries) {
  */
 export function validateAccountFields(fields, { nameOnly = false, now = new Date(), dateLabel = 'Opening date' } = {}) {
   if (nameOnly) {
-    const errors = collectErrors([['name', nameError(fields.name)]]);
-
-    return { errors, body: Object.keys(errors).length ? null : { name: fields.name.trim() } };
+    return validateNameOnly(fields);
   }
 
   const balance = parseAmount(fields.opening_balance, {
