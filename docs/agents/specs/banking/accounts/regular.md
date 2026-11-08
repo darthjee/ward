@@ -142,7 +142,7 @@ which reuses the [Rules](#rules) below.
 | Method | Route | Purpose | Cache class |
 |---|---|---|---|
 | GET | `/accounts.json?type=regular&archived=false` | List accounts; `type` defaults to `regular` (other types reuse the route once their spec defines them); `archived=true` includes archived ones | `user-scoped` |
-| POST | `/accounts.json` | Create; `type: regular` (default) and `type: debt` (see [debt.md](debt.md#routes-and-permissions)) are accepted; any type without a registered handler → 400 | `never` |
+| POST | `/accounts.json` | Create; `type: regular` (default), `type: debt` (see [debt.md](debt.md#routes-and-permissions)) and `type: investment` (see [investment.md](investment.md#routes-and-permissions)) are accepted; any type without a registered handler → 400 | `never` |
 | GET | `/accounts/:accountId.json` | Detail, with the full account number and the current balance | `user-scoped` |
 | PATCH | `/accounts/:accountId.json` | Edit; `type` never accepted; `currency` only while the account has no transactions (else 409); on an archived account only `name` is accepted | `never` |
 | DELETE | `/accounts/:accountId.json` | Hard delete; 409 when the account has transactions | `never` |
@@ -233,7 +233,7 @@ No idle cost — `bank` is lazy. No new heavy dependency: currency data comes fr
   [transactions.md](transactions.md#edge-cases)).
 - **Currency change with transactions** → 409.
 - **Delete with transactions** → 409 (DB-enforced by `ON DELETE RESTRICT`).
-- **Type without a handler on create** → 400 (`regular` and [`debt`](debt.md) are accepted;
+- **Type without a handler on create** → 400 (`regular`, [`debt`](debt.md) and [`investment`](investment.md) are accepted;
   the other types are added as their issues land).
 - **Over-long fields** → 400, never truncated.
 - **Unknown / foreign / wrong-context / non-numeric ids** → 404, indistinguishable.

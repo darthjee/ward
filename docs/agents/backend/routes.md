@@ -8,6 +8,6 @@ entity/event-focused `docs/agents/modules/` pages.
 - [Admin](routes/admin.md) — `/admin/users/*.json`: user search, edit, approve, deny, recovery
   tools
 - [Bank](routes/bank.md) — `/bank/*.json` and `/orgs/:orgId/bank/*.json`: accounts
-  (regular and debt), transactions and the paginated ledger, settings
+  (regular, debt and investment), transactions and the paginated ledger, settings
 
 Future backend modules add their own entry here as they land.

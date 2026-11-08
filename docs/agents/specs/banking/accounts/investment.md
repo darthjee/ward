@@ -189,7 +189,24 @@ PATCH, `null` clears an optional field.
 - `liquidity_days` not an integer ≥ 0 → 400.
 - `kind` not one of the enum values → 400.
 - `yield_rate` outside 0–100 or with more than 4 decimals → 400.
-- Unknown fields inside `investment` are rejected by the whitelist `ValidationPipe`.
+- Unknown fields inside `investment` are rejected by the whitelist `ValidationPipe`;
+  `investment: null` → 400.
+- **PATCH paired rule uses the merged result** (decided in #52). `yield_rate` ↔
+  `yield_period` is checked on the stored details with the request merged on top, not on the
+  request body alone (as #50 does for debts):
+  - PATCH `{ investment: { yield_rate: "3" } }` is accepted when a period is already stored;
+  - PATCH `{ investment: { yield_period: null } }` → 400 while a rate is stored;
+  - clearing the rate still means sending both as `null` (edge case 10).
+- **`maturity_date`** (decided in #52) — any real `YYYY-MM-DD` calendar date, past or future.
+  The "never after UTC today + 1 day" rule of ledger dates does not apply; an invalid date
+  (e.g. `2026-02-30`) → 400.
+- **`liquidity_days`** (decided in #52) — an integer from `0` to `2147483647` (the INT
+  column's range, the same bound as debt's `instalment_count`).
+- **`yield_rate` formatting** (decided in #52) — returned without trailing zeros, like debt's
+  `interest_rate` (stored `12.5000` → `"12.5"`, `0` → `"0"`).
+- **Archived investment: 400 before 409** (decided in #52). Any `investment` field on an
+  archived investment answers 409 `ACCOUNT_ARCHIVED`; a field that fails the basic format
+  checks is still rejected first by the validation pipe with 400 (same as debts).
 
 ### Permissions and caching
 
@@ -228,8 +245,8 @@ logged. Investments inherit the owner from their account; who sees and edits the
 Additive: a new table, a newly accepted `type` value and a nested `investment` object present
 only on investment accounts. Regular and debt accounts are unchanged. The only behaviour change
 is that `POST /accounts.json` with `type: investment` no longer answers 400 (the
-[regular.md](regular.md#accounts) "until the other type specs exist" rule; reconciled by the
-fold sub-issue of #26).
+[regular.md](regular.md#accounts) "until the other type specs exist" rule, reconciled by #50
+and #52: types without a registered handler still answer 400).
 
 ### Memory footprint
 

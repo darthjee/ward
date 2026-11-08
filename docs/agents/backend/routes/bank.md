@@ -54,16 +54,17 @@ does not load the module. The specs (`docs/agents/specs/banking/accounts/regular
 - `balance` (current balance) = `opening_balance` + SUM(transactions dated on or after
   `opening_date`); on the list it comes from one grouped query.
 - Each account type adds its nested object under its type name; `regular` has none, `debt`
-  carries a `debt` object (see [Debt object](#debt-object)), and later types (`investment`,
-  `provider_expense`) will follow the same pattern. Sending another type's nested object (e.g.
+  carries a `debt` object (see [Debt object](#debt-object)), `investment` carries an
+  `investment` object (see [Investment object](#investment-object)), and later types
+  (`provider_expense`) will follow the same pattern. Sending another type's nested object (e.g.
   `debt` on a regular account) → `400`.
 
 ## Accounts
 
 | Method | Route | Body | Success | Errors | Cache class |
 |---|---|---|---|---|---|
-| GET | `<base>/accounts.json?type=regular&archived=false` | — | `200` list of accounts of that `type` (`regular` default, `debt`), sorted by name; `archived=true` also lists archived ones (with `archived_at` set) | `400` type without a handler, invalid `archived` | `user-scoped` |
-| POST | `<base>/accounts.json` | `CreateAccountDto` | `201` account | `400` validation / type without a handler / wrong nested object; `409 ACCOUNT_NAME_TAKEN` | `never` |
+| GET | `<base>/accounts.json?type=regular&archived=false` | — | `200` list of accounts of that `type` (`regular` default, `debt`, `investment`), sorted by name; `archived=true` also lists archived ones (with `archived_at` set) | `400` type without a handler, invalid `archived` | `user-scoped` |
+| POST | `<base>/accounts.json` | `CreateAccountDto` | `201` account | `400` validation / type without a handler / wrong nested object / non-zero `opening_balance` on an investment; `409 ACCOUNT_NAME_TAKEN` | `never` |
 | GET | `<base>/accounts/:accountId.json` | — | `200` account (full number) | `404` | `user-scoped` |
 | PATCH | `<base>/accounts/:accountId.json` | `UpdateAccountDto` | `200` account | `400`; `404`; `409 ACCOUNT_ARCHIVED` (anything but `name` on an archived account), `CURRENCY_LOCKED` (currency change once the account has transactions), `ACCOUNT_NAME_TAKEN` | `never` |
 | DELETE | `<base>/accounts/:accountId.json` | — | `204` | `404`; `409 ACCOUNT_HAS_TRANSACTIONS` (message points to archive; also on the FK race) | `never` |
@@ -74,13 +75,14 @@ does not load the module. The specs (`docs/agents/specs/banking/accounts/regular
 
 | Field | Rule |
 |---|---|
-| `type` | Optional, default `regular`; `regular` and `debt` have handlers; any other type → `400` |
+| `type` | Optional, default `regular`; `regular`, `debt` and `investment` have handlers; any other type → `400` |
 | `debt` | Optional, only with `type: debt` (see [Debt object](#debt-object)) |
+| `investment` | Optional, only with `type: investment` (see [Investment object](#investment-object)) |
 | `name` | Required; trimmed, non-blank, at most 255 characters; unique per owner among active accounts, case-insensitively (accent-sensitive) |
 | `bank_name`, `branch`, `account_number` | Optional, at most 64 characters; trimmed, blank → `null` |
 | `currency` | Optional ISO 4217 code from `Intl.supportedValuesOf('currency')`; defaults to `BANK_DEFAULT_CURRENCY` |
 | `opening_date` | Optional, defaults to UTC today |
-| `opening_balance` | Optional decimal string, default `"0"` |
+| `opening_balance` | Optional decimal string, default `"0"`; must be `0` on an investment account (`400` otherwise) |
 | `notes` | Optional, at most 2000 characters |
 
 `UpdateAccountDto` has the same fields except `type` (sending it → `400`), all optional;
@@ -115,6 +117,36 @@ spec is `docs/agents/specs/banking/accounts/debt.md`.
   decimals; `interest_rate` outside 0–100 or with more than 4 decimals.
 - **`409 ACCOUNT_ARCHIVED`** — any `debt` field on an archived debt (a field failing the
   format checks above is still a `400`, rejected by the validation pipe first).
+
+### Investment object
+
+`type: investment` accounts carry a nested `investment` object, stored 1:1 in
+`bank_investment_details`; the spec is `docs/agents/specs/banking/accounts/investment.md`.
+
+```json
+"investment": {
+  "kind": "fixed_income", "yield_rate": "12.5", "yield_period": "yearly",
+  "maturity_date": "2028-01-15", "liquidity_days": 0
+}
+```
+
+- Present on list rows, the detail and the create / update / archive / unarchive responses of
+  investment accounts; absent on other types. Unset fields are `null`; `yield_rate` is returned
+  without trailing zeros. Loaded with one query per type on the list (no N+1).
+- **Create** — optional; without it a row is still created (all fields `null`).
+- **Opening balance** — always `0`: a non-zero `opening_balance` on create or PATCH → `400`
+  (an account-level rule, enforced by the handler's account hook).
+- **PATCH** — merged partially (omitted fields unchanged, `null` clears); the paired
+  `yield_rate` ↔ `yield_period` rule is checked on the stored details with the request merged
+  on top. The rate is cleared by sending both `null`.
+- **`400`** — `investment: null`, unknown fields inside it, `investment` on a non-investment
+  account; `yield_rate` without `yield_period` (or the reverse); `kind` not one of
+  `fixed_income`, `fund`, `stocks`, `savings`, `pension`, `crypto`, `other`; `yield_period` not
+  `monthly` / `yearly`; `yield_rate` outside 0–100 or with more than 4 decimals;
+  `liquidity_days` not an integer in 0–2147483647; `maturity_date` not a real `YYYY-MM-DD`
+  date (any past or future date is accepted).
+- **`409 ACCOUNT_ARCHIVED`** — any `investment` field on an archived investment (a field
+  failing the format checks above is still a `400`, rejected by the validation pipe first).
 
 ## Transactions
 
