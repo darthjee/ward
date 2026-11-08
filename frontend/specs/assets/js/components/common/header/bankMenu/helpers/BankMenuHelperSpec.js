@@ -4,20 +4,24 @@ import BankMenuHelper, {
 import { renderedOutput } from '../../../../../../../support/renderedOutput.js';
 
 describe('BankMenuHelper', () => {
-  it('lists the Accounts then the Debts entry', () => {
-    expect(BANK_MENU_ENTRIES).toEqual([['Accounts', '/bank/accounts'], ['Debts', '/bank/debts']]);
+  it('lists the Accounts, Debts then Investments entry', () => {
+    expect(BANK_MENU_ENTRIES).toEqual([
+      ['Accounts', '/bank/accounts'], ['Debts', '/bank/debts'], ['Investments', '/bank/investments'],
+    ]);
   });
 
   it('builds every entry from the Personal context', () => {
     const page = renderedOutput(BankMenuHelper.render({ context: { kind: 'personal' } }));
 
-    expect(page.containsInOrder('href="#/bank/accounts"', 'Accounts', 'href="#/bank/debts"', 'Debts')).toBeTrue();
+    expect(page.containsInOrder('href="#/bank/accounts"', 'Accounts', 'href="#/bank/debts"', 'Debts', 'href="#/bank/investments"', 'Investments'))
+      .toBeTrue();
   });
 
   it('builds the default entries from an organization context', () => {
     const page = renderedOutput(BankMenuHelper.render({ context: { kind: 'organization', orgId: 7 } }));
 
-    expect(page.containsInOrder('href="#/orgs/7/bank/accounts"', 'href="#/orgs/7/bank/debts"')).toBeTrue();
+    expect(page.containsInOrder('href="#/orgs/7/bank/accounts"', 'href="#/orgs/7/bank/debts"', 'href="#/orgs/7/bank/investments"'))
+      .toBeTrue();
   });
 
   it('builds every entry from an organization context', () => {

@@ -13,6 +13,10 @@ describe('sectionTarget', () => {
     it('registers the bank debts section', () => {
       expect(SECTIONS_CONTEXT).toContain(['/bank/debts', '/bank/debts']);
     });
+
+    it('registers the bank investments section', () => {
+      expect(SECTIONS_CONTEXT).toContain(['/bank/investments', '/bank/investments']);
+    });
   });
 
   describe('sectionListPathFor', () => {
@@ -47,6 +51,21 @@ describe('sectionTarget', () => {
     });
 
     [
+      '#/bank/investments',
+      '#/bank/investments/new',
+      '#/bank/investments/3',
+      '#/bank/investments/3/edit',
+      '#/bank/investments?archived=true',
+      '#/orgs/3/bank/investments/3/edit',
+      '#/orgs/5/bank/investments?archived=true',
+    ].forEach((hash) => {
+      it(`maps ${hash} to the investments list`, () => {
+        expect(sectionListPathFor(hash)).toBe('/bank/investments');
+      });
+    });
+
+    [
+      '#/bank/investmentsx',
       '#/bank/debtsx',
       '#/bank/accountsx',
       '#/bank/accountsx/12',
@@ -77,6 +96,11 @@ describe('sectionTarget', () => {
 
     it('lands on the organization list and drops the query', () => {
       expect(switchTargetFor('#/bank/accounts?archived=true')(ORG_5)).toBe('#/orgs/5/bank/accounts');
+    });
+
+    it('lands on the investments list in both directions', () => {
+      expect(switchTargetFor('#/orgs/3/bank/investments/3/edit')(PERSONAL)).toBe('#/bank/investments');
+      expect(switchTargetFor('#/bank/investments/3?page=2')(ORG_5)).toBe('#/orgs/5/bank/investments');
     });
 
     it('lands on the landing page outside a section', () => {

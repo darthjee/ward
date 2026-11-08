@@ -51,10 +51,20 @@ describe('BankMenu', () => {
     expect(org.containsInOrder('href="#/orgs/5/bank/debts"', 'Debts')).toBeTrue();
   });
 
+  it('links Investments under Personal and under the active organization', () => {
+    const personal = renderedOutput(withValue({ loggedIn: true }));
+    const org = renderedOutput(withValue(
+      { loggedIn: true },
+      { context: { kind: 'organization', orgId: 5 }, orgs: [{ id: 5, name: 'Acme' }] },
+    ));
+
+    expect(personal.containsInOrder('href="#/bank/debts"', 'href="#/bank/investments"', 'Investments')).toBeTrue();
+    expect(org.containsInOrder('href="#/orgs/5/bank/investments"', 'Investments')).toBeTrue();
+  });
+
   it('shows no disabled or stub entries', () => {
     const page = renderedOutput(withValue({ loggedIn: true }));
 
-    expect(page.contains('Investments')).toBeFalse();
     expect(page.contains('Providers')).toBeFalse();
     expect(page.contains('Calendar')).toBeFalse();
     expect(page.contains('disabled')).toBeFalse();

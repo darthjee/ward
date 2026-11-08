@@ -8,8 +8,9 @@ import { navigate } from '../currentHash.js';
  *
  * @description A matching type (or a response without `type`, or a section without a type) is
  * shown; a type owned by another section redirects there (`<other base>/:id<suffix>`, e.g. a
- * debt opened under `/bank/accounts/:id` goes to `/bank/debts/:id`); a type without a frontend
- * section (e.g. a future `investment`) is treated as not found.
+ * debt opened under `/bank/accounts/:id` goes to `/bank/debts/:id`, an investment opened under
+ * `/bank/debts/:id` goes to `/bank/investments/:id`); a type without a frontend section (an
+ * unknown type) is treated as not found.
  * @param {object} account - The loaded account.
  * @param {{base: string, context: object, suffix: string}} where - The section base the page
  *   lives under, the owner context and the path suffix kept on redirect (e.g. `/edit`).

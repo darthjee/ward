@@ -98,6 +98,12 @@ describe('HashRouteResolver', () => {
       expect(keys.indexOf('bank-debt-new')).toBeLessThan(keys.indexOf('bank-debt'));
     });
 
+    it('lists bank-investment-new before bank-investment', () => {
+      const keys = ROUTES_CONTEXT.map(([, key]) => key);
+
+      expect(keys.indexOf('bank-investment-new')).toBeLessThan(keys.indexOf('bank-investment'));
+    });
+
     it('matches a context route as Personal', () => {
       expect(resolve('#/x', options)).toEqual({ page: 'x-page', context: PERSONAL });
     });
@@ -129,6 +135,12 @@ describe('HashRouteResolver', () => {
       ['/bank/debts/7', 'bank-debt'],
       ['/bank/debts/7?page=2', 'bank-debt'],
       ['/bank/debts/7/edit', 'bank-debt-edit'],
+      ['/bank/investments', 'bank-investments'],
+      ['/bank/investments?archived=true', 'bank-investments'],
+      ['/bank/investments/new', 'bank-investment-new'],
+      ['/bank/investments/3', 'bank-investment'],
+      ['/bank/investments/3?page=2', 'bank-investment'],
+      ['/bank/investments/3/edit', 'bank-investment-edit'],
     ].forEach(([path, page]) => {
       it(`resolves #${path} to ${page} in the Personal context`, () => {
         expect(resolve(`#${path}`)).toEqual({ page, context: PERSONAL });
