@@ -10,27 +10,54 @@ Cross-cutting rules every backend module — Auth and Mail today, and every doma
 |---|---|---|
 | Core | Always resident, at boot | `src/core/` — JWT Guard, DB connection, CacheToken Service, `LazyModuleLoader` wrapper |
 | Always-on | Always resident, at boot | Auth module, Mail module — imported directly into `AppModule` |
-| Lazy | On demand, first request | Domain modules: `bank`, `protocol`, `car-performance`, `links` (planned — none implemented yet) |
+| Lazy | On demand, first request | Domain modules: `bank` (implemented — the reference lazy module), `protocol`, `car-performance`, `links` (planned) |
 
-A **lazy** module is *not* imported into `AppModule` directly. Instead, its controller's first
-route handler calls `LazyModuleLoaderService#loadOnFirstRequest()`
-(`src/core/lazy-module-loader.service.ts`) with a loader function that dynamically `import()`s
-the module class:
+A **lazy** module is *not* imported into `AppModule` directly. Two technical limits mean it
+cannot be lazy in full, so it is split into a small **resident** part and the **lazy** module
+(`src/bank/` is the reference implementation):
+
+| Part | Loading | Holds | Why |
+|---|---|---|---|
+| `<name>RoutesModule` (e.g. `BankRoutesModule`) | Resident — imported by `AppModule` | The thin controllers; the entity classes, registered through `TypeOrmModule.forFeature([...])`; boot-validated config (e.g. `BankConfigModule`); a small loader helper | Nest registers routes only at boot, so a lazily loaded module cannot declare controllers. `autoLoadEntities` only sees entities whose `forFeature` ran before the `DataSource` initialised — an entity known only to a lazy module has no metadata ("No metadata for …"). A config validated only in the lazy module would fail on the first request instead of at startup. |
+| `<name>Module` (e.g. `BankModule`) | Lazy — never imported by `AppModule` | Every service, query and piece of business logic (its own `forFeature` only provides the repositories inside the lazy graph) | This is what keeps idle memory low. |
+
+The resident controllers load the lazy module on the first request through
+`LazyModuleLoaderService#loadOnFirstRequest()` (`src/core/lazy-module-loader.service.ts`), with a
+loader function that dynamically `import()`s the module file. Wrap it in a resident helper so each
+handler is one line, and import the service classes **as types only** in the controllers, reaching
+them through the dynamic import — then not even their code is loaded before the first request:
 
 ```ts
-@Controller('widgets')
-class WidgetController {
+// widget-module.loader.ts (resident)
+@Injectable()
+export class WidgetModuleLoader {
   constructor(private readonly lazyModuleLoader: LazyModuleLoaderService) {}
 
+  async services(): Promise<{ widgets: WidgetService }> {
+    const widget = await import('./widget.module.js'); // widget.module.ts re-exports WidgetService
+    const moduleRef = await this.lazyModuleLoader.loadOnFirstRequest(() => widget.WidgetModule);
+    return { widgets: moduleRef.get(widget.WidgetService) };
+  }
+}
+
+// widgets.controller.ts (resident)
+@OwnerScopedController('widgets')
+export class WidgetsController {
+  constructor(private readonly loader: WidgetModuleLoader) {}
+
   @Get('widgets.json')
-  async list() {
-    const moduleRef = await this.lazyModuleLoader.loadOnFirstRequest(
-      () => import('../widget/widget.module.js').then((m) => m.WidgetModule),
-    );
-    return moduleRef.get(WidgetService).list();
+  async list(@CurrentOwner() owner: OwnerContext) {
+    const { widgets } = await this.loader.services();
+    return widgets.list(owner);
   }
 }
 ```
+
+`LazyModuleLoaderService` is provided by `AppModule` but not exported, so the resident routes
+module lists it in its own `providers` (it is stateless; Nest's `LazyModuleLoader` caches the
+loaded module). Testing: a lazily loaded module ignores `Test.createTestingModule` overrides, so
+e2e specs use `NestFactory.create` with a `@Global()` fake `DataSource` (see
+`src/bank/tests/support/build-bank-test-app.ts`).
 
 Nest instantiates (and thereafter caches) that module's DI graph on first hit, not at
 application boot — this is what actually reduces startup footprint for modules nobody has
@@ -157,8 +184,10 @@ Each module has a page at `docs/agents/modules/<name>.md` (sub-features or varia
 2. **Create `backend/src/<name>/`** with `<name>.module.ts`, `.controller.ts`, `.service.ts`,
    `dto/`, `entities/`, `events/` and `tests/`. Split services early to stay under the
    300-line / complexity-10 limits.
-3. **Wire it.** Always-on: add it to `AppModule.imports`. Lazy: leave it out of `AppModule` and
-   load it from the controller through `LazyModuleLoaderService#loadOnFirstRequest()`.
+3. **Wire it.** Always-on: add it to `AppModule.imports`. Lazy: leave it out of `AppModule`, add a
+   resident `<name>RoutesModule` (controllers, entity `forFeature`, boot config) to
+   `AppModule.imports`, and load the lazy module from the controllers through
+   `LazyModuleLoaderService#loadOnFirstRequest()` (see "Module classification").
 4. **Entities and migrations.** Prefix table names, register entities with
    `TypeOrmModule.forFeature`, add `<timestamp>-<name>-<action>.ts` migrations, use logical FKs
    only, and add the tables to "Owned tables" in `architecture/backend.md`.

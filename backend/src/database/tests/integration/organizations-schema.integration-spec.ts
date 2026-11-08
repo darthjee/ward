@@ -1,6 +1,7 @@
 import type { DataSource } from 'typeorm';
 import { columnInfo, indexNames, tableNames } from './schema-inspection.js';
-import { createTestDataSource, resetDatabase } from './test-data-source.js';
+import { createTestDataSource, resetDatabase, runMigrationsUpTo } from './test-data-source.js';
+import { AuthCreateOrganizations20261107120015 } from '../../migrations/20261107120015-auth-create-organizations.js';
 
 const ORGANIZATIONS = 'auth_organizations';
 const MEMBERSHIPS = 'auth_organization_memberships';
@@ -35,7 +36,7 @@ describe('AuthCreateOrganizations20261107120015 (MySQL)', () => {
 
   beforeEach(async () => {
     await resetDatabase(ds);
-    await ds.runMigrations();
+    await runMigrationsUpTo(ds, AuthCreateOrganizations20261107120015.name);
   });
 
   afterAll(async () => {

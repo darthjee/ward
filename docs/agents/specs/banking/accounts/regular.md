@@ -202,9 +202,13 @@ including [transactions.md](transactions.md).
 - **`bank`** (lazy tier, table prefix `bank_`, already registered in
   `architecture/modular-pattern.md`) owns `Account` (`bank_accounts`) and `Transaction`
   (`bank_transactions`). **No new module.**
-- **Lazy loading** — every bank controller goes through
-  `LazyModuleLoaderService#loadOnFirstRequest()`; nothing of `bank` is resident before the
-  first bank request (`settings.json` loads it too — it is only hit from the bank UI).
+- **Lazy loading** — split between a small resident part and the lazy `BankModule` (see
+  [modular-pattern.md](../../../architecture/modular-pattern.md#module-classification)): the thin
+  controllers, the entity classes and the boot-validated `BANK_DEFAULT_CURRENCY` config are
+  resident (Nest registers routes only at boot, and `autoLoadEntities` only sees entities
+  registered before the `DataSource` initialises); every service, query and piece of business
+  logic loads on the first bank request through `LazyModuleLoaderService#loadOnFirstRequest()`.
+  `settings.json` is served from the resident config and does not load the module.
 - **Depends on `auth` only through `@OwnerScoped()`** (the core guard behind a DI token); `bank`
   never imports `auth` nor queries membership tables.
 - **References** — `user_id` and `organization_id` are logical (no cross-module FK);

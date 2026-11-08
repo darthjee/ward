@@ -18,11 +18,14 @@ import { StrictBody } from '../strict-validation.pipe.js';
 
 const SRC_ROOT = resolve(__dirname, '..', '..');
 const KNOWN_CONTROLLERS = [
+  'AccountsController',
   'AdminController',
   'AuthController',
   'AuthorizationRequestController',
   'HealthController',
   'OrganizationController',
+  'SettingsController',
+  'TransactionsController',
 ];
 
 type ClassConstructor = new (...args: never[]) => unknown;
