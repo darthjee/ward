@@ -13,8 +13,11 @@ export type DebtState = Pick<
   'interestRate' | 'interestPeriod' | 'instalmentAmount' | 'instalmentFrequency' | 'dueDay' | 'dueMonth' | 'instalmentCount'
 >;
 
-/** The nested `debt` response object (snake_case). */
-export interface DebtResponse {
+/**
+ * The nested `debt` response object (snake_case). A type alias (not an
+ * interface) so it stays assignable to the handler's `Record<string, unknown>`.
+ */
+export type DebtResponse = {
   interest_rate: string | null;
   interest_period: DebtPeriod | null;
   instalment_amount: string | null;
@@ -22,7 +25,7 @@ export interface DebtResponse {
   due_day: number | null;
   due_month: number | null;
   instalment_count: number | null;
-}
+};
 
 /** The body field named in `instalment_amount` errors. */
 export const INSTALMENT_AMOUNT_FIELD = 'debt.instalment_amount';

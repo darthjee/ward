@@ -15,7 +15,7 @@ export const ACCOUNT_TYPE_HANDLERS = 'BANK_ACCOUNT_TYPE_HANDLERS';
 export interface AccountTypeContext {
   /** The account's currency once the request is applied. */
   currency: string;
-  /** The stored currency, when the request changes it (stored amounts are rescaled). */
+  /** The stored currency before the request; stored amounts are rescaled when it differs. */
   previousCurrency?: string;
 }
 

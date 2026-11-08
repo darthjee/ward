@@ -2,12 +2,15 @@ import { BadRequestException, ConflictException, NotFoundException } from '@nest
 import { IsNull, QueryFailedError } from 'typeorm';
 import { ErrorCodes } from '../../core/error-codes.js';
 import { AccountTypeRegistry } from '../account-types/account-type.registry.js';
+import { DebtAccountHandler } from '../account-types/debt-account.handler.js';
+import { defaultDebtState } from '../account-types/debt-details.js';
 import { RegularAccountHandler } from '../account-types/regular-account.handler.js';
 import { AccountService } from '../account.service.js';
 import { buildAccount, ORGANIZATION, PERSONAL } from './account.test-support.js';
 import type { CreateAccountDto } from '../dto/create-account.dto.js';
 import type { UpdateAccountDto } from '../dto/update-account.dto.js';
-import type { Account } from '../entities/account.entity.js';
+import { Account } from '../entities/account.entity.js';
+import { DebtDetails } from '../entities/debt-details.entity.js';
 
 function mysqlError(code: string): QueryFailedError {
   return new QueryFailedError('q', [], Object.assign(new Error(code), { code }));
@@ -383,6 +386,205 @@ describe('AccountService', () => {
       const { service } = setup(null);
 
       await expect(service.delete(PERSONAL, 1)).rejects.toThrow(NotFoundException);
+    });
+  });
+});
+
+const STORED_DEBT = {
+  ...defaultDebtState(),
+  accountId: 1,
+  interestRate: '1.9900',
+  interestPeriod: 'monthly',
+  instalmentAmount: 50000n,
+  instalmentFrequency: 'yearly',
+  dueDay: 10,
+  dueMonth: 3,
+};
+
+function setupDebt(account: Account = buildAccount({ type: 'debt' }), details: object[] = [STORED_DEBT]) {
+  const accountSave = jest.fn(async (saved: Account) => ({ ...saved, id: saved.id ?? 99 }));
+  const detailsSave = jest.fn(async (row: object) => row);
+  const detailsFind = jest.fn(async () => details.map((row) => Object.assign(new DebtDetails(), row)));
+  const repositoryFor = (entity: unknown) =>
+    entity === Account ? { save: accountSave } : { save: detailsSave, find: detailsFind };
+  const manager: { getRepository: jest.Mock; transaction: jest.Mock } = {
+    getRepository: jest.fn(repositoryFor),
+    transaction: jest.fn(async (work: (m: unknown) => Promise<unknown>) => work(manager)),
+  };
+  const accountRepository = {
+    find: jest.fn(async (): Promise<Account[]> => [account]),
+    findOneBy: jest.fn(async () => account),
+    create: jest.fn((fields: Partial<Account>) => buildAccount({ id: undefined, ...fields })),
+    save: jest.fn(async (saved: Account) => saved),
+    manager,
+  };
+  const balances = {
+    currentBalances: jest.fn(async () => new Map()),
+    hasTransactions: jest.fn(async () => false),
+  };
+  const registry = new AccountTypeRegistry([new RegularAccountHandler(), new DebtAccountHandler()]);
+  const service = new AccountService(accountRepository as never, registry, balances as never, { defaultCurrency: 'BRL' });
+
+  return { service, accountRepository, balances, accountSave, detailsSave, detailsFind };
+}
+
+describe('AccountService with debt accounts', () => {
+  describe('create', () => {
+    it('creates a debt with a defaults details row when no debt object is sent', async () => {
+      const { service, detailsSave } = setupDebt(buildAccount({ type: 'debt' }), []);
+
+      const result = await service.create(PERSONAL, createDto({ type: 'debt' }));
+
+      expect(detailsSave).toHaveBeenCalledWith({ ...defaultDebtState(), accountId: 99 });
+      expect(result.type).toBe('debt');
+      expect(result.debt).toMatchObject({ instalment_frequency: 'monthly', interest_rate: null });
+    });
+
+    it('parses the instalment amount in the new account currency', async () => {
+      const { service, detailsSave } = setupDebt();
+
+      await service.create(PERSONAL, createDto({
+        type: 'debt',
+        currency: 'JPY',
+        debt: { instalment_amount: '500' },
+      } as Partial<CreateAccountDto>));
+
+      expect(detailsSave).toHaveBeenCalledWith(expect.objectContaining({ instalmentAmount: 500n }));
+    });
+
+    it('rejects a debt object on a regular account with a 400, before saving', async () => {
+      const { service, accountSave } = setupDebt();
+
+      await expect(service.create(PERSONAL, createDto({ debt: {} } as Partial<CreateAccountDto>))).rejects.toThrow(
+        BadRequestException,
+      );
+      expect(accountSave).not.toHaveBeenCalled();
+    });
+
+    it('rejects a broken paired rule with a 400', async () => {
+      const { service } = setupDebt();
+
+      await expect(service.create(PERSONAL, createDto({
+        type: 'debt',
+        debt: { interest_rate: '1' },
+      } as Partial<CreateAccountDto>))).rejects.toThrow(BadRequestException);
+    });
+  });
+
+  describe('update', () => {
+    it('merges the debt object onto the stored details', async () => {
+      const { service, detailsSave } = setupDebt();
+
+      await service.update(PERSONAL, 1, updateDto({ debt: { interest_rate: '2.5' } }));
+
+      expect(detailsSave).toHaveBeenCalledWith(expect.objectContaining({
+        accountId: 1,
+        interestRate: '2.5',
+        interestPeriod: 'monthly',
+        instalmentAmount: 50000n,
+        dueMonth: 3,
+      }));
+    });
+
+    it('rejects clearing only the period, on the merged state', async () => {
+      const { service, detailsSave } = setupDebt();
+
+      await expect(service.update(PERSONAL, 1, updateDto({ debt: { interest_period: null } }))).rejects.toThrow(
+        BadRequestException,
+      );
+      expect(detailsSave).not.toHaveBeenCalled();
+    });
+
+    it('rejects a debt object on a regular account with a 400', async () => {
+      const { service } = setupDebt(buildAccount());
+
+      await expect(service.update(PERSONAL, 1, updateDto({ debt: {} }))).rejects.toThrow(BadRequestException);
+    });
+
+    it('answers 409 for any debt field on an archived debt, even an invalid one', async () => {
+      const { service } = setupDebt(buildAccount({ type: 'debt', archivedAt: new Date() }));
+
+      expect(await codeOf(service.update(PERSONAL, 1, updateDto({ debt: { interest_period: null } })))).toBe(
+        ErrorCodes.ACCOUNT_ARCHIVED,
+      );
+    });
+
+    it('renames an archived debt without touching its details', async () => {
+      const { service, detailsSave } = setupDebt(buildAccount({ type: 'debt', archivedAt: new Date() }));
+
+      await service.update(PERSONAL, 1, updateDto({ name: 'Old loan' }));
+
+      expect(detailsSave).toHaveBeenCalledWith(expect.objectContaining({ instalmentAmount: 50000n, dueMonth: 3 }));
+    });
+
+    it('rescales the stored instalment amount on a currency change', async () => {
+      const { service, detailsSave, accountSave } = setupDebt();
+
+      await service.update(PERSONAL, 1, updateDto({ currency: 'JPY' }));
+
+      expect(accountSave).toHaveBeenCalledWith(expect.objectContaining({ currency: 'JPY', openingBalance: 1000n }));
+      expect(detailsSave).toHaveBeenCalledWith(expect.objectContaining({ instalmentAmount: 500n }));
+    });
+
+    it('rejects a currency change that cannot represent the instalment amount (12.50 BRL to JPY)', async () => {
+      const { service, detailsSave } = setupDebt(buildAccount({ type: 'debt' }), [{ ...STORED_DEBT, instalmentAmount: 1250n }]);
+
+      await expect(service.update(PERSONAL, 1, updateDto({ currency: 'JPY' }))).rejects.toThrow(BadRequestException);
+      expect(detailsSave).not.toHaveBeenCalled();
+    });
+
+    it('parses a sent instalment amount in the new currency instead of rescaling', async () => {
+      const { service, detailsSave } = setupDebt(buildAccount({ type: 'debt' }), [{ ...STORED_DEBT, instalmentAmount: 1250n }]);
+
+      await service.update(PERSONAL, 1, updateDto({ currency: 'JPY', debt: { instalment_amount: '13' } }));
+
+      expect(detailsSave).toHaveBeenCalledWith(expect.objectContaining({ instalmentAmount: 13n }));
+    });
+
+    it('keeps the 409 currency lock ahead of the rescale', async () => {
+      const { service, balances } = setupDebt(buildAccount({ type: 'debt' }), [{ ...STORED_DEBT, instalmentAmount: 1250n }]);
+      balances.hasTransactions.mockResolvedValue(true);
+
+      expect(await codeOf(service.update(PERSONAL, 1, updateDto({ currency: 'JPY' })))).toBe(ErrorCodes.CURRENCY_LOCKED);
+    });
+  });
+
+  describe('responses', () => {
+    const DEBT_RESPONSE = {
+      interest_rate: '1.99',
+      interest_period: 'monthly',
+      instalment_amount: '500.00',
+      instalment_frequency: 'yearly',
+      due_day: 10,
+      due_month: 3,
+      instalment_count: null,
+    };
+
+    it('lists debts with their debt object, loading details in one query', async () => {
+      const { service, accountRepository, detailsFind } = setupDebt();
+
+      const result = await service.list(PERSONAL, { type: 'debt' });
+
+      expect(accountRepository.find).toHaveBeenCalledWith(expect.objectContaining({
+        where: expect.objectContaining({ type: 'debt' }),
+      }));
+      expect(detailsFind).toHaveBeenCalledTimes(1);
+      expect(result[0].debt).toEqual(DEBT_RESPONSE);
+    });
+
+    it('returns the debt object on the detail, archive and unarchive responses', async () => {
+      const { service } = setupDebt();
+
+      expect((await service.find(PERSONAL, 1)).debt).toEqual(DEBT_RESPONSE);
+      expect((await service.archive(PERSONAL, 1)).debt).toEqual(DEBT_RESPONSE);
+      expect((await service.unarchive(PERSONAL, 1)).debt).toEqual(DEBT_RESPONSE);
+    });
+
+    it('never adds a debt object to a regular account', async () => {
+      const { service, detailsFind } = setupDebt(buildAccount());
+
+      expect(await service.find(PERSONAL, 1)).not.toHaveProperty('debt');
+      expect(detailsFind).not.toHaveBeenCalled();
     });
   });
 });

@@ -140,8 +140,10 @@ export class AccountService {
   }
 
   /**
-   * Edits an account. On an archived account only `name` is accepted; the
-   * currency is locked once the account has transactions.
+   * Edits an account. On an archived account only `name` is accepted (checked
+   * before any nested validation); the currency is locked once the account
+   * has transactions. A type's nested object (e.g. `debt`) is merged onto the
+   * stored details.
    * @param {OwnerContext} owner - The resolved owner.
    * @param {number} id - The account id.
    * @param {UpdateAccountDto} dto - The validated body.
@@ -158,10 +160,16 @@ export class AccountService {
       throw accountArchived();
     }
 
+    const previousCurrency = account.currency;
     await this.#applyCurrency(account, dto);
 
+    // PATCH validates the type's nested object merged onto the stored details,
+    // with stored amounts rescaled when the currency changes.
     const stored = (await this.registry.loadDetails([account], this.accountRepository.manager)).get(account.id);
-    const prepared = handler.validateUpdate(nestedObject(dto, handler.type), stored, { currency: account.currency });
+    const prepared = handler.validateUpdate(nestedObject(dto, handler.type), stored, {
+      currency: account.currency,
+      previousCurrency,
+    });
 
     copyEditableFields(account, dto);
 
