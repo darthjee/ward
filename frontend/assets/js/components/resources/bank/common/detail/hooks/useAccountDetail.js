@@ -17,7 +17,8 @@ import { pageFromHash } from '../../pageQuery.js';
  * @description The owner context and the account id are captured on mount (the page is
  * remounted on a context change, see AppHelper); the ledger page lives in the hash query, so
  * reload / back / forward keep it. Deleting the account returns to the section list and a
- * create on another page goes to `<base>/:accountId?page=1`.
+ * create on another page goes to `<base>/:accountId?page=1`. An account of another type is
+ * redirected to its own section (see `guardAccountType`).
  * @param {string} base - The section base path (`'/bank/accounts'` or `'/bank/debts'`).
  * @returns {{context: object, notFound: boolean, state: object, handlers: object}} The owner
  *   context, whether to show Not-found, the helper state (`context`, `accountId`, `page`,
@@ -29,7 +30,7 @@ export default function useAccountDetail(base) {
   const [context] = useState(routeContext);
   const [accountId] = useState(() => Router.extractContextParams(`${base}/:accountId`, currentHash()).accountId);
   const page = pageFromHash(currentHash());
-  const ledger = useAccountLedger(context, accountId, page);
+  const ledger = useAccountLedger(context, accountId, page, base);
   const { reload, setNotFound } = ledger;
   const { form, actions } = useLedgerForm();
   const [actionPending, setActionPending] = useState(null);

@@ -4,6 +4,7 @@ import BankAccountLoader, { buildBankAccountLoadEffect } from '../../detail/cont
 import { fieldsFromAccount } from '../controllers/accountFormFields.js';
 import Router from '../../../../../../utils/routing/Router.js';
 import { currentHash } from '../../currentHash.js';
+import { guardAccountType } from '../../detail/accountTypeGuard.js';
 
 /**
  * Merge a (re)loaded account into the form: the first load fills every field; a reload (after
@@ -29,7 +30,8 @@ export function mergeLoadedAccount(fields, account, locked, fieldsFrom = fieldsF
  * @description Prefilled from the account and ledger page 1, whose `total_count` locks the
  * currency once the account has transactions. An archived account can only be renamed. A `409`
  * shows its message and reloads, so the form re-renders locked / name-only. Submitting goes
- * through `controller.handleSubmit(accountId, fields, account)`.
+ * through `controller.handleSubmit(accountId, fields, account)`. An account of another type is
+ * redirected to its own section's edit page (see `guardAccountType`).
  * @param {Function} Controller - The form controller class (an `AccountFormController`).
  * @param {{base: string, fieldsFrom: Function, idPrefix: string}} options - The section base
  *   path, the account → form fields builder and the input id prefix.
@@ -55,7 +57,7 @@ export default function useAccountEditPage(Controller, { base, fieldsFrom, idPre
     onConflict: () => setAttempt((value) => value + 1),
   }), [Controller, context, form.setFieldErrors, form.setSubmitError, form.setPending, setNotFound]);
 
-  useEffect(() => buildBankAccountLoadEffect(loader, context, accountId, 1, {
+  useEffect(() => buildBankAccountLoadEffect(loader, context, accountId, 1, guardAccountType({
     onLoaded: ({ account: loaded, ledger }) => {
       const hasTransactions = ledger.pagination.total_count > 0;
 
@@ -66,7 +68,7 @@ export default function useAccountEditPage(Controller, { base, fieldsFrom, idPre
     },
     onNotFound: () => setNotFound(true),
     onError: setLoadError,
-  })(), [loader, context, accountId, attempt, setFields, setNotFound, fieldsFrom]);
+  }, { base, context, suffix: '/edit' }))(), [loader, context, accountId, attempt, setFields, setNotFound, fieldsFrom, base]);
 
   const submit = () => controller.handleSubmit(accountId, form.fields, account);
 
