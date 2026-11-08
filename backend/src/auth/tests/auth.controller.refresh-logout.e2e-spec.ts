@@ -142,7 +142,7 @@ describe('AuthController (e2e)', () => {
         .send({ refreshToken: login.body.refreshToken })
         .expect(201);
 
-      expect(response.body).toEqual({ loggedIn: true, isAdmin: false });
+      expect(response.body).toEqual({ loggedIn: true, isAdmin: false, userId: ctx.userRepo.rows[0].id });
     });
 
     it('resolves loggedIn: false for an unknown refresh token, without a 401', async () => {
@@ -180,7 +180,7 @@ describe('AuthController (e2e)', () => {
         .send({ refreshToken: login.body.refreshToken })
         .expect(201);
 
-      expect(response.body).toEqual({ loggedIn: true, isAdmin: true });
+      expect(response.body).toEqual({ loggedIn: true, isAdmin: true, userId: ctx.userRepo.rows[0].id });
     });
 
     it('does not set or clear the access-token cookie', async () => {
@@ -243,7 +243,7 @@ describe('AuthController (e2e)', () => {
 
         const response = await status(login.body.refreshToken);
 
-        expect(response.body).toEqual({ loggedIn: true, isAdmin: false });
+        expect(response.body).toEqual({ loggedIn: true, isAdmin: false, userId: ctx.userRepo.rows[0].id });
       });
 
       it('answers a denied user with the anonymous answer byte-for-byte, revoking the token with admin_denied', async () => {

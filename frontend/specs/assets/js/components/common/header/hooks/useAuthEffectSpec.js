@@ -69,6 +69,26 @@ describe('useAuthEffect', () => {
       expect(setLoggedIn).toHaveBeenCalledWith(false);
     });
 
+    it('passes the user id to the optional setUserId setter', () => {
+      const setUserId = jasmine.createSpy('setUserId');
+
+      buildAuthEffect(controller, { ...setters, setUserId })();
+
+      AuthEvents.emit(true, false, false, 7);
+
+      expect(setUserId).toHaveBeenCalledWith(7);
+    });
+
+    it('passes a null user id when logged out', () => {
+      const setUserId = jasmine.createSpy('setUserId');
+
+      buildAuthEffect(controller, { ...setters, setUserId })();
+
+      AuthEvents.emit(false, false);
+
+      expect(setUserId).toHaveBeenCalledWith(null);
+    });
+
     it('works without a setPending setter', () => {
       buildAuthEffect(controller, setters)();
 

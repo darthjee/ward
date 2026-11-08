@@ -2,6 +2,7 @@ import Navbar from 'react-bootstrap/cjs/Navbar.js';
 import Nav from 'react-bootstrap/cjs/Nav.js';
 import Container from 'react-bootstrap/cjs/Container.js';
 import NavDropdown from 'react-bootstrap/cjs/NavDropdown.js';
+import ContextSwitcher from '../contextSwitcher/ContextSwitcher.jsx';
 
 /**
  * Render a single link that opens the login modal in a given mode instead of navigating.
@@ -52,31 +53,43 @@ function renderMyAccountDropdown() {
 }
 
 /**
- * Render the Login/Register/Recover links when logged out, or the Logout action (plus, for an
- * admin, the Admin Users link, and the "My account" dropdown) when logged in. Renders nothing
- * while the session is pending admin approval (the Awaiting-approval view owns Log out then).
+ * Render the logged-in menu: for an admin the Admin Users link, the "My account" dropdown and
+ * the Logout action. Renders nothing while logged out or pending admin approval (the
+ * Awaiting-approval view owns Log out then).
  *
  * @param {boolean} isLoggedIn - Whether a session is currently active.
  * @param {boolean} isAdmin - Whether the current session belongs to an admin user.
- * @param {Function} onLogout - Click handler for the Logout link, used when logged in.
- * @param {Function} onOpenLogin - Called with a mode string (`'password'` / `'register'` /
- *   `'recover'`) to open the login modal, used by the Login/Register/Recover links.
+ * @param {Function} onLogout - Click handler for the Logout link.
  * @param {boolean} pending - Whether the session is awaiting admin approval.
- * @returns {React.ReactElement|null} The rendered auth nav links, or `null` while pending.
+ * @returns {React.ReactElement|null} The logged-in menu, or `null`.
  */
-function renderAuthLinks(isLoggedIn, isAdmin, onLogout, onOpenLogin, pending) {
-  if (pending) {
+function renderAccountLinks(isLoggedIn, isAdmin, onLogout, pending) {
+  if (pending || !isLoggedIn) {
     return null;
   }
 
-  if (isLoggedIn) {
-    return (
-      <>
-        {renderAdminLink(isAdmin)}
-        {renderMyAccountDropdown()}
-        <Nav.Link href="#" onClick={onLogout}>Logout</Nav.Link>
-      </>
-    );
+  return (
+    <>
+      {renderAdminLink(isAdmin)}
+      {renderMyAccountDropdown()}
+      <Nav.Link href="#" onClick={onLogout}>Logout</Nav.Link>
+    </>
+  );
+}
+
+/**
+ * Render the Login/Register/Recover links while logged out. Renders nothing once logged in or
+ * while the session is pending admin approval.
+ *
+ * @param {boolean} isLoggedIn - Whether a session is currently active.
+ * @param {Function} onOpenLogin - Called with a mode string (`'password'` / `'register'` /
+ *   `'recover'`) to open the login modal.
+ * @param {boolean} pending - Whether the session is awaiting admin approval.
+ * @returns {React.ReactElement|null} The login links, or `null`.
+ */
+function renderLoginLinks(isLoggedIn, onOpenLogin, pending) {
+  if (pending || isLoggedIn) {
+    return null;
   }
 
   return (
@@ -93,7 +106,8 @@ function renderAuthLinks(isLoggedIn, isAdmin, onLogout, onOpenLogin, pending) {
  */
 const HeaderHelper = {
   /**
-   * Render the application navigation bar.
+   * Render the application navigation bar: the brand and the context switcher (or, logged out,
+   * the login links) on the left, the logged-in menu right-aligned.
    *
    * @param {boolean} isLoggedIn - Whether a session is currently active.
    * @param {boolean} isAdmin - Whether the current session belongs to an admin user.
@@ -113,7 +127,11 @@ const HeaderHelper = {
           <Navbar.Toggle aria-controls="header-navbar" />
           <Navbar.Collapse id="header-navbar">
             <Nav className="me-auto">
-              {renderAuthLinks(isLoggedIn, isAdmin, onLogout, onOpenLogin, pending)}
+              <ContextSwitcher loggedIn={isLoggedIn} pending={pending} />
+              {renderLoginLinks(isLoggedIn, onOpenLogin, pending)}
+            </Nav>
+            <Nav className="ms-auto">
+              {renderAccountLinks(isLoggedIn, isAdmin, onLogout, pending)}
             </Nav>
           </Navbar.Collapse>
         </Container>

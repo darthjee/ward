@@ -42,10 +42,10 @@ describe('SessionStatusService', () => {
         userRepository.findOneBy.mockResolvedValue(user);
       });
 
-      it('resolves with loggedIn: true and the user isAdmin, without status', async () => {
+      it('resolves with loggedIn: true, the user isAdmin and userId, without status', async () => {
         const result = await service.status('a-refresh-token');
 
-        expect(result).toEqual({ loggedIn: true, isAdmin: false });
+        expect(result).toEqual({ loggedIn: true, isAdmin: false, userId: 1 });
         expect(result).not.toHaveProperty('status');
       });
 
@@ -75,8 +75,8 @@ describe('SessionStatusService', () => {
         userRepository.findOneBy.mockResolvedValue({ ...user, isAdmin: true });
       });
 
-      it('resolves with isAdmin: true', async () => {
-        await expect(service.status('a-refresh-token')).resolves.toEqual({ loggedIn: true, isAdmin: true });
+      it('resolves with isAdmin: true and the userId', async () => {
+        await expect(service.status('a-refresh-token')).resolves.toEqual({ loggedIn: true, isAdmin: true, userId: 1 });
       });
     });
 
@@ -92,6 +92,10 @@ describe('SessionStatusService', () => {
           isAdmin: false,
           status: 'pending',
         });
+      });
+
+      it('does not expose the userId', async () => {
+        await expect(service.status('a-refresh-token')).resolves.not.toHaveProperty('userId');
       });
 
       it('keeps the session (no revocation)', async () => {
@@ -115,6 +119,7 @@ describe('SessionStatusService', () => {
 
         expect(JSON.stringify(denied)).toBe(JSON.stringify(unknown));
         expect(denied).toEqual(ANONYMOUS);
+        expect(denied).not.toHaveProperty('userId');
       });
 
       it('revokes only that token, with admin_denied', async () => {
@@ -143,6 +148,10 @@ describe('SessionStatusService', () => {
 
       it('resolves with loggedIn: false and isAdmin: false, without throwing', async () => {
         await expect(service.status('unknown-token')).resolves.toEqual(ANONYMOUS);
+      });
+
+      it('does not expose a userId', async () => {
+        await expect(service.status('unknown-token')).resolves.not.toHaveProperty('userId');
       });
 
       it('does not look up the user', async () => {

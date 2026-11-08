@@ -39,7 +39,8 @@ An `:id` that is not an integer answers `400` (`ParseIntPipe`); an unknown `:id`
 `q` matches `username` or `email` case-insensitively (`ILike`); `status` filters by account
 status; both are optional and ANDed. With neither, every account is returned, unpaginated.
 `currentUserId` is the caller's own id (`@CurrentUser().sub`), so the admin page can hide deny on
-the admin's own row (`status.json` exposes no user id).
+the admin's own row (`status.json` also returns `userId` in its logged-in answer since #47, but
+the admin page keeps using `currentUserId`).
 
 ### `POST /admin/users/:id/edit.json`
 

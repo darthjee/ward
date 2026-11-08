@@ -49,7 +49,7 @@ describe('LoginModalController status re-check', () => {
   ].forEach(([mode, fields]) => {
     describe(`${mode} success`, () => {
       it('checks status.json with the stored token', async () => {
-        client.status.and.resolveTo({ loggedIn: true, isAdmin: false });
+        client.status.and.resolveTo({ loggedIn: true, isAdmin: false, userId: 7 });
 
         await build().handleSubmit(mode, fields);
 
@@ -57,11 +57,11 @@ describe('LoginModalController status re-check', () => {
       });
 
       it('emits logged in from the status answer, not from the response', async () => {
-        client.status.and.resolveTo({ loggedIn: true, isAdmin: false });
+        client.status.and.resolveTo({ loggedIn: true, isAdmin: false, userId: 7 });
 
         await build().handleSubmit(mode, fields);
 
-        expect(AuthEvents.emit).toHaveBeenCalledOnceWith(true, false, false);
+        expect(AuthEvents.emit).toHaveBeenCalledOnceWith(true, false, false, 7);
         expect(LoginModalEvents.close).toHaveBeenCalledTimes(1);
         expect(globalThis.window.location.hash).toBe('/');
       });
@@ -112,12 +112,12 @@ describe('LoginModalController status re-check', () => {
     };
 
     it('emits from the status answer', async () => {
-      client.status.and.resolveTo({ loggedIn: true, isAdmin: true });
+      client.status.and.resolveTo({ loggedIn: true, isAdmin: true, userId: 7 });
 
       await approve();
 
       expect(client.status).toHaveBeenCalledWith('refresh-token');
-      expect(AuthEvents.emit).toHaveBeenCalledOnceWith(true, true, false);
+      expect(AuthEvents.emit).toHaveBeenCalledOnceWith(true, true, false, 7);
       expect(LoginModalEvents.close).toHaveBeenCalledTimes(1);
     });
 

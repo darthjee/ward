@@ -1,10 +1,16 @@
 import AppController from '../../../../assets/js/components/AppController.js';
 
 describe('AppController', () => {
-  it('resolves the current page from the hash', () => {
+  it('resolves the current route from the hash', () => {
     const controller = new AppController(() => undefined, null, () => '#/recover-password');
 
-    expect(controller.getPage()).toBe('reset-password');
+    expect(controller.getRoute()).toEqual({ page: 'reset-password', context: { kind: 'personal' } });
+  });
+
+  it('resolves an organization route from the hash', () => {
+    const controller = new AppController(() => undefined, null, () => '#/orgs/5/edit');
+
+    expect(controller.getRoute()).toEqual({ page: 'org-edit', context: { kind: 'organization', orgId: 5 } });
   });
 
   it('subscribes to hashchange when an event target is given', () => {
@@ -16,7 +22,7 @@ describe('AppController', () => {
     expect(eventTarget.addEventListener).toHaveBeenCalledWith('hashchange', jasmine.any(Function));
   });
 
-  it('updates the page when the hash changes', () => {
+  it('updates the route when the hash changes', () => {
     const setPage = jasmine.createSpy('setPage');
     const eventTarget = jasmine.createSpyObj('eventTarget', ['addEventListener', 'removeEventListener']);
     let hash = '#/';
@@ -27,7 +33,7 @@ describe('AppController', () => {
     hash = '#/recover-password';
     handler();
 
-    expect(setPage).toHaveBeenCalledWith('reset-password');
+    expect(setPage).toHaveBeenCalledWith({ page: 'reset-password', context: { kind: 'personal' } });
   });
 
   it('unsubscribes on cleanup', () => {
