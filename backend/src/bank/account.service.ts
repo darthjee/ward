@@ -118,10 +118,10 @@ export class AccountService {
    */
   async create(owner: OwnerContext, dto: CreateAccountDto): Promise<AccountResponse> {
     const handler = this.registry.get(dto.type ?? DEFAULT_ACCOUNT_TYPE);
-    const nested = nestedObject(dto, handler.type);
-    handler.validateCreate(nested);
+    this.registry.assertNoForeignNested(dto, handler.type);
 
     const currency = dto.currency ?? this.config.defaultCurrency;
+    const prepared = handler.validateCreate(nestedObject(dto, handler.type), { currency });
     const account = this.accountRepository.create({
       ...ownerColumns(owner),
       type: handler.type,
@@ -136,12 +136,14 @@ export class AccountService {
       notes: dto.notes ?? null,
     });
 
-    return this.#presentOne(await this.#saveWithDetails(account, handler, nested), true);
+    return this.#presentOne(await this.#saveWithDetails(account, handler, prepared), true);
   }
 
   /**
-   * Edits an account. On an archived account only `name` is accepted; the
-   * currency is locked once the account has transactions.
+   * Edits an account. On an archived account only `name` is accepted (checked
+   * before any nested validation); the currency is locked once the account
+   * has transactions. A type's nested object (e.g. `debt`) is merged onto the
+   * stored details.
    * @param {OwnerContext} owner - The resolved owner.
    * @param {number} id - The account id.
    * @param {UpdateAccountDto} dto - The validated body.
@@ -152,14 +154,22 @@ export class AccountService {
   async update(owner: OwnerContext, id: number, dto: UpdateAccountDto): Promise<AccountResponse> {
     const account = await this.findOwned(owner, id);
     const handler = this.registry.get(account.type);
-    const nested = nestedObject(dto, handler.type);
-    handler.validateUpdate(nested);
+    this.registry.assertNoForeignNested(dto, handler.type);
 
     if (account.archivedAt && presentFields(dto).some((field) => field !== ARCHIVED_EDITABLE_FIELD)) {
       throw accountArchived();
     }
 
+    const previousCurrency = account.currency;
     await this.#applyCurrency(account, dto);
+
+    // PATCH validates the type's nested object merged onto the stored details,
+    // with stored amounts rescaled when the currency changes.
+    const stored = (await this.registry.loadDetails([account], this.accountRepository.manager)).get(account.id);
+    const prepared = handler.validateUpdate(nestedObject(dto, handler.type), stored, {
+      currency: account.currency,
+      previousCurrency,
+    });
 
     copyEditableFields(account, dto);
 
@@ -167,7 +177,7 @@ export class AccountService {
       account.openingBalance = parseAmountInput('opening_balance', dto.opening_balance, account.currency);
     }
 
-    return this.#presentOne(await this.#saveWithDetails(account, handler, nested), true);
+    return this.#presentOne(await this.#saveWithDetails(account, handler, prepared), true);
   }
 
   /**
@@ -251,11 +261,11 @@ export class AccountService {
     account.currency = dto.currency;
   }
 
-  async #saveWithDetails(account: Account, handler: AccountTypeHandler, nested: unknown): Promise<Account> {
+  async #saveWithDetails(account: Account, handler: AccountTypeHandler, prepared: unknown): Promise<Account> {
     return mapNameClash(() =>
       this.accountRepository.manager.transaction(async (manager) => {
         const saved = await manager.getRepository(Account).save(account);
-        await handler.saveDetails(saved, nested, manager);
+        await handler.saveDetails(saved, prepared, manager);
         return saved;
       }),
     );
@@ -269,31 +279,14 @@ export class AccountService {
 
   async #present(accounts: Account[], mask: boolean): Promise<AccountResponse[]> {
     const balances = await this.balances.currentBalances(accounts);
-    const details = await this.#loadDetails(accounts);
+    const details = await this.registry.loadDetails(accounts, this.accountRepository.manager);
 
     return accounts.map((account) =>
       serializeAccount(account, {
         balance: balances.get(account.id) ?? account.openingBalance,
         mask,
-        nested: this.registry.get(account.type).serialize(details.get(account.id)),
+        nested: this.registry.get(account.type).serialize(details.get(account.id), account),
       }),
     );
-  }
-
-  async #loadDetails(accounts: Account[]): Promise<Map<number, unknown>> {
-    const idsByType = new Map<string, number[]>();
-
-    for (const account of accounts) {
-      idsByType.set(account.type, [...(idsByType.get(account.type) ?? []), account.id]);
-    }
-
-    const details = new Map<number, unknown>();
-
-    for (const [type, ids] of idsByType) {
-      const loaded = await this.registry.get(type).loadDetails(ids, this.accountRepository.manager);
-      loaded.forEach((value, id) => details.set(id, value));
-    }
-
-    return details;
   }
 }

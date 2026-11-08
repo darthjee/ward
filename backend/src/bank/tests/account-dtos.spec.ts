@@ -1,6 +1,7 @@
 import { BadRequestException, ValidationPipe } from '@nestjs/common';
 import { StrictValidationPipe } from '../../core/strict-validation.pipe.js';
 import { CreateAccountDto } from '../dto/create-account.dto.js';
+import { DebtDetailsDto } from '../dto/debt-details.dto.js';
 import { ListAccountsQueryDto } from '../dto/list-accounts-query.dto.js';
 import { UpdateAccountDto } from '../dto/update-account.dto.js';
 
@@ -83,6 +84,80 @@ describe('UpdateAccountDto', () => {
     ['over-long notes', { notes: 'x'.repeat(2001) }],
   ])('rejects %s with a 400', async (_label, body) => {
     await expect(update(body)).rejects.toThrow(BadRequestException);
+  });
+});
+
+describe('nested debt object', () => {
+  const FULL_DEBT = {
+    interest_rate: '1.99',
+    interest_period: 'monthly',
+    instalment_amount: '500.00',
+    instalment_frequency: 'yearly',
+    due_day: 31,
+    due_month: 12,
+    instalment_count: 1,
+  };
+
+  it('transforms debt into a DebtDetailsDto on create and update', async () => {
+    const created = await create({ name: 'Loan', type: 'debt', debt: FULL_DEBT });
+    const updated = await update({ debt: { due_day: 1 } });
+
+    expect(created.debt).toBeInstanceOf(DebtDetailsDto);
+    expect(created.debt).toMatchObject(FULL_DEBT);
+    expect(updated.debt).toBeInstanceOf(DebtDetailsDto);
+    expect(updated.debt?.instalment_amount).toBeUndefined();
+  });
+
+  it.each([
+    ['an empty object', {}],
+    ['every nullable field cleared', {
+      interest_rate: null,
+      interest_period: null,
+      instalment_amount: null,
+      due_day: null,
+      due_month: null,
+      instalment_count: null,
+    }],
+    ['a zero rate', { interest_rate: '0' }],
+    ['a 100% rate', { interest_rate: '100' }],
+    ['a 4-decimal rate', { interest_rate: '99.9999' }],
+    ['a 100.0000 rate', { interest_rate: '100.0000' }],
+    ['a yearly interest period', { interest_period: 'yearly' }],
+    ['due_day 1', { due_day: 1 }],
+    ['due_month 1', { due_month: 1 }],
+    ['instalment_count at the int column bound', { instalment_count: 2147483647 }],
+  ])('accepts %s', async (_label, debt) => {
+    await expect(update({ debt })).resolves.toBeInstanceOf(UpdateAccountDto);
+    await expect(create({ name: 'a', debt })).resolves.toBeInstanceOf(CreateAccountDto);
+  });
+
+  it.each([
+    ['null debt', null],
+    ['a non-object debt', 'loan'],
+    ['an unknown nested key', { color: 'red' }],
+    ['an owner key inside debt', { account_id: 1 }],
+    ['a numeric rate', { interest_rate: 1.99 }],
+    ['a negative rate', { interest_rate: '-1' }],
+    ['a rate above 100', { interest_rate: '100.0001' }],
+    ['a 5-decimal rate', { interest_rate: '1.00001' }],
+    ['a rate with a trailing dot', { interest_rate: '1.' }],
+    ['an exponent rate', { interest_rate: '1e2' }],
+    ['an unknown interest period', { interest_period: 'weekly' }],
+    ['a numeric instalment amount', { instalment_amount: 500 }],
+    ['a null instalment frequency', { instalment_frequency: null }],
+    ['an unknown instalment frequency', { instalment_frequency: 'daily' }],
+    ['due_day 0', { due_day: 0 }],
+    ['due_day 32', { due_day: 32 }],
+    ['a fractional due_day', { due_day: 1.5 }],
+    ['a string due_day', { due_day: '5' }],
+    ['due_month 0', { due_month: 0 }],
+    ['due_month 13', { due_month: 13 }],
+    ['instalment_count 0', { instalment_count: 0 }],
+    ['a fractional instalment_count', { instalment_count: 2.5 }],
+    ['instalment_count over the int column bound', { instalment_count: 2147483648 }],
+  ])('rejects %s with a 400', async (_label, debt) => {
+    await expect(update({ debt })).rejects.toThrow(BadRequestException);
+    await expect(create({ name: 'a', debt })).rejects.toThrow(BadRequestException);
   });
 });
 

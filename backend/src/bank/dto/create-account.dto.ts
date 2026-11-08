@@ -1,5 +1,6 @@
-import { Transform } from 'class-transformer';
-import { IsNotEmpty, IsOptional, IsString } from 'class-validator';
+import { Transform, Type } from 'class-transformer';
+import { IsNotEmpty, IsObject, IsOptional, IsString, ValidateNested } from 'class-validator';
+import { DebtDetailsDto } from './debt-details.dto.js';
 import {
   ACCOUNT_NAME_MAX_LENGTH,
   ACCOUNT_SHORT_FIELD_MAX_LENGTH,
@@ -66,4 +67,11 @@ export class CreateAccountDto {
   @IsString()
   @MaxCodePoints(NOTES_MAX_LENGTH)
     notes?: string | null;
+
+  /** Debt details; only meaningful on a `debt` account (checked by the handler). */
+  @IsOptionalNonNull()
+  @IsObject()
+  @ValidateNested()
+  @Type(() => DebtDetailsDto)
+    debt?: DebtDetailsDto;
 }

@@ -1,5 +1,7 @@
 import { maskAccountNumber, serializeAccount } from '../account-response.js';
 import { buildAccount } from './account.test-support.js';
+import { DebtAccountHandler } from '../account-types/debt-account.handler.js';
+import { DebtDetails } from '../entities/debt-details.entity.js';
 
 describe('maskAccountNumber', () => {
   it.each([
@@ -61,5 +63,38 @@ describe('serializeAccount', () => {
     const debt = buildAccount({ type: 'debt' });
 
     expect(serializeAccount(debt, { balance: 0n, mask: false, nested: { rate: '1' } }).debt).toEqual({ rate: '1' });
+  });
+
+  it('serializes a debt account\'s debt object in snake_case, with decimal strings and null unset fields', () => {
+    const debt = buildAccount({ type: 'debt', currency: 'BRL' });
+    const details = Object.assign(new DebtDetails(), {
+      accountId: debt.id,
+      interestRate: '0.0000',
+      interestPeriod: 'yearly',
+      instalmentAmount: 123456n,
+      instalmentFrequency: 'monthly',
+      dueDay: 31,
+      dueMonth: null,
+      instalmentCount: null,
+    });
+    const nested = new DebtAccountHandler().serialize(details, debt);
+
+    expect(serializeAccount(debt, { balance: -100000n, mask: false, nested })).toMatchObject({
+      type: 'debt',
+      balance: '-1000.00',
+      debt: {
+        interest_rate: '0',
+        interest_period: 'yearly',
+        instalment_amount: '1234.56',
+        instalment_frequency: 'monthly',
+        due_day: 31,
+        due_month: null,
+        instalment_count: null,
+      },
+    });
+  });
+
+  it('never adds a debt key to a regular account', () => {
+    expect(serializeAccount(buildAccount(), { balance: 0n, mask: false })).not.toHaveProperty('debt');
   });
 });

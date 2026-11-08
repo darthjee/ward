@@ -8,6 +8,7 @@ import { PasswordResetToken } from '../../../auth/entities/password-reset-token.
 import { RefreshToken } from '../../../auth/entities/refresh-token.entity.js';
 import { User } from '../../../auth/entities/user.entity.js';
 import { Account } from '../../../bank/entities/account.entity.js';
+import { DebtDetails } from '../../../bank/entities/debt-details.entity.js';
 import { Transaction } from '../../../bank/entities/transaction.entity.js';
 import { dataSourceOptions } from '../../data-source.js';
 import { AuthCreateUsers20260824120001 } from '../../migrations/20260824120001-auth-create-users.js';
@@ -27,6 +28,7 @@ import { AuthAddUsersStatus20261019120014 } from '../../migrations/2026101912001
 import { AuthCreateOrganizations20261107120015 } from '../../migrations/20261107120015-auth-create-organizations.js';
 import { BankCreateAccounts20261108120016 } from '../../migrations/20261108120016-bank-create-accounts.js';
 import { BankCreateTransactions20261108120017 } from '../../migrations/20261108120017-bank-create-transactions.js';
+import { BankCreateDebtDetails20261108120018 } from '../../migrations/20261108120018-bank-create-debt-details.js';
 
 type MigrationClass = new () => MigrationInterface;
 type MysqlOptions = MysqlConnectionOptions;
@@ -55,6 +57,7 @@ export const MIGRATIONS: ReadonlyArray<{ file: string; migration: MigrationClass
   { file: '20261107120015-auth-create-organizations', migration: AuthCreateOrganizations20261107120015 },
   { file: '20261108120016-bank-create-accounts', migration: BankCreateAccounts20261108120016 },
   { file: '20261108120017-bank-create-transactions', migration: BankCreateTransactions20261108120017 },
+  { file: '20261108120018-bank-create-debt-details', migration: BankCreateDebtDetails20261108120018 },
 ];
 
 /** Every entity the app maps, so repositories resolve against the test database. */
@@ -62,6 +65,7 @@ export const ENTITIES = [
   Account,
   AccountEditLockout,
   AuthorizationRequest,
+  DebtDetails,
   Organization,
   OrganizationMembership,
   PasswordResetToken,

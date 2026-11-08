@@ -12,6 +12,7 @@ import { ORGANIZATION_MEMBERSHIP_LOOKUP, type OrganizationMembershipLookup } fro
 import { OwnerContextGuard } from '../../../core/owner-context.guard.js';
 import { BankRoutesModule } from '../../bank-routes.module.js';
 import { Account } from '../../entities/account.entity.js';
+import { DebtDetails } from '../../entities/debt-details.entity.js';
 import { Transaction } from '../../entities/transaction.entity.js';
 
 // The bank e2e harness. A real Nest application (`NestFactory.create`, not
@@ -63,6 +64,7 @@ function fakeDataSource(repos: InMemoryBankRepos) {
   const repositoryFor = (entity: unknown): unknown => {
     if (entity === Account) return { ...repos.accounts, manager };
     if (entity === Transaction) return { ...repos.transactions, manager };
+    if (entity === DebtDetails) return repos.debtDetails;
     throw new Error(`no in-memory repository for ${String(entity)}`);
   };
   const manager = {

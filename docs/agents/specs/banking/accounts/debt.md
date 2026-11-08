@@ -75,7 +75,7 @@ Debt-specific fields, **all optional**, stored in a 1:1 table `bank_debt_details
 | `dueDay` | int 1–31 | Day of the month an instalment is due; 29–31 clamp to the month's last day, see [bills.md](../bills.md#recurrence-model) |
 | `instalmentFrequency` | `monthly` \| `yearly` | Defaults to `monthly` |
 | `dueMonth` | int 1–12 | Month an instalment is due; required when `instalmentFrequency` is `yearly`, unset otherwise |
-| `instalmentCount` | int ≥ 1 | Informational total number of instalments; empty = open-ended |
+| `instalmentCount` | int 1–2 147 483 647 (the `int` column range) | Informational total number of instalments; empty = open-ended |
 
 ### Credit cards
 
@@ -185,7 +185,8 @@ travels as a nested `debt` object. All routes live under the same base path as
 The `debt` object (`snake_case`): `interest_rate` (decimal string, e.g. `"1.99"`),
 `interest_period`, `instalment_amount` (decimal string in the account's currency exponent, as
 every amount), `instalment_frequency`, `due_day`, `due_month`, `instalment_count`. Unset fields
-are returned as `null`.
+are returned as `null`. `interest_rate` is returned without trailing zeros (stored `1.9900` →
+`"1.99"`, `0` → `"0"`).
 
 ### Validation
 
@@ -193,11 +194,26 @@ are returned as `null`.
 - `interest_rate` and `interest_period` go together: one without the other → 400.
 - `due_month` is required when `instalment_frequency` is `yearly` and rejected (400) when it is
   `monthly`.
-- Ranges → 400 when outside: `due_day` 1–31, `due_month` 1–12, `instalment_count` ≥ 1,
+- Ranges → 400 when outside: `due_day` 1–31, `due_month` 1–12, `instalment_count` 1–2147483647,
   `instalment_amount` > 0 (and within the amount bound and currency decimals of
   [transactions.md](transactions.md#currency)), `interest_rate` 0–100 with at most 4
   decimals.
-- Unknown fields inside `debt` are rejected by the whitelist `ValidationPipe`.
+- Unknown fields inside `debt` are rejected by the whitelist `ValidationPipe`; `debt: null` → 400.
+- **PATCH paired rules use the merged result** (decided in #50). `interest_rate` ↔
+  `interest_period` and `instalment_frequency: yearly` ↔ `due_month` are checked on the stored
+  details with the request merged on top, not on the request body alone:
+  - PATCH `{ debt: { interest_rate: "2.5" } }` is accepted when a period is already stored;
+  - PATCH `{ debt: { interest_period: null } }` → 400 while a rate is stored;
+  - `yearly` → `monthly` still clears `due_month` automatically (edge case 2).
+- **Currency change rescales `instalment_amount`** (decided in #50). A debt's `currency` can
+  change only before any transaction, as in [regular.md](regular.md#accounts). The stored
+  `instalment_amount` is converted like `opening_balance`: its decimal value is kept and
+  rescaled to the new currency's exponent; when it cannot be represented → 400 (e.g. `12.50`
+  BRL → JPY). When the same request also sends `instalment_amount`, that value is read in the
+  new currency and nothing is rescaled.
+- **Archived debt: 400 before 409.** A `debt` field on an archived debt answers 409
+  `ACCOUNT_ARCHIVED`, even when it breaks a paired rule; a field that fails the basic format
+  checks (e.g. `due_day: 99`) is still rejected first by the validation pipe with 400.
 
 ### Permissions and caching
 
@@ -235,8 +251,8 @@ Debts inherit the owner from their account; who sees and edits them follows
 Additive: a new table, a newly accepted `type` value and a nested `debt` object present only on
 debt accounts. Regular accounts are unchanged. The only behaviour change is that
 `POST /accounts.json` with `type: debt` no longer answers 400 (the
-[regular.md](regular.md#accounts) "until the other type specs exist" rule; reconciled by the
-fold sub-issue of #26).
+[regular.md](regular.md#accounts) "until the other type specs exist" rule, reconciled by #50:
+types without a registered handler still answer 400).
 
 ### Memory footprint
 
@@ -304,7 +320,7 @@ Negligible: one small table in the already-lazy `bank` module, no new dependency
 - Validation → 400: a `debt` object on a non-debt account (create and PATCH);
   `interest_rate` without `interest_period` and vice versa; `instalment_frequency` `yearly`
   without `due_month`; `due_month` with `monthly`; `due_day` 0 / 32; `due_month` 0 / 13;
-  `instalment_count` 0; `instalment_amount` 0, negative, over the amount bound or with more
+  `instalment_count` 0 or 2147483648; `instalment_amount` 0, negative, over the amount bound or with more
   decimals than the currency allows; `interest_rate` negative, over 100 or with 5 decimals;
   unknown fields inside `debt`. Boundaries accepted: `due_day` 1 / 31, `due_month` 1 / 12,
   `instalment_count` 1, `interest_rate` 0 and 100, 4 decimals.
