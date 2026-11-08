@@ -12,19 +12,19 @@ export class RegularAccountHandler implements AccountTypeHandler {
 
   /**
    * @param {unknown} nested - Must be absent.
-   * @returns {void}
+   * @returns {undefined} Nothing to save.
    * @throws {BadRequestException} When a nested object is given.
    */
-  validateCreate(nested: unknown): void {
+  validateCreate(nested: unknown): undefined {
     this.#rejectNested(nested);
   }
 
   /**
    * @param {unknown} nested - Must be absent.
-   * @returns {void}
+   * @returns {undefined} Nothing to save.
    * @throws {BadRequestException} When a nested object is given.
    */
-  validateUpdate(nested: unknown): void {
+  validateUpdate(nested: unknown): undefined {
     this.#rejectNested(nested);
   }
 

@@ -3,6 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { AccountBalancesQuery } from './account-balances.query.js';
 import { ACCOUNT_TYPE_HANDLERS, type AccountTypeHandler } from './account-types/account-type-handler.js';
 import { AccountTypeRegistry } from './account-types/account-type.registry.js';
+import { DebtAccountHandler } from './account-types/debt-account.handler.js';
 import { RegularAccountHandler } from './account-types/regular-account.handler.js';
 import { AccountService } from './account.service.js';
 import { BankConfigModule } from './bank-config.module.js';
@@ -33,9 +34,10 @@ export { TransactionService } from './transaction.service.js';
   imports: [TypeOrmModule.forFeature([Account, DebtDetails, Transaction]), BankConfigModule],
   providers: [
     RegularAccountHandler,
+    DebtAccountHandler,
     {
       provide: ACCOUNT_TYPE_HANDLERS,
-      inject: [RegularAccountHandler],
+      inject: [RegularAccountHandler, DebtAccountHandler],
       useFactory: (...handlers: AccountTypeHandler[]): AccountTypeHandler[] => handlers,
     },
     AccountTypeRegistry,

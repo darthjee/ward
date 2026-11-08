@@ -9,8 +9,19 @@ import type { Account } from '../entities/account.entity.js';
 export const ACCOUNT_TYPE_HANDLERS = 'BANK_ACCOUNT_TYPE_HANDLERS';
 
 /**
+ * What a handler needs to know about the account it validates a nested
+ * object for.
+ */
+export interface AccountTypeContext {
+  /** The account's currency once the request is applied. */
+  currency: string;
+  /** The stored currency, when the request changes it (stored amounts are rescaled). */
+  previousCurrency?: string;
+}
+
+/**
  * The extension point of the generic account routes. Each account `type`
- * (`regular`, later `debt`, `investment`, `provider_expense`) registers one
+ * (`regular`, `debt`, later `investment`, `provider_expense`) registers one
  * handler; the generic `AccountService` only ever talks to handlers through
  * the registry and never names a specific type. A type's nested body and
  * response object is named after the type (e.g. `debt`).
@@ -24,18 +35,22 @@ export interface AccountTypeHandler {
   /**
    * Validates the type's nested object on create.
    * @param {unknown} nested - The nested body object (`undefined` when absent).
-   * @returns {void}
+   * @param {AccountTypeContext} context - The new account's currency.
+   * @returns {unknown} The prepared details, handed to {@link saveDetails}.
    * @throws {BadRequestException} When the nested object is invalid.
    */
-  validateCreate(nested: unknown): void;
+  validateCreate(nested: unknown, context: AccountTypeContext): unknown;
 
   /**
-   * Validates the type's nested object on update.
+   * Validates the type's nested object on update, merged onto the stored
+   * details (paired rules are checked on the merged result).
    * @param {unknown} nested - The nested body object (`undefined` when absent).
-   * @returns {void}
-   * @throws {BadRequestException} When the nested object is invalid.
+   * @param {unknown} stored - The stored details loaded by {@link loadDetails}, if any.
+   * @param {AccountTypeContext} context - The account's (final and previous) currency.
+   * @returns {unknown} The prepared details, handed to {@link saveDetails}.
+   * @throws {BadRequestException} When the nested object or the merged result is invalid.
    */
-  validateUpdate(nested: unknown): void;
+  validateUpdate(nested: unknown, stored: unknown, context: AccountTypeContext): unknown;
 
   /**
    * Loads the one-to-one details rows of the given accounts.
@@ -48,17 +63,18 @@ export interface AccountTypeHandler {
   /**
    * Creates or updates the account's details row.
    * @param {Account} account - The saved account.
-   * @param {unknown} nested - The validated nested body object, if any.
+   * @param {unknown} prepared - The details returned by the validate step.
    * @param {EntityManager} manager - The (transactional) entity manager.
    * @returns {Promise<void>}
    */
-  saveDetails(account: Account, nested: unknown, manager: EntityManager): Promise<void>;
+  saveDetails(account: Account, prepared: unknown, manager: EntityManager): Promise<void>;
 
   /**
    * Serializes the details into the nested response object.
    * @param {unknown} details - The details loaded by {@link loadDetails}, if any.
+   * @param {Account} account - The account (e.g. for its currency).
    * @returns {Record<string, unknown> | undefined} The nested object, or
    *   `undefined` when the type has none.
    */
-  serialize(details: unknown): Record<string, unknown> | undefined;
+  serialize(details: unknown, account: Account): Record<string, unknown> | undefined;
 }
