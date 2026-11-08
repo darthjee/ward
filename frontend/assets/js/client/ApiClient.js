@@ -61,19 +61,26 @@ function buildApiError(response, data) {
 /**
  * Perform a raw JSON request, without any `401`-recovery behavior.
  *
+ * @description A request without a body (`body === undefined`, e.g. a GET — `fetch` rejects a
+ * GET carrying a body) is sent with no `body` option at all.
  * @param {string} method - HTTP method.
  * @param {string} path - Request path.
- * @param {object} body - Fields to serialize as the JSON request body.
+ * @param {object} [body] - Fields to serialize as the JSON request body; omitted for none.
  * @returns {Promise<{response: Response, data: object}>} The raw response and its parsed
  *   JSON body.
  */
 async function request(method, path, body) {
-  const response = await fetch(path, {
+  const options = {
     method,
     credentials: 'same-origin',
     headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-    body: JSON.stringify(body),
-  });
+  };
+
+  if (body !== undefined) {
+    options.body = JSON.stringify(body);
+  }
+
+  const response = await fetch(path, options);
 
   const data = await parseBody(response);
 
@@ -163,6 +170,18 @@ async function handleUnauthorized(method, path, body) {
  * refresh itself fails, the session is treated as expired.
  */
 const ApiClient = {
+  /**
+   * Submit a GET request, without a body. Same headers/credentials/error-handling shape as
+   * {@link ApiClient.postJson}.
+   *
+   * @param {string} path - Request path.
+   * @returns {Promise<object>} The parsed JSON response body, on success; `undefined` when the
+   *   session turned out to be expired.
+   */
+  async getJson(path) {
+    return sendJson('GET', path, undefined);
+  },
+
   /**
    * Submit a POST request with a JSON body. Always sends same-origin credentials so the
    * session cookie set by the backend (via `Set-Cookie`) is stored/sent automatically.

@@ -161,6 +161,48 @@ describe('ApiClient', () => {
     });
   });
 
+  describe('.getJson', () => {
+    it('sends a GET without a body, with same-origin credentials', async () => {
+      globalThis.fetch = fetchSequence([{ ok: true, status: 200, json: [] }]);
+
+      await ApiClient.getJson('/orgs.json');
+
+      const [path, options] = globalThis.fetch.calls.argsFor(0);
+
+      expect(path).toBe('/orgs.json');
+      expect(options).toEqual(jasmine.objectContaining({ method: 'GET', credentials: 'same-origin' }));
+      expect('body' in options).toBe(false);
+    });
+
+    it('resolves with the parsed JSON body on success', async () => {
+      globalThis.fetch = fetchSequence([{ ok: true, status: 200, json: [{ id: 1, name: 'Acme' }] }]);
+
+      expect(await ApiClient.getJson('/orgs.json')).toEqual([{ id: 1, name: 'Acme' }]);
+    });
+
+    it('throws an ApiError with the backend message on a non-401 failure', async () => {
+      globalThis.fetch = fetchSequence([{ ok: false, status: 404, json: errorBody(404, 'NOT_FOUND', 'Not Found') }]);
+
+      await expectAsync(ApiClient.getJson('/orgs/9.json'))
+        .toBeRejectedWith(jasmine.objectContaining({ status: 404, message: 'Not Found', code: 'NOT_FOUND' }));
+    });
+
+    it('refreshes on a 401 and retries the GET without a body', async () => {
+      stubRefreshFlow([
+        { ok: false, status: 401, json: errorBody(401, 'UNAUTHORIZED', 'Unauthorized') },
+        { ok: true, status: 200, json: { user: { id: 1 }, refreshToken: 'new-refresh-token' } },
+        { ok: true, status: 200, json: [{ id: 1 }] },
+      ]);
+
+      const data = await ApiClient.getJson('/orgs.json');
+      const retryOptions = globalThis.fetch.calls.argsFor(2)[1];
+
+      expect(data).toEqual([{ id: 1 }]);
+      expect(retryOptions.method).toBe('GET');
+      expect('body' in retryOptions).toBe(false);
+    });
+  });
+
   describe('401 handling', () => {
     it('refreshes the access token and retries the original request on success', async () => {
       stubRefreshFlow([
