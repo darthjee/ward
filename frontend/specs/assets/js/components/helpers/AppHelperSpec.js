@@ -8,6 +8,7 @@ import OrganizationNew from '../../../../../assets/js/components/resources/organ
 import OrganizationOverview from '../../../../../assets/js/components/resources/organizations/pages/OrganizationOverview.jsx';
 import OrganizationEdit from '../../../../../assets/js/components/resources/organizations/pages/OrganizationEdit.jsx';
 import NotFound from '../../../../../assets/js/components/common/notFound/NotFound.jsx';
+import BankAccountList from '../../../../../assets/js/components/resources/bank/accounts/pages/BankAccountList.jsx';
 import HashRouteResolver from '../../../../../assets/js/utils/routing/HashRouteResolver.js';
 import ModalRedirect from '../../../../../assets/js/components/common/ModalRedirect.jsx';
 import ResetPasswordLanding from '../../../../../assets/js/components/resources/accounts/pages/ResetPasswordLanding.jsx';
@@ -66,6 +67,7 @@ describe('AppHelper', () => {
     ['org-overview', OrganizationOverview],
     ['org-edit', OrganizationEdit],
     ['not-found', NotFound],
+    ['bank-accounts', BankAccountList],
   ].forEach(([key, Page]) => {
     it(`maps the ${key} key to its page`, () => {
       expect(partsOf(key).page.type).toBe(Page);
