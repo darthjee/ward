@@ -3,6 +3,8 @@ export const MAX_ORG_ID = 2147483647;
 
 const ORG_ID_PATTERN = /^[1-9][0-9]*$/;
 
+const ORG_PREFIX_PATTERN = /^\/orgs\/([^/]+)(\/.*)?$/;
+
 /** The Personal owner context. */
 export const PERSONAL = Object.freeze({ kind: 'personal' });
 
@@ -106,4 +108,47 @@ export function isSameContext(a, b) {
   }
 
   return !isOrganization(a) || a.orgId === b.orgId;
+}
+
+/**
+ * Normalize a raw hash into a path: drops the leading `#` and any query string.
+ *
+ * @param {string} hash - The raw hash value.
+ * @returns {string} The path (empty for an empty hash).
+ */
+export function hashPath(hash) {
+  return String(hash ?? '').split('?')[0].replace(/^#/, '');
+}
+
+/**
+ * Split an `/orgs/<seg>` prefix off a path.
+ *
+ * @description `orgId` is `null` when the segment is malformed (see {@link parseOrgId}); `rest`
+ * is the remaining path, `'/'` when empty.
+ * @param {string} path - The path (no `#`, no query string).
+ * @returns {{orgId: (number|null), rest: string}|null} The split, or `null` when the path has
+ *   no `/orgs/<seg>` prefix.
+ */
+export function splitOrgPrefix(path) {
+  const match = ORG_PREFIX_PATTERN.exec(path);
+
+  if (!match) {
+    return null;
+  }
+
+  return { orgId: parseOrgId(match[1]), rest: match[2] || '/' };
+}
+
+/**
+ * Strip the `/orgs/<id>` prefix of a valid organization hash.
+ *
+ * @param {string} hash - The raw hash value.
+ * @returns {string} The path without the prefix (`'/'` for the organization root); the plain
+ *   path when there is no valid organization prefix.
+ */
+export function stripContextPrefix(hash) {
+  const path = hashPath(hash);
+  const split = splitOrgPrefix(path);
+
+  return split?.orgId ? split.rest : path;
 }

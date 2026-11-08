@@ -26,13 +26,13 @@ const PAGES = new Map([
  */
 const AppHelper = {
   /**
-   * Render the app shell wrapping the page matching the given key, plus the route-independent
-   * login modal. Unknown keys fall back to the home page.
+   * Render the app shell wrapping the page matching the given route, plus the route-independent
+   * login modal. Unknown page keys fall back to the home page.
    *
-   * @param {string} page - Current page key.
+   * @param {{page: string, context: object}} route - Current route (page key and owner context).
    * @returns {React.ReactElement} The rendered app shell.
    */
-  render(page) {
+  render({ page }) {
     return (
       <>
         <Header>

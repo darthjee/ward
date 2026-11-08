@@ -3,10 +3,13 @@ import {
   PERSONAL,
   contextHash,
   contextPath,
+  hashPath,
   isSameContext,
   landingFor,
   organizationContext,
   parseOrgId,
+  splitOrgPrefix,
+  stripContextPrefix,
 } from '../../../../../assets/js/utils/context/ownerContext.js';
 
 describe('ownerContext', () => {
@@ -110,6 +113,53 @@ describe('ownerContext', () => {
 
     it('does not match a missing context', () => {
       expect(isSameContext(undefined, PERSONAL)).toBe(false);
+    });
+  });
+
+  describe('hashPath', () => {
+    it('drops the leading # and the query string', () => {
+      expect(hashPath('#/a/b?x=1')).toBe('/a/b');
+    });
+
+    it('returns an empty path for a missing hash', () => {
+      expect(hashPath(undefined)).toBe('');
+    });
+  });
+
+  describe('splitOrgPrefix', () => {
+    it('returns null without an /orgs/<seg> prefix', () => {
+      expect(splitOrgPrefix('/bank/accounts')).toBeNull();
+      expect(splitOrgPrefix('/orgs')).toBeNull();
+    });
+
+    it('splits a valid id and the rest', () => {
+      expect(splitOrgPrefix('/orgs/5/bank')).toEqual({ orgId: 5, rest: '/bank' });
+    });
+
+    it('uses / as the rest of the organization root', () => {
+      expect(splitOrgPrefix('/orgs/5')).toEqual({ orgId: 5, rest: '/' });
+    });
+
+    it('reports a malformed id as null', () => {
+      expect(splitOrgPrefix('/orgs/abc/edit')).toEqual({ orgId: null, rest: '/edit' });
+    });
+  });
+
+  describe('stripContextPrefix', () => {
+    it('strips a valid organization prefix', () => {
+      expect(stripContextPrefix('#/orgs/5/bank/accounts?x=1')).toBe('/bank/accounts');
+    });
+
+    it('strips the organization root to /', () => {
+      expect(stripContextPrefix('#/orgs/5')).toBe('/');
+    });
+
+    it('keeps a Personal path', () => {
+      expect(stripContextPrefix('#/bank/accounts')).toBe('/bank/accounts');
+    });
+
+    it('keeps a malformed organization path', () => {
+      expect(stripContextPrefix('#/orgs/new')).toBe('/orgs/new');
     });
   });
 });

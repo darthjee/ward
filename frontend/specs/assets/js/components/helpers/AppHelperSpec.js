@@ -6,12 +6,14 @@ import ModalRedirect from '../../../../../assets/js/components/common/ModalRedir
 import ResetPasswordLanding from '../../../../../assets/js/components/resources/accounts/pages/ResetPasswordLanding.jsx';
 
 describe('AppHelper', () => {
+  const routeFor = (page) => ({ page, context: { kind: 'personal' } });
+
   const markupFor = (page) => renderToStaticMarkup(
-    React.createElement('div', null, AppHelper.render(page)),
+    React.createElement('div', null, AppHelper.render(routeFor(page))),
   );
 
   const partsOf = (page) => {
-    const [header, loginModal] = AppHelper.render(page).props.children;
+    const [header, loginModal] = AppHelper.render(routeFor(page)).props.children;
     return { page: header.props.children, loginModal };
   };
 
