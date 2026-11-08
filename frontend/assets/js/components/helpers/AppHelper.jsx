@@ -14,6 +14,8 @@ import OrganizationOverview from '../resources/organizations/pages/OrganizationO
 import OrganizationEdit from '../resources/organizations/pages/OrganizationEdit.jsx';
 import NotFound from '../common/notFound/NotFound.jsx';
 import BankAccountList from '../resources/bank/accounts/pages/BankAccountList.jsx';
+import BankAccountNew from '../resources/bank/accounts/pages/BankAccountNew.jsx';
+import BankAccountEdit from '../resources/bank/accounts/pages/BankAccountEdit.jsx';
 
 const PAGES = new Map([
   ['register', <ModalRedirect mode="register" />],
@@ -27,6 +29,8 @@ const PAGES = new Map([
   ['org-overview', <OrganizationOverview />],
   ['org-edit', <OrganizationEdit />],
   ['bank-accounts', <BankAccountList />],
+  ['bank-account-new', <BankAccountNew />],
+  ['bank-account-edit', <BankAccountEdit />],
   ['not-found', <NotFound />],
   ['home', <Home />],
 ]);

@@ -1,5 +1,5 @@
 import BankClient from '../../../../../../client/BankClient.js';
-import { classifyError } from '../../../common/bankErrors.js';
+import { buildLoadEffect, runLoad } from '../../../common/runLoad.js';
 
 /**
  * Loads the regular accounts for the Accounts list page.
@@ -30,27 +30,8 @@ export default class BankAccountsLoader {
    * @param {Function} [isActive] - Liveness check; late answers are dropped once it is false.
    * @returns {Promise<void>} Resolves once the outcome is reported.
    */
-  async load(context, archived, { onLoaded, onNotFound, onError }, isActive = () => true) {
-    try {
-      const accounts = await this.#client.listAccounts(context, { archived });
-
-      if (accounts && isActive()) {
-        onLoaded(accounts);
-      }
-    } catch (error) {
-      if (!isActive()) {
-        return;
-      }
-
-      const classified = classifyError(error);
-
-      if (classified.kind === 'notFound') {
-        onNotFound();
-        return;
-      }
-
-      onError(classified);
-    }
+  async load(context, archived, callbacks, isActive = () => true) {
+    await runLoad(() => this.#client.listAccounts(context, { archived }), callbacks, isActive);
   }
 }
 
@@ -66,13 +47,5 @@ export default class BankAccountsLoader {
  * @returns {Function} Effect callback, returning a cleanup that drops late answers.
  */
 export function buildBankAccountsLoadEffect(loader, context, archived, callbacks) {
-  return () => {
-    let active = true;
-
-    loader.load(context, archived, callbacks, () => active);
-
-    return () => {
-      active = false;
-    };
-  };
+  return buildLoadEffect((isActive) => loader.load(context, archived, callbacks, isActive));
 }

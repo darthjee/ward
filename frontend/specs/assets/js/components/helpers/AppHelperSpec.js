@@ -9,6 +9,8 @@ import OrganizationOverview from '../../../../../assets/js/components/resources/
 import OrganizationEdit from '../../../../../assets/js/components/resources/organizations/pages/OrganizationEdit.jsx';
 import NotFound from '../../../../../assets/js/components/common/notFound/NotFound.jsx';
 import BankAccountList from '../../../../../assets/js/components/resources/bank/accounts/pages/BankAccountList.jsx';
+import BankAccountNew from '../../../../../assets/js/components/resources/bank/accounts/pages/BankAccountNew.jsx';
+import BankAccountEdit from '../../../../../assets/js/components/resources/bank/accounts/pages/BankAccountEdit.jsx';
 import HashRouteResolver from '../../../../../assets/js/utils/routing/HashRouteResolver.js';
 import ModalRedirect from '../../../../../assets/js/components/common/ModalRedirect.jsx';
 import ResetPasswordLanding from '../../../../../assets/js/components/resources/accounts/pages/ResetPasswordLanding.jsx';
@@ -68,6 +70,8 @@ describe('AppHelper', () => {
     ['org-edit', OrganizationEdit],
     ['not-found', NotFound],
     ['bank-accounts', BankAccountList],
+    ['bank-account-new', BankAccountNew],
+    ['bank-account-edit', BankAccountEdit],
   ].forEach(([key, Page]) => {
     it(`maps the ${key} key to its page`, () => {
       expect(partsOf(key).page.type).toBe(Page);
