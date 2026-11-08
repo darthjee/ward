@@ -69,3 +69,34 @@ export function trimToNull({ value }: { value: unknown }): unknown {
 
   return trimmed === '' ? null : trimmed;
 }
+
+/** Highest accepted debt interest rate, in percent. */
+export const INTEREST_RATE_MAX = 100;
+
+// A non-negative decimal with at most 4 fractional digits (`DECIMAL(7,4)`).
+const INTEREST_RATE_FORMAT = /^\d+(\.\d{1,4})?$/;
+
+/**
+ * @param {unknown} value - The raw value.
+ * @returns {boolean} Whether `value` is a decimal string between 0 and
+ *   {@link INTEREST_RATE_MAX} with at most 4 decimals.
+ */
+export function isInterestRate(value: unknown): boolean {
+  return typeof value === 'string' && INTEREST_RATE_FORMAT.test(value) && Number(value) <= INTEREST_RATE_MAX;
+}
+
+/**
+ * Validates a debt interest rate: a decimal string, 0–100, at most 4 decimals.
+ * @returns {PropertyDecorator} The validation decorator.
+ */
+export function IsInterestRate(): PropertyDecorator {
+  return ValidateBy({
+    name: 'isInterestRate',
+    validator: {
+      validate: isInterestRate,
+      defaultMessage: buildMessage(
+        (eachPrefix) => `${eachPrefix}$property must be a decimal string between 0 and 100 with at most 4 decimals`,
+      ),
+    },
+  });
+}
