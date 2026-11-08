@@ -162,7 +162,7 @@ describe('AccountService', () => {
       await expect(service.create(PERSONAL, createDto({ opening_balance: value }))).rejects.toThrow(BadRequestException);
     });
 
-    it.each(['debt', 'investment', 'nope'])('rejects the type %p with a 400', async (type) => {
+    it.each(['debt', 'provider_expense', 'nope'])('rejects the type %p with a 400', async (type) => {
       const { service } = setup();
 
       await expect(service.create(PERSONAL, createDto({ type }))).rejects.toThrow(BadRequestException);

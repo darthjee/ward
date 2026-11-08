@@ -19,7 +19,7 @@ describe('AccountTypeRegistry', () => {
     const withDebt = new AccountTypeRegistry([new RegularAccountHandler(), new DebtAccountHandler()]);
 
     expect(withDebt.get('debt')).toBeInstanceOf(DebtAccountHandler);
-    expect(() => withDebt.get('investment')).toThrow(BadRequestException);
+    expect(() => withDebt.get('provider_expense')).toThrow(BadRequestException);
   });
 
   describe('assertNoForeignNested', () => {
