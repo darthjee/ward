@@ -17,6 +17,10 @@ import BankAccountList from '../resources/bank/accounts/pages/BankAccountList.js
 import BankAccountNew from '../resources/bank/accounts/pages/BankAccountNew.jsx';
 import BankAccountEdit from '../resources/bank/accounts/pages/BankAccountEdit.jsx';
 import BankAccountDetail from '../resources/bank/accounts/pages/BankAccountDetail.jsx';
+import DebtList from '../resources/bank/debts/pages/DebtList.jsx';
+import DebtNew from '../resources/bank/debts/pages/DebtNew.jsx';
+import DebtEdit from '../resources/bank/debts/pages/DebtEdit.jsx';
+import DebtDetail from '../resources/bank/debts/pages/DebtDetail.jsx';
 
 const PAGES = new Map([
   ['register', <ModalRedirect mode="register" />],
@@ -33,6 +37,10 @@ const PAGES = new Map([
   ['bank-account-new', <BankAccountNew />],
   ['bank-account-edit', <BankAccountEdit />],
   ['bank-account', <BankAccountDetail />],
+  ['bank-debts', <DebtList />],
+  ['bank-debt-new', <DebtNew />],
+  ['bank-debt-edit', <DebtEdit />],
+  ['bank-debt', <DebtDetail />],
   ['not-found', <NotFound />],
   ['home', <Home />],
 ]);

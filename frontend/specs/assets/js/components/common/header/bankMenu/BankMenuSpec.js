@@ -40,10 +40,20 @@ describe('BankMenu', () => {
     expect(page.contains('href="#/orgs/5/bank/accounts"')).toBeTrue();
   });
 
+  it('links Debts under Personal and under the active organization', () => {
+    const personal = renderedOutput(withValue({ loggedIn: true }));
+    const org = renderedOutput(withValue(
+      { loggedIn: true },
+      { context: { kind: 'organization', orgId: 5 }, orgs: [{ id: 5, name: 'Acme' }] },
+    ));
+
+    expect(personal.containsInOrder('href="#/bank/debts"', 'Debts')).toBeTrue();
+    expect(org.containsInOrder('href="#/orgs/5/bank/debts"', 'Debts')).toBeTrue();
+  });
+
   it('shows no disabled or stub entries', () => {
     const page = renderedOutput(withValue({ loggedIn: true }));
 
-    expect(page.contains('Debts')).toBeFalse();
     expect(page.contains('Investments')).toBeFalse();
     expect(page.contains('Providers')).toBeFalse();
     expect(page.contains('Calendar')).toBeFalse();

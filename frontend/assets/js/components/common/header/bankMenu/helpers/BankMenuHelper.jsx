@@ -9,6 +9,7 @@ import { contextHash } from '../../../../../utils/context/ownerContext.js';
  */
 export const BANK_MENU_ENTRIES = [
   ['Accounts', '/bank/accounts'],
+  ['Debts', '/bank/debts'],
 ];
 
 /**
