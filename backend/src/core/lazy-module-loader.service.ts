@@ -10,29 +10,43 @@ import { LazyModuleLoader, ModuleRef } from '@nestjs/core';
  * |-----------|---------------------------|---------------------------------------------------|
  * | Core      | Always resident, at boot  | Router, JWT Guard, DB Connection, CacheToken Svc  |
  * | Always-on | Always resident, at boot  | Auth Module, Mail Module                          |
- * | Lazy      | On demand, first request  | (future domain modules)                           |
+ * | Lazy      | On demand, first request  | `bank` (first lazy module)                        |
  *
- * A lazy module is *not* imported into `AppModule` directly. Instead, its
- * controller's first route handler calls `loadOnFirstRequest()` with a
- * loader function that dynamically `import()`s the module class — Nest
- * instantiates (and thereafter caches) that module's DI graph on first
- * hit, not at application boot.
+ * A lazy module is split in two (see `bank/` for the reference
+ * implementation):
  *
- * Example (future lazy module):
+ * - **Resident** (a small `<name>RoutesModule`, imported by `AppModule`):
+ *   the thin controllers (Nest registers routes only at boot, so a lazily
+ *   loaded module cannot declare them), the entity classes registered through
+ *   a resident `TypeOrmModule.forFeature([...])` (`autoLoadEntities` only sees
+ *   entities whose `forFeature` ran before the `DataSource` initialised — an
+ *   entity known only to a lazy module has no metadata), and any
+ *   boot-validated config.
+ * - **Lazy** (the `<name>Module`, never imported by `AppModule`): every
+ *   service, query and piece of business logic. The resident controllers load
+ *   it on the first request by calling `loadOnFirstRequest()` with a loader
+ *   function that dynamically `import()`s the module class — Nest
+ *   instantiates (and thereafter caches) that module's DI graph on first hit,
+ *   not at application boot. Controllers import the service classes as types
+ *   only and reach them through the dynamic import, so not even their code is
+ *   loaded before then.
+ *
+ * Example (resident helper of a lazy module):
  * ```ts
- * @Controller('widgets')
- * class WidgetController {
+ * @Injectable()
+ * class WidgetModuleLoader {
  *   constructor(private readonly lazyModuleLoader: LazyModuleLoaderService) {}
  *
- *   @Get()
- *   async list() {
- *     const moduleRef = await this.lazyModuleLoader.loadOnFirstRequest(
- *       () => import('../widget/widget.module.js').then((m) => m.WidgetModule),
- *     );
- *     return moduleRef.get(WidgetService).list();
+ *   async service(): Promise<WidgetService> {
+ *     const widget = await import('./widget.module.js');
+ *     const moduleRef = await this.lazyModuleLoader.loadOnFirstRequest(() => widget.WidgetModule);
+ *     return moduleRef.get(widget.WidgetService);
  *   }
  * }
  * ```
+ *
+ * This service is provided by `AppModule` but not exported, so a resident
+ * routes module lists it in its own `providers` (it is stateless).
  */
 @Injectable()
 export class LazyModuleLoaderService {
