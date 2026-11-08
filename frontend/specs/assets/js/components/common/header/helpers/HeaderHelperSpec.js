@@ -79,6 +79,16 @@ describe('HeaderHelper', () => {
       expect(markupOf(false, true)).not.toContain('href="#/admin/users"');
     });
 
+    it('does not render the context switcher', () => {
+      expect(markupOf(false, false)).not.toContain('context-switcher');
+    });
+
+    it('keeps the login links in the left nav', () => {
+      const markup = markupOf(false, false);
+
+      expect(markup.indexOf('Login')).toBeLessThan(markup.indexOf('ms-auto'));
+    });
+
     it('does not render the My account dropdown', () => {
       expect(markupOf(false, false)).not.toContain('My account');
     });
@@ -106,6 +116,14 @@ describe('HeaderHelper', () => {
 
       expect(markup).toContain('href="#/admin/users"');
       expect(markup).toContain('Admin Users');
+    });
+
+    it('renders the context switcher on the left and the account menu right-aligned', () => {
+      const markup = markupOf(true, false);
+
+      expect(markup).toContain('id="context-switcher"');
+      expect(markup.indexOf('context-switcher')).toBeLessThan(markup.indexOf('ms-auto'));
+      expect(markup.indexOf('ms-auto')).toBeLessThan(markup.indexOf('My account'));
     });
 
     it('renders the My account dropdown with an Authorizations item', () => {
@@ -137,6 +155,7 @@ describe('HeaderHelper', () => {
     it('renders no logged-in menu, even with loggedIn set', () => {
       const markup = pendingMarkup(true);
 
+      expect(markup).not.toContain('context-switcher');
       expect(markup).not.toContain('Logout');
       expect(markup).not.toContain('My account');
     });
