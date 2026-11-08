@@ -3,6 +3,7 @@ import {
   currencyDigits,
   formatMoney,
   fromSignedAmount,
+  negateAmount,
   parseAmount,
   toSignedAmount,
 } from '../../../../../../../assets/js/components/resources/bank/common/amounts.js';
@@ -159,6 +160,30 @@ describe('amounts', () => {
       const { direction, value } = fromSignedAmount('-7.25');
 
       expect(toSignedAmount(direction, value)).toBe('-7.25');
+    });
+  });
+
+  describe('negateAmount', () => {
+    it('negates a positive amount', () => {
+      expect(negateAmount('10000.00')).toBe('-10000.00');
+      expect(negateAmount('+5')).toBe('-5');
+    });
+
+    it('makes a negative amount positive', () => {
+      expect(negateAmount('-10000.00')).toBe('10000.00');
+    });
+
+    it('keeps blank and zero values unchanged', () => {
+      expect(negateAmount('')).toBe('');
+      expect(negateAmount(null)).toBe('');
+      expect(negateAmount(undefined)).toBe('');
+      expect(negateAmount('0')).toBe('0');
+      expect(negateAmount('0.00')).toBe('0.00');
+      expect(negateAmount('-0')).toBe('-0');
+    });
+
+    it('trims the input', () => {
+      expect(negateAmount(' 12.5 ')).toBe('-12.5');
     });
   });
 

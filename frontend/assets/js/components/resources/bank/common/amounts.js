@@ -110,6 +110,23 @@ export function fromSignedAmount(amount) {
 }
 
 /**
+ * Negate a decimal string without going through `Number` (no rounding): `'10.00'` → `'-10.00'`,
+ * `'-3'` → `'3'`. Blank and zero values are returned unchanged (never `-0`).
+ *
+ * @param {string|null} amount - The decimal string (API value or user input).
+ * @returns {string} The negated decimal string (`''` for a blank value).
+ */
+export function negateAmount(amount) {
+  const text = String(amount ?? '').trim();
+
+  if (text === '' || /^[-+]?0*(\.0*)?$/.test(text)) {
+    return text;
+  }
+
+  return text.startsWith('-') ? text.slice(1) : `-${text.replace(/^\+/, '')}`;
+}
+
+/**
  * Format an API decimal string as money in the account's currency.
  *
  * @description Uses the browser's default locale (display preferences are #65). Amounts are
