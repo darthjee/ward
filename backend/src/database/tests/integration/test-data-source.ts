@@ -7,6 +7,8 @@ import { Organization } from '../../../auth/entities/organization.entity.js';
 import { PasswordResetToken } from '../../../auth/entities/password-reset-token.entity.js';
 import { RefreshToken } from '../../../auth/entities/refresh-token.entity.js';
 import { User } from '../../../auth/entities/user.entity.js';
+import { Account } from '../../../bank/entities/account.entity.js';
+import { Transaction } from '../../../bank/entities/transaction.entity.js';
 import { dataSourceOptions } from '../../data-source.js';
 import { AuthCreateUsers20260824120001 } from '../../migrations/20260824120001-auth-create-users.js';
 import { AuthCreateRefreshTokens20260824120002 } from '../../migrations/20260824120002-auth-create-refresh-tokens.js';
@@ -23,6 +25,8 @@ import { AuthAddRefreshTokensRevokedReason20261018120012 } from '../../migration
 import { AuthDropSessions20261018120013 } from '../../migrations/20261018120013-auth-drop-sessions.js';
 import { AuthAddUsersStatus20261019120014 } from '../../migrations/20261019120014-auth-add-users-status.js';
 import { AuthCreateOrganizations20261107120015 } from '../../migrations/20261107120015-auth-create-organizations.js';
+import { BankCreateAccounts20261108120016 } from '../../migrations/20261108120016-bank-create-accounts.js';
+import { BankCreateTransactions20261108120017 } from '../../migrations/20261108120017-bank-create-transactions.js';
 
 type MigrationClass = new () => MigrationInterface;
 type MysqlOptions = MysqlConnectionOptions;
@@ -49,16 +53,20 @@ export const MIGRATIONS: ReadonlyArray<{ file: string; migration: MigrationClass
   { file: '20261018120013-auth-drop-sessions', migration: AuthDropSessions20261018120013 },
   { file: '20261019120014-auth-add-users-status', migration: AuthAddUsersStatus20261019120014 },
   { file: '20261107120015-auth-create-organizations', migration: AuthCreateOrganizations20261107120015 },
+  { file: '20261108120016-bank-create-accounts', migration: BankCreateAccounts20261108120016 },
+  { file: '20261108120017-bank-create-transactions', migration: BankCreateTransactions20261108120017 },
 ];
 
 /** Every entity the app maps, so repositories resolve against the test database. */
 export const ENTITIES = [
+  Account,
   AccountEditLockout,
   AuthorizationRequest,
   Organization,
   OrganizationMembership,
   PasswordResetToken,
   RefreshToken,
+  Transaction,
   User,
 ];
 
