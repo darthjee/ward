@@ -289,6 +289,27 @@ describe('bank account routes (e2e)', () => {
     });
   });
 
+  describe('account_number masking', () => {
+    it('masks the number on every write response and returns it in full only on the detail', async () => {
+      const masked = '•••• 65-4';
+      const prefix = `/orgs/${ALICE_ORG}/bank/accounts`;
+      const created = await send(app, 'post', `${prefix}.json`, ALICE, {
+        name: 'Masking check', account_number: '98765-4',
+      }).expect(201);
+      const path = `${prefix}/${created.body.id}`;
+
+      const patched = await send(app, 'patch', `${path}.json`, ALICE, { notes: 'n' }).expect(200);
+      const archived = await send(app, 'post', `${path}/archive.json`, ALICE).expect(200);
+      const unarchived = await send(app, 'post', `${path}/unarchive.json`, ALICE).expect(200);
+      const detail = await send(app, 'get', `${path}.json`, ALICE).expect(200);
+
+      [created, patched, archived, unarchived].forEach((response) => {
+        expect(response.body.account_number).toBe(masked);
+      });
+      expect(detail.body.account_number).toBe('98765-4');
+    });
+  });
+
   describe('update', () => {
     it('edits fields and the opening anchor', async () => {
       const account = await createAccount(app, ALICE, null, { bank_name: 'Old' });

@@ -88,7 +88,7 @@ export class AccountService {
    * @throws {NotFoundException} The uniform 404 when not owned by `owner`.
    */
   async find(owner: OwnerContext, id: number): Promise<AccountResponse> {
-    return this.#presentOne(await this.findOwned(owner, id));
+    return this.#presentOne(await this.findOwned(owner, id), false);
   }
 
   /**
@@ -112,7 +112,7 @@ export class AccountService {
    * Creates an account owned by `owner` (owner taken from the route only).
    * @param {OwnerContext} owner - The resolved owner.
    * @param {CreateAccountDto} dto - The validated body.
-   * @returns {Promise<AccountResponse>} The new account.
+   * @returns {Promise<AccountResponse>} The new account (`account_number` masked).
    * @throws {BadRequestException} For a type without a handler or an invalid amount.
    * @throws {ConflictException} 409 on an active-name clash.
    */
@@ -136,7 +136,7 @@ export class AccountService {
       notes: dto.notes ?? null,
     });
 
-    return this.#presentOne(await this.#saveWithDetails(account, handler, nested));
+    return this.#presentOne(await this.#saveWithDetails(account, handler, nested), true);
   }
 
   /**
@@ -145,7 +145,7 @@ export class AccountService {
    * @param {OwnerContext} owner - The resolved owner.
    * @param {number} id - The account id.
    * @param {UpdateAccountDto} dto - The validated body.
-   * @returns {Promise<AccountResponse>} The updated account.
+   * @returns {Promise<AccountResponse>} The updated account (`account_number` masked).
    * @throws {NotFoundException} The uniform 404 when not owned by `owner`.
    * @throws {ConflictException} 409 on an archived edit, a locked currency or a name clash.
    */
@@ -167,14 +167,14 @@ export class AccountService {
       account.openingBalance = parseAmountInput('opening_balance', dto.opening_balance, account.currency);
     }
 
-    return this.#presentOne(await this.#saveWithDetails(account, handler, nested));
+    return this.#presentOne(await this.#saveWithDetails(account, handler, nested), true);
   }
 
   /**
    * Archives an account (idempotent).
    * @param {OwnerContext} owner - The resolved owner.
    * @param {number} id - The account id.
-   * @returns {Promise<AccountResponse>} The archived account.
+   * @returns {Promise<AccountResponse>} The archived account (`account_number` masked).
    * @throws {NotFoundException} The uniform 404 when not owned by `owner`.
    */
   async archive(owner: OwnerContext, id: number): Promise<AccountResponse> {
@@ -185,14 +185,14 @@ export class AccountService {
       await this.accountRepository.save(account);
     }
 
-    return this.#presentOne(account);
+    return this.#presentOne(account, true);
   }
 
   /**
    * Unarchives an account (idempotent).
    * @param {OwnerContext} owner - The resolved owner.
    * @param {number} id - The account id.
-   * @returns {Promise<AccountResponse>} The active account.
+   * @returns {Promise<AccountResponse>} The active account (`account_number` masked).
    * @throws {NotFoundException} The uniform 404 when not owned by `owner`.
    * @throws {ConflictException} 409 when an active account already has its name.
    */
@@ -204,7 +204,7 @@ export class AccountService {
       await mapNameClash(() => this.accountRepository.save(account));
     }
 
-    return this.#presentOne(account);
+    return this.#presentOne(account, true);
   }
 
   /**
@@ -261,8 +261,8 @@ export class AccountService {
     );
   }
 
-  async #presentOne(account: Account): Promise<AccountResponse> {
-    const [response] = await this.#present([account], false);
+  async #presentOne(account: Account, mask: boolean): Promise<AccountResponse> {
+    const [response] = await this.#present([account], mask);
 
     return response;
   }

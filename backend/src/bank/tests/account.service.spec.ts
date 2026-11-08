@@ -309,6 +309,42 @@ describe('AccountService', () => {
     });
   });
 
+  describe('account_number masking', () => {
+    const MASKED = '•••• 45-6';
+
+    it('returns the full number only on the detail', async () => {
+      const { service } = setup();
+
+      expect((await service.find(PERSONAL, 1)).account_number).toBe('12345-6');
+    });
+
+    it('masks the number on the create response', async () => {
+      const { service } = setup();
+
+      const result = await service.create(PERSONAL, createDto({ account_number: '12345-6' }));
+
+      expect(result.account_number).toBe(MASKED);
+    });
+
+    it('masks the number on the update response', async () => {
+      const { service } = setup();
+
+      expect((await service.update(PERSONAL, 1, updateDto({ notes: 'n' }))).account_number).toBe(MASKED);
+    });
+
+    it('masks the number on the archive response', async () => {
+      const { service } = setup();
+
+      expect((await service.archive(PERSONAL, 1)).account_number).toBe(MASKED);
+    });
+
+    it('masks the number on the unarchive response', async () => {
+      const { service } = setup(buildAccount({ archivedAt: new Date() }));
+
+      expect((await service.unarchive(PERSONAL, 1)).account_number).toBe(MASKED);
+    });
+  });
+
   describe('delete', () => {
     it('deletes an account without transactions', async () => {
       const { service, accountRepository } = setup();
