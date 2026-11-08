@@ -1,5 +1,5 @@
-import { parseAmount } from '../../../common/amounts.js';
-import { isAfterLocalToday, localToday } from '../../../common/dates.js';
+import { parseAmount } from '../../amounts.js';
+import { isAfterLocalToday, localToday } from '../../dates.js';
 
 /** Largest account name accepted (mirrors the backend). */
 export const NAME_MAX_LENGTH = 255;

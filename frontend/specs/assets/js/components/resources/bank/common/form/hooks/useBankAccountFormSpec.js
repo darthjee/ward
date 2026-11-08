@@ -2,7 +2,7 @@ import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import useBankAccountForm, {
   buildFieldHandlers,
-} from '../../../../../../../../../assets/js/components/resources/bank/accounts/pages/hooks/useBankAccountForm.js';
+} from '../../../../../../../../../assets/js/components/resources/bank/common/form/hooks/useBankAccountForm.js';
 import {
   DEFAULT_OWNER_CONTEXT,
   OwnerContext,

@@ -7,9 +7,7 @@ import LedgerFormHelper from '../../../common/detail/helpers/LedgerFormHelper.js
 import LedgerTableHelper from '../../../common/detail/helpers/LedgerTableHelper.jsx';
 import { contextHash } from '../../../../../../utils/context/ownerContext.js';
 import { ledgerPageHref } from '../../../common/detail/ledgerPageHref.js';
-
-/** Section base of the Accounts submenu. */
-export const ACCOUNTS_BASE = '/bank/accounts';
+import { ACCOUNTS_BASE } from '../../../common/sections.js';
 
 /**
  * Render the inline form row, hidden on an archived account.

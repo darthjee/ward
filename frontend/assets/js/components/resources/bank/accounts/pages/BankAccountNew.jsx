@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import NotFound from '../../../../common/notFound/NotFound.jsx';
-import useBankAccountForm from './hooks/useBankAccountForm.js';
+import useBankAccountForm from '../../common/form/hooks/useBankAccountForm.js';
 import BankAccountLoader, { buildBankSettingsLoadEffect } from '../../common/detail/controllers/BankAccountLoader.js';
 import BankAccountNewController from './controllers/BankAccountNewController.js';
-import { emptyAccountFields } from './controllers/accountFormFields.js';
+import { emptyAccountFields } from '../../common/form/controllers/accountFormFields.js';
 import BankAccountFormHelper from './helpers/BankAccountFormHelper.jsx';
 import { contextHash } from '../../../../../utils/context/ownerContext.js';
+import { ACCOUNTS_BASE } from '../../common/sections.js';
 
 /**
  * New account page (`<ui>/bank/accounts/new`): the currency defaults to `settings.json`'s
@@ -62,6 +63,6 @@ export default function BankAccountNew() {
     archived: false,
     idPrefix: 'bank-account-new-',
   }, handlers, {
-    heading: 'New account', submitLabel: 'Create', cancelHref: contextHash(context, '/bank/accounts'),
+    heading: 'New account', submitLabel: 'Create', cancelHref: contextHash(context, ACCOUNTS_BASE),
   });
 }

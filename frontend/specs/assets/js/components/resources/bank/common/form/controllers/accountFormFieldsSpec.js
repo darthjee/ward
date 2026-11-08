@@ -4,7 +4,7 @@ import {
   emptyAccountFields,
   fieldsFromAccount,
   validateAccountFields,
-} from '../../../../../../../../../assets/js/components/resources/bank/accounts/pages/controllers/accountFormFields.js';
+} from '../../../../../../../../../assets/js/components/resources/bank/common/form/controllers/accountFormFields.js';
 
 const NOW = new Date(2026, 4, 10, 12);
 

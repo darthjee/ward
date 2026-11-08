@@ -2,7 +2,7 @@ import BankAccountFormHelper, {
   ARCHIVED_NOTICE,
   SETTINGS_WARNING,
 } from '../../../../../../../../../assets/js/components/resources/bank/accounts/pages/helpers/BankAccountFormHelper.jsx';
-import { emptyAccountFields } from '../../../../../../../../../assets/js/components/resources/bank/accounts/pages/controllers/accountFormFields.js';
+import { emptyAccountFields } from '../../../../../../../../../assets/js/components/resources/bank/common/form/controllers/accountFormFields.js';
 import { localToday } from '../../../../../../../../../assets/js/components/resources/bank/common/dates.js';
 import { classifyError } from '../../../../../../../../../assets/js/components/resources/bank/common/bankErrors.js';
 import ApiError from '../../../../../../../../../assets/js/client/ApiError.js';

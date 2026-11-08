@@ -1,5 +1,5 @@
 import BankAccountEditController from '../../../../../../../../../assets/js/components/resources/bank/accounts/pages/controllers/BankAccountEditController.js';
-import { fieldsFromAccount } from '../../../../../../../../../assets/js/components/resources/bank/accounts/pages/controllers/accountFormFields.js';
+import { fieldsFromAccount } from '../../../../../../../../../assets/js/components/resources/bank/common/form/controllers/accountFormFields.js';
 import ApiError from '../../../../../../../../../assets/js/client/ApiError.js';
 
 const ACCOUNT = {

@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
 import NotFound from '../../../../common/notFound/NotFound.jsx';
-import useBankAccountForm from './hooks/useBankAccountForm.js';
+import useBankAccountForm from '../../common/form/hooks/useBankAccountForm.js';
 import BankAccountLoader, { buildBankAccountLoadEffect } from '../../common/detail/controllers/BankAccountLoader.js';
 import BankAccountEditController from './controllers/BankAccountEditController.js';
-import { fieldsFromAccount } from './controllers/accountFormFields.js';
+import { fieldsFromAccount } from '../../common/form/controllers/accountFormFields.js';
 import BankAccountFormHelper from './helpers/BankAccountFormHelper.jsx';
 import Router from '../../../../../utils/routing/Router.js';
 import { contextHash } from '../../../../../utils/context/ownerContext.js';
+import { ACCOUNTS_BASE } from '../../common/sections.js';
 import { currentHash } from '../../common/currentHash.js';
 
 /**
@@ -94,6 +95,6 @@ export default function BankAccountEdit() {
   }, handlers, {
     heading: account?.archived_at ? 'Rename account' : 'Edit account',
     submitLabel: 'Save',
-    cancelHref: contextHash(context, `/bank/accounts/${accountId}`),
+    cancelHref: contextHash(context, `${ACCOUNTS_BASE}/${accountId}`),
   });
 }
