@@ -21,7 +21,7 @@ export interface AccountTypeContext {
 
 /**
  * The extension point of the generic account routes. Each account `type`
- * (`regular`, `debt`, later `investment`, `provider_expense`) registers one
+ * (`regular`, `debt`, `investment`, later `provider_expense`) registers one
  * handler; the generic `AccountService` only ever talks to handlers through
  * the registry and never names a specific type. A type's nested body and
  * response object is named after the type (e.g. `debt`).
@@ -31,6 +31,16 @@ export interface AccountTypeHandler {
   readonly type: string;
   /** Whether accounts of this type carry a ledger (transactions, balance). */
   readonly carriesLedger: boolean;
+
+  /**
+   * Checks the type's account-level rules on the account as it is about to
+   * be saved (create and PATCH; e.g. an investment's `opening_balance` must
+   * be 0).
+   * @param {Account} account - The account with the request applied.
+   * @returns {void}
+   * @throws {BadRequestException} When an account-level rule is broken.
+   */
+  validateAccount(account: Account): void;
 
   /**
    * Validates the type's nested object on create.

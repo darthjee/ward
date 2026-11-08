@@ -1,7 +1,8 @@
 import { BadRequestException } from '@nestjs/common';
 import { buildAccount } from './account.test-support.js';
 import { DebtAccountHandler } from '../account-types/debt-account.handler.js';
-import { defaultDebtState, normaliseRate, type DebtState } from '../account-types/debt-details.js';
+import { defaultDebtState, type DebtState } from '../account-types/debt-details.js';
+import { normaliseRate } from '../account-types/rate.js';
 import type { DebtDetailsDto } from '../dto/debt-details.dto.js';
 import { DebtDetails } from '../entities/debt-details.entity.js';
 

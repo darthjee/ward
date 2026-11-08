@@ -11,6 +11,12 @@ export class RegularAccountHandler implements AccountTypeHandler {
   readonly carriesLedger = true;
 
   /**
+   * No-op: regular accounts have no account-level rule.
+   * @returns {void}
+   */
+  validateAccount(): void {}
+
+  /**
    * @param {unknown} nested - Must be absent.
    * @returns {undefined} Nothing to save.
    * @throws {BadRequestException} When a nested object is given.

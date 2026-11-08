@@ -28,6 +28,12 @@ export class DebtAccountHandler implements AccountTypeHandler {
   readonly carriesLedger = true;
 
   /**
+   * No-op: debt accounts have no account-level rule.
+   * @returns {void}
+   */
+  validateAccount(): void {}
+
+  /**
    * @param {unknown} nested - The validated `debt` object, if any.
    * @param {AccountTypeContext} context - The new account's currency.
    * @returns {DebtState} The details to insert.
