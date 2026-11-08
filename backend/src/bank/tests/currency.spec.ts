@@ -1,4 +1,5 @@
 import {
+  convertExponent,
   currencyExponent,
   formatAmount,
   InvalidAmountError,
@@ -105,6 +106,33 @@ describe('currency helpers', () => {
       ['10000000000000', 'JPY'],
     ])('parse then format keeps %s in %s', (value, currency) => {
       expect(formatAmount(parseAmount(value, currency), currency)).toBe(value);
+    });
+  });
+
+  describe('convertExponent', () => {
+    it.each([
+      [100000n, 'BRL', 'JPY', 1000n],
+      [1000n, 'JPY', 'BRL', 100000n],
+      [-1000n, 'BHD', 'JPY', -1n],
+    ])('converts %s from %s to %s', (minor, from, to, expected) => {
+      expect(convertExponent(minor, from, to)).toBe(expected);
+    });
+
+    it('keeps the value between currencies with the same exponent', () => {
+      expect(convertExponent(-123456n, 'BRL', 'USD')).toBe(-123456n);
+    });
+
+    it('rejects a value that loses decimals', () => {
+      expect(() => convertExponent(12345n, 'BRL', 'JPY')).toThrow(InvalidAmountError);
+      expect(() => convertExponent(-1234n, 'BHD', 'BRL')).toThrow(InvalidAmountError);
+    });
+
+    it('drops trailing zero decimals', () => {
+      expect(convertExponent(-1230n, 'BHD', 'BRL')).toBe(-123n);
+    });
+
+    it('rejects a value that overflows once rescaled', () => {
+      expect(() => convertExponent(MAX_ABS_MINOR_UNITS, 'JPY', 'BRL')).toThrow('too large');
     });
   });
 });

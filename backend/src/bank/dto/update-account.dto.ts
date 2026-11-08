@@ -1,0 +1,64 @@
+import { Transform } from 'class-transformer';
+import { IsNotEmpty, IsOptional, IsString } from 'class-validator';
+import {
+  ACCOUNT_NAME_MAX_LENGTH,
+  ACCOUNT_SHORT_FIELD_MAX_LENGTH,
+  IsLedgerDate,
+  IsOptionalNonNull,
+  IsSupportedCurrency,
+  NOTES_MAX_LENGTH,
+  trimToNull,
+} from './field-validators.js';
+import { MaxCodePoints, trimString } from '../../core/string-validators.js';
+
+/**
+ * Request body for `PATCH <base>/accounts/:accountId.json`, taken through
+ * `@StrictBody()`. Every field is optional; `type` is not declared (fixed
+ * after creation), so sending it answers 400, as do owner fields, ids and
+ * computed fields. On an archived account only `name` is accepted, and
+ * `currency` is locked once the account has transactions (both 409, checked
+ * by the service).
+ */
+export class UpdateAccountDto {
+  @IsOptionalNonNull()
+  @Transform(trimString)
+  @IsString()
+  @IsNotEmpty()
+  @MaxCodePoints(ACCOUNT_NAME_MAX_LENGTH)
+    name?: string;
+
+  @Transform(trimToNull)
+  @IsOptional()
+  @IsString()
+  @MaxCodePoints(ACCOUNT_SHORT_FIELD_MAX_LENGTH)
+    bank_name?: string | null;
+
+  @Transform(trimToNull)
+  @IsOptional()
+  @IsString()
+  @MaxCodePoints(ACCOUNT_SHORT_FIELD_MAX_LENGTH)
+    branch?: string | null;
+
+  @Transform(trimToNull)
+  @IsOptional()
+  @IsString()
+  @MaxCodePoints(ACCOUNT_SHORT_FIELD_MAX_LENGTH)
+    account_number?: string | null;
+
+  @IsOptionalNonNull()
+  @IsSupportedCurrency()
+    currency?: string;
+
+  @IsOptionalNonNull()
+  @IsLedgerDate()
+    opening_date?: string;
+
+  @IsOptionalNonNull()
+  @IsString()
+    opening_balance?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxCodePoints(NOTES_MAX_LENGTH)
+    notes?: string | null;
+}

@@ -74,14 +74,14 @@ export function parseAmount(value: string, currency: string, options: ParseAmoun
     : null;
 
   if (!match) {
-    throw new InvalidAmountError('amount must be a decimal string');
+    throw new InvalidAmountError('must be a decimal string');
   }
 
   const [, sign, integerPart, fraction = ''] = match;
   const exponent = currencyExponent(currency);
 
   if (fraction.length > exponent) {
-    throw new InvalidAmountError(`amount allows at most ${exponent} decimal places for ${currency}`);
+    throw new InvalidAmountError(`allows at most ${exponent} decimal places for ${currency}`);
   }
 
   const magnitude = BigInt(integerPart + fraction.padEnd(exponent, '0'));
@@ -112,6 +112,34 @@ export function formatAmount(minor: bigint, currency: string): string {
 }
 
 /**
+ * Re-expresses an amount in another currency's exponent, without any FX
+ * conversion: `100000n` (BRL, "1000.00") becomes `1000n` in JPY ("1000").
+ * Used when an account's currency changes while it has no transactions, so
+ * the opening balance keeps its decimal value.
+ * @param {bigint} minor - The amount in minor units of `from`.
+ * @param {string} from - The current ISO 4217 code.
+ * @param {string} to - The new ISO 4217 code.
+ * @returns {bigint} The same decimal value in minor units of `to`.
+ * @throws {InvalidAmountError} When the value has more decimals than `to`
+ *   allows, or exceeds {@link MAX_ABS_MINOR_UNITS} once rescaled.
+ */
+export function convertExponent(minor: bigint, from: string, to: string): bigint {
+  const shift = currencyExponent(to) - currencyExponent(from);
+
+  if (shift >= 0) {
+    return checkedAmount(minor * 10n ** BigInt(shift), {});
+  }
+
+  const divisor = 10n ** BigInt(-shift);
+
+  if (minor % divisor !== 0n) {
+    throw new InvalidAmountError(`allows at most ${currencyExponent(to)} decimal places for ${to}`);
+  }
+
+  return minor / divisor;
+}
+
+/**
  * Applies the zero and overflow rules to a parsed amount.
  * @param {bigint} amount - The parsed amount in minor units.
  * @param {ParseAmountOptions} options - Extra rules (e.g. `nonZero`).
@@ -120,11 +148,11 @@ export function formatAmount(minor: bigint, currency: string): string {
  */
 function checkedAmount(amount: bigint, options: ParseAmountOptions): bigint {
   if (options.nonZero && amount === 0n) {
-    throw new InvalidAmountError('amount must not be zero');
+    throw new InvalidAmountError('must not be zero');
   }
 
   if (amount > MAX_ABS_MINOR_UNITS || amount < -MAX_ABS_MINOR_UNITS) {
-    throw new InvalidAmountError('amount is too large');
+    throw new InvalidAmountError('is too large');
   }
 
   return amount;
