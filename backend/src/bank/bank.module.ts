@@ -1,8 +1,6 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AccountBalancesQuery } from './account-balances.query.js';
-import { AccountantChargesQuery } from './accountant-charges.query.js';
-import { AccountantService } from './accountant.service.js';
 import { ACCOUNT_TYPE_HANDLERS, type AccountTypeHandler } from './account-types/account-type-handler.js';
 import { AccountTypeRegistry } from './account-types/account-type.registry.js';
 import { DebtAccountHandler } from './account-types/debt-account.handler.js';
@@ -10,6 +8,8 @@ import { InvestmentAccountHandler } from './account-types/investment-account.han
 import { ProviderExpenseAccountHandler } from './account-types/provider-expense-account.handler.js';
 import { RegularAccountHandler } from './account-types/regular-account.handler.js';
 import { AccountService } from './account.service.js';
+import { AccountantChargesQuery } from './accountant-charges.query.js';
+import { AccountantService } from './accountant.service.js';
 import { BankConfigModule } from './bank-config.module.js';
 import { Account } from './entities/account.entity.js';
 import { DebtDetails } from './entities/debt-details.entity.js';

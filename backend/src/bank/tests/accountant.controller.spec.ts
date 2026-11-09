@@ -3,9 +3,9 @@ import { HTTP_CODE_METADATA } from '@nestjs/common/constants.js';
 import { CacheClass } from '../../core/cache-class.js';
 import { CACHE_CLASS_KEY } from '../../core/cache-policy.decorator.js';
 import { AccountantController } from '../accountant.controller.js';
-import type { AccountantChargesQueryDto } from '../dto/accountant-charges-query.dto.js';
 import { ORGANIZATION, PERSONAL } from './account.test-support.js';
 import { fakeLoader } from './bank-controllers.test-support.js';
+import type { AccountantChargesQueryDto } from '../dto/accountant-charges-query.dto.js';
 
 describe('AccountantController', () => {
   it('delegates the preview with the owner and the validated query', async () => {

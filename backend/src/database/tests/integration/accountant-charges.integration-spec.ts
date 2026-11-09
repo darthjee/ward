@@ -1,5 +1,6 @@
 import type { DataSource, EntityManager, Repository } from 'typeorm';
 import { createTestDataSource, resetDatabase } from './test-data-source.js';
+import { ownerColumns } from '../../../bank/account-fields.js';
 import { AccountantChargesQuery, PREVIEW_MAX_ROWS } from '../../../bank/accountant-charges.query.js';
 import { Account } from '../../../bank/entities/account.entity.js';
 import { Transaction } from '../../../bank/entities/transaction.entity.js';
@@ -15,7 +16,6 @@ interface AccountFields {
   forAccountant?: boolean | null;
   archived?: boolean;
   openingDate?: string;
-  currency?: string;
 }
 
 describe('accountant hand-off SQL (MySQL)', () => {
@@ -25,19 +25,17 @@ describe('accountant hand-off SQL (MySQL)', () => {
   let query: AccountantChargesQuery;
 
   async function insertAccount(fields: AccountFields = {}): Promise<number> {
-    const owner = fields.owner ?? ALICE;
+    const { owner = ALICE, type = 'provider_expense', forAccountant = true, openingDate = '2026-01-01' } = fields;
     const account = await accounts.save(accounts.create({
-      userId: owner.kind === 'user' ? owner.userId : null,
-      organizationId: owner.kind === 'organization' ? owner.organizationId : null,
-      type: fields.type ?? 'provider_expense',
+      ...ownerColumns(owner),
+      type,
       name: `Provider ${Math.random()}`,
       bankName: 'Vivo',
-      currency: fields.currency ?? 'BRL',
-      openingDate: fields.openingDate ?? '2026-01-01',
+      currency: 'BRL',
+      openingDate,
       openingBalance: 0n,
       archivedAt: fields.archived ? new Date() : null,
     }));
-    const forAccountant = fields.forAccountant === undefined ? true : fields.forAccountant;
     if (forAccountant !== null) {
       await ds.query(
         'INSERT INTO bank_provider_expense_details (account_id, for_accountant, provider_tax_id) VALUES (?, ?, ?)',
