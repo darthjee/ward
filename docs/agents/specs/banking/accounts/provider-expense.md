@@ -123,6 +123,10 @@ any charge ↔ payment link (reconciliation territory).
   - **Add payment** — opens the inline add form with a positive amount and the description
     prefilled as "Payment".
   - The plain inline add of [regular.md](regular.md#detail) stays available.
+  - **Mapping onto the inline form** (decided in #55) — both shortcuts open the inline form's
+    **In / Out** toggle: **Add charge** = **Out**, description "Charge", amount prefilled with
+    `expected_amount` when set (empty otherwise); **Add payment** = **In**, description
+    "Payment", amount empty. Both are hidden on an archived account.
 - **Paying from a regular account** is two independent manual transactions (e.g. `-200` on the
   regular account, `+200` on the provider account), owners being the same or not. Linking them
   is the *Linked transfers* [Future epic](../README.md#future-epics) (same owner only).
@@ -231,6 +235,13 @@ Provider-expense accounts get their **own "Providers" submenu** in the Bank menu
 the [Accounts submenu UI](regular.md#accounts-submenu-ui) and the
 [Debts submenu UI](debt.md#debts-submenu-ui).
 
+**Shared code** (decided in #55) — the Providers pages are built on the `bank/common` pieces
+the Accounts, Debts and Investments submenus use (ledger, inline transaction form, header /
+archive actions, common form fields, type guard, confirmation modal, error alert), never
+copies; those pieces are parameterised where Providers differs (the "Provider" and
+"Customer / contract number" labels, the optional branch, an extra per-row slot in the ledger
+for the sent mark, extra confirmation kinds, a header link slot for the hand-off).
+
 ### List
 
 `<ui>/providers`
@@ -238,6 +249,8 @@ the [Accounts submenu UI](regular.md#accounts-submenu-ui) and the
 - `provider_expense` accounts only. Columns: name, provider, current balance, expected amount
   with its frequency (e.g. "200,00 / month"), for-accountant marker, currency. Amounts
   formatted with `Intl` in the account's own currency. **No grand total.**
+  - **Frequency display** (decided in #55) — `monthly` → "/ month", `yearly` → "/ year"
+    (e.g. "200,00 / month"); a missing `expected_amount` shows "—".
 - Sorted by name; no pagination.
 - *Show archived* toggle (archived rows marked); **New provider** button and an
   **Accountant hand-off** link.
@@ -252,12 +265,23 @@ the [Accounts submenu UI](regular.md#accounts-submenu-ui) and the
   paginated ledger with inline add / edit.
 - Plus a **provider info block**: provider tax id, expected amount, frequency, due day / month,
   for-accountant flag.
+  - (decided in #55) The expected amount uses the list's frequency display ("—" when unset);
+    the due month shows the month name; due day and due month are shown only when set.
 - **Add charge** / **Add payment** shortcuts above the ledger (see
   [Recording charges and payments](#recording-charges-and-payments)); hidden on an archived
   account.
 - Sent charges show their `sentToAccountantAt` date and a per-charge **Mark as unsent** action
   (also available on an archived account, see [Edge cases](#edge-cases)).
+  - **Sent mark display** (decided in #55) — a charge carrying `sent_to_accountant_at` shows
+    "Sent <local date>" under its description, with a **Mark as unsent** link. The link stays
+    visible on an archived account, while Edit / Delete stay hidden there. Mark as unsent posts
+    that single id to `mark-unsent` and reloads the ledger, with **no confirmation** (it is
+    the undo).
 - Editing or deleting a sent charge shows a warning before saving.
+  - **Warning** (decided in #55) — saving an edit of a charge with `sent_to_accountant_at`
+    first opens a confirmation modal ("This charge was already sent to the accountant…",
+    confirm label "Save"); deleting one keeps the usual delete confirmation, with that warning
+    added to its text.
 
 ### Create / Edit
 
@@ -275,11 +299,28 @@ the [Accounts submenu UI](regular.md#accounts-submenu-ui) and the
 
 - A **date range**, defaulting to the last full month computed from the browser's local date;
   the API receives explicit dates.
+  - **Range inputs** (decided in #55) — two date inputs, defaulting to the last full month of
+    the browser's local date; the API receives explicit `YYYY-MM-DD` dates. Client-side checks
+    mirror the API's (both dates required, `from` ≤ `to`): an invalid range shows an inline
+    message and sends nothing. The API's `400` (future date, > 366 days, > 1000 rows) is shown
+    in the page's error alert.
 - An **"Unsent only"** toggle, on by default.
+- **Loading** (decided in #55) — the preview loads on page open and reloads automatically
+  whenever a date or the "Unsent only" toggle changes, once the client-side range check
+  passes; there is **no Preview button**. Download CSV and Mark as sent act on the rows
+  currently loaded and are both disabled while a load is in flight.
 - The **preview list** of charges (date, provider, description, amount, currency, sent date);
   any totals are **per currency**, never summed.
+  - **Per-currency totals** (decided in #55) — summed exactly in minor units per currency and
+    shown under the preview, one line per currency, never a single total.
 - **Download CSV** — exactly the previewed rows (see [Performance & security](#performance--security)).
+  Allowed on an empty preview (a header-only CSV).
 - **Mark as sent** — posts the previewed ids; disabled on an empty preview.
+  - **Gate and confirmation** (decided in #55) — enabled whenever the loaded preview has rows;
+    downloading first is **not** enforced. Clicking opens a confirmation ("Mark N charges as
+    sent?") and only the confirmation posts the ids.
+  - **After marking** (decided in #55) — the preview reloads (with "Unsent only" on, the marked
+    rows disappear) and a success alert shows "N charges marked as sent".
 
 ## Routes and permissions
 
@@ -408,6 +449,12 @@ Same as [regular.md](regular.md#rules):
    doubled.
 2. **CSV format** — UTF-8 **with BOM** (accents in Excel), comma-separated, `.` decimal point,
    ISO dates; filename `ward-accountant-<from>-<to>.csv` (no owner or organization name).
+   **Header row and columns** (decided in #55) — built from the loaded preview rows only, by a
+   pure builder module; an English header row of seven columns, the account name and
+   `bank_name` in their own columns:
+   `Date,Account,Provider,Provider tax id,Description,Amount,Currency`. An empty `bank_name` /
+   `provider_tax_id` is an empty quoted field; `amount` is written as the API string (already
+   `.` decimal, in the currency's exponent).
 3. **Ownership in the mark routes** — all ids are resolved in **one query** joined to
    `bank_accounts` and filtered by the active owner; any unresolved id → 404; the 400 cases
    (payments, non-`forAccountant` charges) are checked in the same pass; the update runs in one
