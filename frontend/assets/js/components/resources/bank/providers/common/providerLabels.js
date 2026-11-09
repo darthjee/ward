@@ -6,6 +6,9 @@ export const EMPTY_MARK = '—';
 /** The charge frequency select options, as `[value, label]` pairs in display order. */
 export const FREQUENCY_OPTIONS = [['monthly', 'Monthly'], ['yearly', 'Yearly']];
 
+/** Display label of each charge frequency. */
+const FREQUENCY_LABELS = new Map(FREQUENCY_OPTIONS);
+
 /** The provider form's labels for the shared bank fields. */
 export const PROVIDER_FIELD_LABELS = {
   bankName: 'Provider',
@@ -33,4 +36,14 @@ export function formatExpected(amount, frequency, currency) {
  */
 export function forAccountantLabel(forAccountant) {
   return forAccountant ? 'Yes' : EMPTY_MARK;
+}
+
+/**
+ * Read the display label of a charge frequency.
+ *
+ * @param {string|null} frequency - The `charge_frequency` (`monthly` | `yearly`).
+ * @returns {string} "Monthly" / "Yearly", or `''` when unset or unknown.
+ */
+export function frequencyLabel(frequency) {
+  return FREQUENCY_LABELS.get(frequency) ?? '';
 }

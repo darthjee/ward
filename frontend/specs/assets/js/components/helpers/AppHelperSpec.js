@@ -23,6 +23,7 @@ import BankInvestmentDetail from '../../../../../assets/js/components/resources/
 import BankProviderList from '../../../../../assets/js/components/resources/bank/providers/pages/BankProviderList.jsx';
 import BankProviderNew from '../../../../../assets/js/components/resources/bank/providers/pages/BankProviderNew.jsx';
 import BankProviderEdit from '../../../../../assets/js/components/resources/bank/providers/pages/BankProviderEdit.jsx';
+import BankProviderDetail from '../../../../../assets/js/components/resources/bank/providers/pages/BankProviderDetail.jsx';
 import HashRouteResolver from '../../../../../assets/js/utils/routing/HashRouteResolver.js';
 import ModalRedirect from '../../../../../assets/js/components/common/ModalRedirect.jsx';
 import ResetPasswordLanding from '../../../../../assets/js/components/resources/accounts/pages/ResetPasswordLanding.jsx';
@@ -96,6 +97,7 @@ describe('AppHelper', () => {
     ['bank-providers', BankProviderList],
     ['bank-provider-new', BankProviderNew],
     ['bank-provider-edit', BankProviderEdit],
+    ['bank-provider', BankProviderDetail],
   ].forEach(([key, Page]) => {
     it(`maps the ${key} key to its page`, () => {
       expect(partsOf(key).page.type).toBe(Page);
