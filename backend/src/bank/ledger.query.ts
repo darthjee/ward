@@ -13,6 +13,8 @@ export interface LedgerRow {
   amount: bigint;
   description: string;
   notes: string | null;
+  /** The hand-off mark; the serializer decides whether it is shown. */
+  sentToAccountantAt: Date | null;
   balance: bigint;
 }
 
@@ -22,6 +24,7 @@ interface RawLedgerRow {
   amount: string | number;
   description: string;
   notes: string | null;
+  sent_to_accountant_at: Date | string | null;
   cumulative: string | number;
   before_anchor: string | number;
 }
@@ -31,9 +34,10 @@ interface RawLedgerRow {
 // order and the page window are applied outside. `before_anchor` is the sum of
 // the transactions dated before the opening anchor (same on every row).
 // `DATE_FORMAT` keeps the `DATE` a plain string, never a timezone-shifted `Date`.
-const LEDGER_PAGE_SQL = `SELECT id, date, amount, description, notes, cumulative, before_anchor
+const LEDGER_PAGE_SQL = `SELECT id, date, amount, description, notes, sent_to_accountant_at, cumulative, before_anchor
   FROM (
     SELECT t.id, DATE_FORMAT(t.date, '%Y-%m-%d') AS date, t.date AS sort_date, t.amount, t.description, t.notes,
+           t.sent_to_accountant_at,
            SUM(t.amount) OVER (ORDER BY t.date, t.id ROWS UNBOUNDED PRECEDING) AS cumulative,
            SUM(IF(t.date < ?, t.amount, 0)) OVER () AS before_anchor
       FROM bank_transactions t
@@ -101,6 +105,7 @@ export class LedgerQuery {
       amount: BigInt(row.amount),
       description: row.description,
       notes: row.notes,
+      sentToAccountantAt: row.sent_to_accountant_at === null ? null : new Date(row.sent_to_accountant_at),
       balance: account.openingBalance - BigInt(row.before_anchor) + BigInt(row.cumulative),
     }));
   }

@@ -2,6 +2,7 @@ import { BadRequestException, ConflictException, NotFoundException } from '@nest
 import { ErrorCodes } from '../../core/error-codes.js';
 import { ownerNotFound } from '../../core/parse-id.js';
 import { AccountTypeRegistry } from '../account-types/account-type.registry.js';
+import { ProviderExpenseAccountHandler } from '../account-types/provider-expense-account.handler.js';
 import { RegularAccountHandler } from '../account-types/regular-account.handler.js';
 import type { CreateTransactionDto } from '../dto/create-transaction.dto.js';
 import type { Account } from '../entities/account.entity.js';
@@ -26,7 +27,7 @@ function buildTransaction(overrides: Partial<Transaction> = {}): Transaction {
 }
 
 function row(id: number, balance: bigint): LedgerRow {
-  return { id, date: '2026-01-10', amount: -100n, description: `t${id}`, notes: null, balance };
+  return { id, date: '2026-01-10', amount: -100n, description: `t${id}`, notes: null, sentToAccountantAt: null, balance };
 }
 
 function setup(account: Account | null = buildAccount(), stored: Transaction | null = buildTransaction()) {
@@ -49,7 +50,7 @@ function setup(account: Account | null = buildAccount(), stored: Transaction | n
     page: jest.fn(async (): Promise<LedgerRow[]> => []),
     openingEffective: jest.fn(async () => 100000n),
   };
-  const registry = new AccountTypeRegistry([new RegularAccountHandler()]);
+  const registry = new AccountTypeRegistry([new RegularAccountHandler(), new ProviderExpenseAccountHandler()]);
   const service = new TransactionService(
     transactionRepository as never,
     accounts as never,
@@ -86,6 +87,7 @@ describe('TransactionService', () => {
         amount: -1250n,
         description: 'Coffee',
         notes: null,
+        sentToAccountantAt: null,
       });
       expect(result).toEqual({
         id: 42,
@@ -130,6 +132,20 @@ describe('TransactionService', () => {
       const { service } = setup(null);
 
       await expect(service.create(PERSONAL, 1, createDto())).rejects.toThrow(NotFoundException);
+    });
+
+    it('returns an unsent mark on a new provider-expense charge', async () => {
+      const { service } = setup(buildAccount({ type: 'provider_expense' }));
+
+      await expect(service.create(PERSONAL, 1, createDto())).resolves.toMatchObject({ sent_to_accountant_at: null });
+    });
+
+    it('omits the mark on a new provider-expense payment', async () => {
+      const { service } = setup(buildAccount({ type: 'provider_expense' }));
+
+      const result = await service.create(PERSONAL, 1, createDto({ amount: '12.50' }));
+
+      expect(result).not.toHaveProperty('sent_to_accountant_at');
     });
 
     it('answers 404 for an account type without a ledger', async () => {
@@ -180,6 +196,54 @@ describe('TransactionService', () => {
       const { service } = setup(buildAccount({ archivedAt: new Date() }));
 
       expect(await conflictCode(service.update(PERSONAL, 1, 5, {}))).toBe(ErrorCodes.ACCOUNT_ARCHIVED);
+    });
+
+    describe('on a sent provider-expense charge', () => {
+      const SENT_AT = new Date('2026-11-01T10:00:00Z');
+      const provider = (): Account => buildAccount({ type: 'provider_expense' });
+      const sent = (): Transaction => buildTransaction({ sentToAccountantAt: SENT_AT });
+
+      it('clears the mark when the amount turns positive (a payment)', async () => {
+        const { service, transactionRepository } = setup(provider(), sent());
+
+        const result = await service.update(PERSONAL, 1, 5, { amount: '12.50' });
+
+        expect(transactionRepository.save).toHaveBeenCalledWith(expect.objectContaining({ sentToAccountantAt: null }));
+        expect(result).not.toHaveProperty('sent_to_accountant_at');
+      });
+
+      it('yields an unsent charge when flipped back', async () => {
+        const { service } = setup(provider(), buildTransaction({ amount: 1250n, sentToAccountantAt: null }));
+
+        await expect(service.update(PERSONAL, 1, 5, { amount: '-12.50' })).resolves.toMatchObject({
+          sent_to_accountant_at: null,
+        });
+      });
+
+      it('keeps the mark on a new negative amount', async () => {
+        const { service } = setup(provider(), sent());
+
+        await expect(service.update(PERSONAL, 1, 5, { amount: '-99.00' })).resolves.toMatchObject({
+          sent_to_accountant_at: SENT_AT,
+        });
+      });
+
+      it('keeps the mark on any other edit', async () => {
+        const { service } = setup(provider(), sent());
+
+        await expect(service.update(PERSONAL, 1, 5, { description: 'Tea', notes: 'n', date: '2026-01-01' })).resolves.toMatchObject({
+          sent_to_accountant_at: SENT_AT,
+        });
+      });
+    });
+
+    it('never touches the mark of a positive amount on another account type', async () => {
+      const { service, transactionRepository } = setup(buildAccount(), buildTransaction({ sentToAccountantAt: null }));
+
+      const result = await service.update(PERSONAL, 1, 5, { amount: '3' });
+
+      expect(transactionRepository.save).toHaveBeenCalledWith(expect.objectContaining({ sentToAccountantAt: null }));
+      expect(result).not.toHaveProperty('sent_to_accountant_at');
     });
   });
 

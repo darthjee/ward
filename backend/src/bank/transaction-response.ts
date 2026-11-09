@@ -4,8 +4,19 @@ import type { Transaction } from './entities/transaction.entity.js';
 import type { LedgerRow } from './ledger.query.js';
 import type { Pagination } from './pagination.js';
 
+/** The account type whose charges carry the accountant hand-off mark. */
+export const PROVIDER_EXPENSE_TYPE = 'provider_expense';
+
+/**
+ * The hand-off mark, present only on a charge of a provider-expense account: the ISO timestamp,
+ * or `null` when unsent. Absent everywhere else, so other responses stay unchanged.
+ */
+export interface HandOffMark {
+  sent_to_accountant_at?: Date | null;
+}
+
 /** The public view of a transaction (snake_case; never an owner field). */
-export interface TransactionResponse {
+export interface TransactionResponse extends HandOffMark {
   id: number;
   date: string;
   amount: string;
@@ -16,7 +27,7 @@ export interface TransactionResponse {
 }
 
 /** One ledger row of the ledger envelope. */
-export interface LedgerRowResponse {
+export interface LedgerRowResponse extends HandOffMark {
   id: number;
   date: string;
   amount: string;
@@ -40,17 +51,33 @@ export interface LedgerResponse {
 }
 
 /**
+ * @param {Account} account - The transaction's account (its type and currency).
+ * @param {bigint} amount - The signed amount, in minor units.
+ * @param {Date | null | undefined} sentAt - The stored hand-off mark.
+ * @returns {HandOffMark} `{ sent_to_accountant_at }` for a charge of a provider-expense
+ *   account, `{}` otherwise (the key is absent, not `null`).
+ */
+export function handOffMark(account: Account, amount: bigint, sentAt: Date | null | undefined): HandOffMark {
+  if (account.type !== PROVIDER_EXPENSE_TYPE || amount >= 0n) {
+    return {};
+  }
+
+  return { sent_to_accountant_at: sentAt ?? null };
+}
+
+/**
  * @param {Transaction} transaction - The transaction.
- * @param {string} currency - The account's ISO 4217 code.
+ * @param {Account} account - Its account (for the currency and the hand-off mark).
  * @returns {TransactionResponse} Its public view, `amount` as a decimal string.
  */
-export function serializeTransaction(transaction: Transaction, currency: string): TransactionResponse {
+export function serializeTransaction(transaction: Transaction, account: Account): TransactionResponse {
   return {
     id: transaction.id,
     date: transaction.date,
-    amount: formatAmount(transaction.amount, currency),
+    amount: formatAmount(transaction.amount, account.currency),
     description: transaction.description,
     notes: transaction.notes,
+    ...handOffMark(account, transaction.amount, transaction.sentToAccountantAt),
     created_at: transaction.createdAt,
     updated_at: transaction.updatedAt,
   };
@@ -81,6 +108,7 @@ export function serializeLedger(
       amount: format(row.amount),
       description: row.description,
       notes: row.notes,
+      ...handOffMark(account, row.amount, row.sentToAccountantAt),
       balance: format(row.balance),
     })),
     opening: opening === null ? null : { date: account.openingDate, amount: format(opening), balance: format(opening) },
