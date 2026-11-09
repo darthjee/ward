@@ -11,6 +11,7 @@ import { BankConfigModule } from './bank-config.module.js';
 import { Account } from './entities/account.entity.js';
 import { DebtDetails } from './entities/debt-details.entity.js';
 import { InvestmentDetails } from './entities/investment-details.entity.js';
+import { ProviderExpenseDetails } from './entities/provider-expense-details.entity.js';
 import { Transaction } from './entities/transaction.entity.js';
 import { LedgerQuery } from './ledger.query.js';
 import { TransactionService } from './transaction.service.js';
@@ -33,7 +34,7 @@ export { TransactionService } from './transaction.service.js';
  * and to the `ACCOUNT_TYPE_HANDLERS` factory's `inject` list.
  */
 @Module({
-  imports: [TypeOrmModule.forFeature([Account, DebtDetails, InvestmentDetails, Transaction]), BankConfigModule],
+  imports: [TypeOrmModule.forFeature([Account, DebtDetails, InvestmentDetails, ProviderExpenseDetails, Transaction]), BankConfigModule],
   providers: [
     RegularAccountHandler,
     DebtAccountHandler,

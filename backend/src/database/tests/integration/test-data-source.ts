@@ -10,6 +10,7 @@ import { User } from '../../../auth/entities/user.entity.js';
 import { Account } from '../../../bank/entities/account.entity.js';
 import { DebtDetails } from '../../../bank/entities/debt-details.entity.js';
 import { InvestmentDetails } from '../../../bank/entities/investment-details.entity.js';
+import { ProviderExpenseDetails } from '../../../bank/entities/provider-expense-details.entity.js';
 import { Transaction } from '../../../bank/entities/transaction.entity.js';
 import { dataSourceOptions } from '../../data-source.js';
 import { AuthCreateUsers20260824120001 } from '../../migrations/20260824120001-auth-create-users.js';
@@ -31,6 +32,7 @@ import { BankCreateAccounts20261108120016 } from '../../migrations/2026110812001
 import { BankCreateTransactions20261108120017 } from '../../migrations/20261108120017-bank-create-transactions.js';
 import { BankCreateDebtDetails20261108120018 } from '../../migrations/20261108120018-bank-create-debt-details.js';
 import { BankCreateInvestmentDetails20261108120019 } from '../../migrations/20261108120019-bank-create-investment-details.js';
+import { BankCreateProviderExpenseDetails20261108120020 } from '../../migrations/20261108120020-bank-create-provider-expense-details.js';
 
 type MigrationClass = new () => MigrationInterface;
 type MysqlOptions = MysqlConnectionOptions;
@@ -61,6 +63,7 @@ export const MIGRATIONS: ReadonlyArray<{ file: string; migration: MigrationClass
   { file: '20261108120017-bank-create-transactions', migration: BankCreateTransactions20261108120017 },
   { file: '20261108120018-bank-create-debt-details', migration: BankCreateDebtDetails20261108120018 },
   { file: '20261108120019-bank-create-investment-details', migration: BankCreateInvestmentDetails20261108120019 },
+  { file: '20261108120020-bank-create-provider-expense-details', migration: BankCreateProviderExpenseDetails20261108120020 },
 ];
 
 /** Every entity the app maps, so repositories resolve against the test database. */
@@ -73,6 +76,7 @@ export const ENTITIES = [
   Organization,
   OrganizationMembership,
   PasswordResetToken,
+  ProviderExpenseDetails,
   RefreshToken,
   Transaction,
   User,

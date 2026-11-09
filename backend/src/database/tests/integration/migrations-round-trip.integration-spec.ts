@@ -54,6 +54,7 @@ describe('migrations round trip (MySQL)', () => {
       'bank_accounts',
       'bank_debt_details',
       'bank_investment_details',
+      'bank_provider_expense_details',
       'bank_transactions',
     ]);
   });
