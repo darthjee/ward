@@ -7,11 +7,15 @@ export const DEBTS_BASE = '/bank/debts';
 /** Section base of the Investments submenu (investment accounts). */
 export const INVESTMENTS_BASE = '/bank/investments';
 
+/** Section base of the Providers submenu (provider-expense accounts). */
+export const PROVIDERS_BASE = '/bank/providers';
+
 /** Section base of each account type that has a frontend submenu. */
 export const SECTION_BY_TYPE = new Map([
   ['regular', ACCOUNTS_BASE],
   ['debt', DEBTS_BASE],
   ['investment', INVESTMENTS_BASE],
+  ['provider_expense', PROVIDERS_BASE],
 ]);
 
 /** Account type shown by each section base. */
