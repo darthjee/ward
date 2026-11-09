@@ -18,6 +18,7 @@ function buildTransaction(overrides: Partial<Transaction> = {}): Transaction {
     amount: -1250n,
     description: 'Coffee',
     notes: null,
+    sentToAccountantAt: null,
     createdAt: new Date('2026-01-10T00:00:00Z'),
     updatedAt: new Date('2026-01-10T00:00:00Z'),
     ...overrides,

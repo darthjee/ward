@@ -159,6 +159,21 @@ describe('bank schema (MySQL)', () => {
       expect(await ds.query(`SELECT id FROM ${ACCOUNTS}`)).toEqual([]);
     });
 
+    it('creates sent_to_accountant_at as a nullable datetime with no default', async () => {
+      expect(await columnInfo(ds, TRANSACTIONS, 'sent_to_accountant_at')).toMatchObject({
+        type: 'datetime',
+        nullable: true,
+        default: null,
+      });
+    });
+
+    it('leaves sent_to_accountant_at NULL on a new transaction', async () => {
+      const accountId = await insertAccount(ds, { userId: 1 }, 'Nubank');
+      await insertTransaction(ds, accountId);
+
+      expect(await ds.query(`SELECT sent_to_accountant_at AS sent FROM ${TRANSACTIONS}`)).toEqual([{ sent: null }]);
+    });
+
     it('rejects a transaction of an unknown account', async () => {
       await expect(insertTransaction(ds, 999999)).rejects.toThrow(/foreign key constraint fails/);
     });
@@ -273,7 +288,11 @@ describe('bank schema (MySQL)', () => {
   });
 
   describe('down', () => {
-    it('drops bank_provider_expense_details, bank_investment_details, bank_debt_details, then bank_transactions, then bank_accounts', async () => {
+    it('drops sent_to_accountant_at, then bank_provider_expense_details, bank_investment_details, bank_debt_details, then bank_transactions, then bank_accounts', async () => {
+      await ds.undoLastMigration();
+      expect(await columnInfo(ds, TRANSACTIONS, 'sent_to_accountant_at')).toBeUndefined();
+      expect(await tableNames(ds)).toContain(PROVIDER_EXPENSE_DETAILS);
+
       await ds.undoLastMigration();
       expect(await tableNames(ds)).not.toContain(PROVIDER_EXPENSE_DETAILS);
       expect(await tableNames(ds)).toContain(INVESTMENT_DETAILS);
