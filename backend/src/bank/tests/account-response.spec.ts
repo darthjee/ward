@@ -2,8 +2,10 @@ import { maskAccountNumber, serializeAccount } from '../account-response.js';
 import { buildAccount } from './account.test-support.js';
 import { DebtAccountHandler } from '../account-types/debt-account.handler.js';
 import { InvestmentAccountHandler } from '../account-types/investment-account.handler.js';
+import { ProviderExpenseAccountHandler } from '../account-types/provider-expense-account.handler.js';
 import { DebtDetails } from '../entities/debt-details.entity.js';
 import { InvestmentDetails } from '../entities/investment-details.entity.js';
+import { ProviderExpenseDetails } from '../entities/provider-expense-details.entity.js';
 
 describe('maskAccountNumber', () => {
   it.each([
@@ -127,5 +129,44 @@ describe('serializeAccount', () => {
     expect(serializeAccount(buildAccount(), { balance: 0n, mask: false })).not.toHaveProperty('investment');
     expect(serializeAccount(buildAccount({ type: 'debt' }), { balance: 0n, mask: false, nested: {} }))
       .not.toHaveProperty('investment');
+  });
+
+  it('serializes a provider account\'s provider_expense object in snake_case, with the amount as a decimal string', () => {
+    const provider = buildAccount({ type: 'provider_expense', currency: 'BRL' });
+    const details = Object.assign(new ProviderExpenseDetails(), {
+      accountId: provider.id,
+      forAccountant: true,
+      providerTaxId: '12.345.678/0001-90',
+      expectedAmount: 20000n,
+      dueDay: 10,
+      chargeFrequency: 'monthly',
+      dueMonth: null,
+    });
+    const nested = new ProviderExpenseAccountHandler().serialize(details, provider);
+
+    const response = serializeAccount(provider, { balance: -20000n, mask: false, nested });
+
+    expect(response).toMatchObject({
+      type: 'provider_expense',
+      balance: '-200.00',
+      provider_expense: {
+        for_accountant: true,
+        provider_tax_id: '12.345.678/0001-90',
+        expected_amount: '200.00',
+        charge_frequency: 'monthly',
+        due_day: 10,
+        due_month: null,
+      },
+    });
+    expect(response).not.toHaveProperty('debt');
+    expect(response).not.toHaveProperty('investment');
+  });
+
+  it('never adds a provider_expense key to a regular, debt or investment account', () => {
+    expect(serializeAccount(buildAccount(), { balance: 0n, mask: false })).not.toHaveProperty('provider_expense');
+    expect(serializeAccount(buildAccount({ type: 'debt' }), { balance: 0n, mask: false, nested: {} }))
+      .not.toHaveProperty('provider_expense');
+    expect(serializeAccount(buildAccount({ type: 'investment' }), { balance: 0n, mask: false, nested: {} }))
+      .not.toHaveProperty('provider_expense');
   });
 });

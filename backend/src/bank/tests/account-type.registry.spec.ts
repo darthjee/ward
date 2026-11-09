@@ -3,7 +3,15 @@ import { buildAccount } from './account.test-support.js';
 import { AccountTypeRegistry } from '../account-types/account-type.registry.js';
 import { DebtAccountHandler } from '../account-types/debt-account.handler.js';
 import { InvestmentAccountHandler } from '../account-types/investment-account.handler.js';
+import { ProviderExpenseAccountHandler } from '../account-types/provider-expense-account.handler.js';
 import { RegularAccountHandler } from '../account-types/regular-account.handler.js';
+
+const allHandlers = (): AccountTypeRegistry => new AccountTypeRegistry([
+  new RegularAccountHandler(),
+  new DebtAccountHandler(),
+  new InvestmentAccountHandler(),
+  new ProviderExpenseAccountHandler(),
+]);
 
 describe('AccountTypeRegistry', () => {
   const registry = new AccountTypeRegistry([new RegularAccountHandler()]);
@@ -12,22 +20,40 @@ describe('AccountTypeRegistry', () => {
     expect(registry.get('regular')).toBeInstanceOf(RegularAccountHandler);
   });
 
-  it.each(['debt', 'investment', 'provider_expense', 'unknown', ''])('rejects %p (no handler) with a 400', (type) => {
+  it.each(['savings', 'nope', 'unknown', ''])('rejects %p (unknown type) with a 400', (type) => {
     expect(() => registry.get(type)).toThrow(BadRequestException);
+    expect(() => allHandlers().get(type)).toThrow(BadRequestException);
   });
 
-  it('resolves debt once its handler is registered', () => {
-    const withDebt = new AccountTypeRegistry([new RegularAccountHandler(), new DebtAccountHandler()]);
-
-    expect(withDebt.get('debt')).toBeInstanceOf(DebtAccountHandler);
-    expect(() => withDebt.get('provider_expense')).toThrow(BadRequestException);
+  it('rejects a type whose handler is not registered', () => {
+    expect(() => registry.get('debt')).toThrow(BadRequestException);
   });
 
-  it('resolves investment once its handler is registered', () => {
-    const all = new AccountTypeRegistry([new RegularAccountHandler(), new DebtAccountHandler(), new InvestmentAccountHandler()]);
+  it.each([
+    ['regular', RegularAccountHandler],
+    ['debt', DebtAccountHandler],
+    ['investment', InvestmentAccountHandler],
+    ['provider_expense', ProviderExpenseAccountHandler],
+  ])('resolves %p once every handler is registered', (type, handler) => {
+    expect(allHandlers().get(type)).toBeInstanceOf(handler);
+  });
 
-    expect(all.get('investment')).toBeInstanceOf(InvestmentAccountHandler);
-    expect(() => all.get('provider_expense')).toThrow(BadRequestException);
+  describe('assertNoForeignNested with provider_expense registered', () => {
+    const all = allHandlers();
+
+    it.each([
+      ['a provider_expense object on a regular account', { provider_expense: {} }, 'regular'],
+      ['a provider_expense object on a debt account', { provider_expense: { due_day: 1 } }, 'debt'],
+      ['a provider_expense object on an investment account', { provider_expense: {} }, 'investment'],
+      ['a debt object on a provider_expense account', { debt: {} }, 'provider_expense'],
+      ['an investment object on a provider_expense account', { investment: {} }, 'provider_expense'],
+    ])('rejects %s', (_label, dto, type) => {
+      expect(() => all.assertNoForeignNested(dto, type)).toThrow(BadRequestException);
+    });
+
+    it('accepts a provider_expense object on a provider_expense account', () => {
+      expect(() => all.assertNoForeignNested({ provider_expense: {} }, 'provider_expense')).not.toThrow();
+    });
   });
 
   describe('assertNoForeignNested with investment registered', () => {
