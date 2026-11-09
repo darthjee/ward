@@ -1,7 +1,8 @@
 # Routes — Bank
 
-Routes of the lazy `bank` module (`backend/src/bank/`), served by three thin resident
-controllers: `AccountsController`, `TransactionsController` and `SettingsController`. Each is
+Routes of the lazy `bank` module (`backend/src/bank/`), served by four thin resident
+controllers: `AccountsController`, `TransactionsController`, `SettingsController` and
+`AccountantController`. Each is
 declared with `@OwnerScopedController('bank')`, so every route is mounted under **both** base
 paths (the external `/api` prefix is added by the proxy):
 
@@ -10,7 +11,7 @@ paths (the external `/api` prefix is added by the proxy):
 
 The controllers parse the ids, load the lazy `BankModule` on the first bank request
 (`BankModuleLoader` → `LazyModuleLoaderService#loadOnFirstRequest()`) and delegate to its
-`AccountService` / `TransactionService`. `settings.json` reads the resident `BANK_CONFIG` and
+`AccountService` / `TransactionService` / `AccountantService`. `settings.json` reads the resident `BANK_CONFIG` and
 does not load the module. The specs (`docs/agents/specs/banking/accounts/regular.md`,
 `debt.md`, `transactions.md`) are the source of truth for the behaviour.
 
@@ -187,8 +188,8 @@ transaction routes unchanged.
 - **`409 ACCOUNT_ARCHIVED`** — any `provider_expense` field on an archived provider-expense
   account (a field failing the format checks above is still a `400`, rejected by the
   validation pipe first).
-- The accountant hand-off (`sent_to_accountant_at`, preview, mark sent / unsent) is not
-  implemented yet (#71).
+- The accountant hand-off (`sent_to_accountant_at`, preview, mark sent / unsent) is described
+  in [Accountant hand-off](#accountant-hand-off).
 
 ## Transactions
 
@@ -206,6 +207,16 @@ same fields, all optional. A transaction never moves between accounts.
 
 Transaction response: `{ id, date, amount, description, notes, created_at, updated_at }`.
 
+- **`sent_to_accountant_at`** — present **only** on a charge (negative amount) of a
+  `provider_expense` account: the ISO timestamp of the accountant hand-off mark, or `null` when
+  unsent. On payments of provider-expense accounts and on every transaction of other account
+  types the key is **absent** (not `null`), so those responses are unchanged. The same rule
+  applies to the ledger rows (never on the virtual opening row).
+- The body never accepts `sent_to_accountant_at` / `sentToAccountantAt` (`400`); the mark is
+  set and cleared only by the [hand-off routes](#accountant-hand-off). A PATCH keeps the mark,
+  except one that turns a sent charge positive (a payment), which clears it; flipping it back
+  yields an unsent charge.
+
 ### Ledger envelope and pagination
 
 The project's first paginated route; the `pagination` block is the convention for later ones.
@@ -220,6 +231,9 @@ The project's first paginated route; the `pagination` block is the convention fo
 ```
 
 - 50 rows per page, newest first (within a day, by `id`, newest first).
+- Rows of provider-expense **charges** also carry `sent_to_accountant_at` (ISO timestamp or
+  `null`); the key is absent on every other row and on `opening` (see
+  [Transactions](#transactions)).
 - `balance` is the running balance, computed with a window function over the account's whole
   ledger before the `LIMIT`, so it is correct across pages.
 - `opening` is the virtual opening row (`opening_balance` − SUM(transactions dated before
@@ -228,6 +242,74 @@ The project's first paginated route; the `pagination` block is the convention fo
 - `page` defaults to `1`; a non-numeric or `< 1` page → `400`. A page past the last answers
   `transactions: []` and `opening: null` with the same metadata. `total_pages` is at least 1, so
   an empty ledger has one page holding the opening row.
+
+## Accountant hand-off
+
+Served by `AccountantController`, delegating to the lazy `AccountantService`; the spec is
+`docs/agents/specs/banking/accounts/provider-expense.md` (*Business expenses for the
+accountant*). There is no CSV route: the CSV is built client-side from the preview.
+
+| Method | Route | Body | Success | Errors | Cache class |
+|---|---|---|---|---|---|
+| GET | `<base>/accountant/charges.json?from=&to=&include_sent=false` | — | `200 { charges: [...] }` | `400 VALIDATION_FAILED`; `404` non-member `:orgId` | `user-scoped` |
+| POST | `<base>/accountant/mark-sent.json` | `{ "transaction_ids": [...] }` | `200 { charges: [...] }` | `400 VALIDATION_FAILED`; `404` | `never` |
+| POST | `<base>/accountant/mark-unsent.json` | `{ "transaction_ids": [...] }` | `200 { charges: [...] }` | `400 VALIDATION_FAILED`; `404` | `never` |
+
+### Preview
+
+Lists the **charges** (negative amounts, never payments) of every `for_accountant`
+provider-expense account of the active owner (archived accounts included, charges dated before
+`opening_date` included) dated in `[from, to]`, ordered by date then id.
+
+- **`from` / `to`** — required `YYYY-MM-DD` dates, each not after UTC today + 1 day; `from`
+  after `to` → `400`; `from == to` (one day) is allowed; `to − from` at most **366** days.
+- **`include_sent`** — optional `true` / `false` (default `false`: unsent charges only); any
+  other value → `400`.
+- A repeated parameter → `400`; unknown parameters are ignored.
+- **Cap** — more than **1000** charges → `400` ("narrow the range"), never a partial list. An
+  empty range answers `{ "charges": [] }`.
+
+```json
+{
+  "charges": [
+    {
+      "id": 7, "date": "2026-10-05", "description": "Charge", "amount": "-129.90",
+      "sent_to_accountant_at": null,
+      "account": { "id": 12, "name": "Vivo Fibra", "bank_name": "Vivo",
+                   "provider_tax_id": "02.558.157/0001-62", "currency": "BRL" }
+    }
+  ]
+}
+```
+
+`amount` is in the row's own currency exponent (currencies may be mixed); `account` carries only
+those five fields (no owner fields, no `account_number`, no balance).
+
+### Mark sent / unsent
+
+- **Body** (`@StrictBody()`) — `transaction_ids`: 1 to **1000** positive integers; an empty
+  list, more than 1000 ids, a non-positive-integer entry or any other field → `400`. Duplicates
+  are de-duplicated.
+- **All-or-nothing** — the ids are resolved in one owner-scoped query that locks their
+  `bank_transactions` rows (`SELECT … FOR UPDATE OF t`) inside one DB transaction:
+  - any unknown, other owner's or wrong-context id → the uniform `404` (checked first, so a
+    request mixing `404` and `400` ids answers `404`);
+  - `mark-sent`: a payment, a charge of a `for_accountant`-off account or any transaction of
+    another account type → `400 VALIDATION_FAILED` naming the rejected ids
+    (e.g. "transactions 7, 9 are not hand-off charges");
+  - `mark-unsent`: a payment or another account type → `400`; charges of a
+    `for_accountant`-off account can still be un-marked;
+  - nothing is stamped or cleared on any error.
+- **Archived accounts** — marking is allowed (hand-off metadata, not a ledger edit), while
+  transaction create / edit / delete there stay `409 ACCOUNT_ARCHIVED`.
+- **Reply** — `200` with every posted id (de-duplicated) and its resulting mark:
+
+  ```json
+  { "charges": [ { "id": 7, "sent_to_accountant_at": "2026-11-09T12:00:00.000Z" } ] }
+  ```
+
+  `mark-sent` is idempotent: an already-sent charge keeps (and reports) its original
+  timestamp. `mark-unsent` reports `null` for every id; an already-unsent charge is a no-op.
 
 ## Settings
 

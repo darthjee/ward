@@ -77,7 +77,7 @@ projected balance) needs no data migration.
 | `amount` | yes | yes | **Signed**: positive = money in, negative = money out; zero rejected. Storage format: see [Currency](#currency) |
 | `description` | yes | yes | Trimmed, max 255 characters |
 | `notes` | no | yes | Free text, max 2000 characters |
-| `sentToAccountantAt` | no | no | Nullable `DATETIME`; provider-expense charges only, set and cleared only by the accountant hand-off routes — see [provider-expense.md](provider-expense.md#business-expenses-for-the-accountant) |
+| `sentToAccountantAt` | no | no | Nullable `DATETIME`; provider-expense charges only, set and cleared only by the accountant hand-off routes — see [provider-expense.md](provider-expense.md#business-expenses-for-the-accountant); exception (decided in #71): a `PATCH` that turns a sent charge positive (a payment) also clears it |
 | `createdAt` / `updatedAt` | — | — | |
 
 - **Editable and hard-deletable** — nothing is locked until reconciliation exists.

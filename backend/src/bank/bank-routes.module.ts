@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { AccountantController } from './accountant.controller.js';
 import { AccountsController } from './accounts.controller.js';
 import { BankConfigModule } from './bank-config.module.js';
 import { BankModuleLoader } from './bank-module.loader.js';
@@ -29,7 +30,7 @@ import { LazyModuleLoaderService } from '../core/lazy-module-loader.service.js';
  */
 @Module({
   imports: [TypeOrmModule.forFeature([Account, DebtDetails, InvestmentDetails, ProviderExpenseDetails, Transaction]), BankConfigModule],
-  controllers: [AccountsController, TransactionsController, SettingsController],
+  controllers: [AccountsController, TransactionsController, SettingsController, AccountantController],
   providers: [LazyModuleLoaderService, BankModuleLoader],
 })
 // NestJS module classes are intentionally empty; all behavior lives in @Module().

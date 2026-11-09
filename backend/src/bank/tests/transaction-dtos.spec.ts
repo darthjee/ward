@@ -42,6 +42,7 @@ describe('CreateTransactionDto', () => {
     ['userId', { userId: 2 }],
     ['organizationId', { organizationId: 2 }],
     ['sent_to_accountant_at', { sent_to_accountant_at: '2026-01-01' }],
+    ['sentToAccountantAt', { sentToAccountantAt: '2026-01-01' }],
     ['balance', { balance: '1.00' }],
     ['unknown field', { color: 'red' }],
   ])('rejects a %s with a 400', async (_label, fields) => {
@@ -61,6 +62,8 @@ describe('UpdateTransactionDto', () => {
     ['future date', { date: isoDay(2) }],
     ['blank description', { description: '' }],
     ['accountId', { accountId: 3 }],
+    ['sent_to_accountant_at', { sent_to_accountant_at: '2026-01-01T00:00:00Z' }],
+    ['sentToAccountantAt', { sentToAccountantAt: null }],
   ])('rejects a %s with a 400', async (_label, body) => {
     await expect(update(body)).rejects.toThrow(BadRequestException);
   });

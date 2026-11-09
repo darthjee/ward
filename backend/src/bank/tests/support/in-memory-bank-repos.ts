@@ -165,6 +165,10 @@ function checkActiveName(account: Account, others: Account[]): void {
 export function createInMemoryBankRepos(): InMemoryBankRepos {
   const accounts = createInMemoryBankRepo(Account, checkActiveName);
   const transactions = createInMemoryBankRepo(Transaction);
+  const createTransaction = transactions.create;
+  // Like the nullable column with no default: a new transaction starts unsent.
+  transactions.create = (fields: Partial<Transaction>): Transaction =>
+    createTransaction({ sentToAccountantAt: null, ...fields });
   const debtDetails = createInMemoryDetailsRepo(DebtDetails);
   const investmentDetails = createInMemoryDetailsRepo(InvestmentDetails);
   const providerExpenseDetails = createInMemoryDetailsRepo(ProviderExpenseDetails);

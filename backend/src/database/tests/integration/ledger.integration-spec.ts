@@ -77,6 +77,18 @@ describe('bank ledger SQL (MySQL)', () => {
     ]);
   });
 
+  it('maps sent_to_accountant_at as a Date, or null when unsent', async () => {
+    const account = await insertAccount();
+    const sent = await insertTransaction(account.id, '2026-11-02', -1n);
+    await insertTransaction(account.id, '2026-11-01', -2n);
+    await ds.query('UPDATE bank_transactions SET sent_to_accountant_at = ? WHERE id = ?', ['2026-11-09 12:00:00', sent.id]);
+
+    const rows = await ledger.page(account, 1, 50);
+
+    expect(rows[0].sentToAccountantAt).toBeInstanceOf(Date);
+    expect(rows[1].sentToAccountantAt).toBeNull();
+  });
+
   it('orders newest first, by id within a day', async () => {
     const account = await insertAccount();
     const first = await insertTransaction(account.id, '2026-11-02', 1n);

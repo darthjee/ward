@@ -29,6 +29,13 @@ export class Transaction {
   @Column({ type: 'text', nullable: true })
     notes!: string | null;
 
+  /**
+   * Accountant hand-off mark of a provider-expense charge: set only by Mark as sent, cleared by
+   * Mark as unsent (or by a PATCH that turns the charge into a payment). `null` when unsent.
+   */
+  @Column({ name: 'sent_to_accountant_at', type: 'datetime', nullable: true })
+    sentToAccountantAt!: Date | null;
+
   @CreateDateColumn({ name: 'created_at' })
     createdAt!: Date;
 

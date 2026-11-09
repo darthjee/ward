@@ -14,6 +14,7 @@ import { Transaction } from './entities/transaction.entity.js';
 import { LedgerQuery } from './ledger.query.js';
 import { buildPagination, LEDGER_PER_PAGE } from './pagination.js';
 import {
+  PROVIDER_EXPENSE_TYPE,
   serializeLedger,
   serializeTransaction,
   type LedgerResponse,
@@ -90,9 +91,10 @@ export class TransactionService {
       amount: parseAmountInput('amount', dto.amount, account.currency, AMOUNT_RULES),
       description: dto.description,
       notes: dto.notes ?? null,
+      sentToAccountantAt: null,
     });
 
-    return serializeTransaction(await this.transactionRepository.save(transaction), account.currency);
+    return serializeTransaction(await this.transactionRepository.save(transaction), account);
   }
 
   /**
@@ -116,11 +118,12 @@ export class TransactionService {
 
     if (dto.amount !== undefined) {
       transaction.amount = parseAmountInput('amount', dto.amount, account.currency, AMOUNT_RULES);
+      clearMarkOnPayment(account, transaction);
     }
 
     Object.assign(transaction, definedFields({ date: dto.date, description: dto.description, notes: dto.notes }));
 
-    return serializeTransaction(await this.transactionRepository.save(transaction), account.currency);
+    return serializeTransaction(await this.transactionRepository.save(transaction), account);
   }
 
   /**
@@ -176,4 +179,17 @@ export class TransactionService {
  */
 function definedFields(fields: Record<string, unknown>): Record<string, unknown> {
   return Object.fromEntries(Object.entries(fields).filter(([, value]) => value !== undefined));
+}
+
+/**
+ * A sent charge edited into a payment (positive amount) loses its hand-off mark, so a payment
+ * is never marked; flipping it back yields an unsent charge. Other edits keep the mark.
+ * @param {Account} account - The transaction's account.
+ * @param {Transaction} transaction - The transaction, with its new amount.
+ * @returns {void}
+ */
+function clearMarkOnPayment(account: Account, transaction: Transaction): void {
+  if (account.type === PROVIDER_EXPENSE_TYPE && transaction.amount > 0n) {
+    transaction.sentToAccountantAt = null;
+  }
 }

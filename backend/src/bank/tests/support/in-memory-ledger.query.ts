@@ -37,7 +37,15 @@ export class LedgerQuery {
     let balance = await this.openingEffective(account);
     const rows = ledger.map((row) => {
       balance += row.amount;
-      return { id: row.id, date: row.date, amount: row.amount, description: row.description, notes: row.notes, balance };
+      return {
+        id: row.id,
+        date: row.date,
+        amount: row.amount,
+        description: row.description,
+        notes: row.notes,
+        sentToAccountantAt: row.sentToAccountantAt ?? null,
+        balance,
+      };
     });
 
     return rows.reverse().slice((page - 1) * perPage, page * perPage);

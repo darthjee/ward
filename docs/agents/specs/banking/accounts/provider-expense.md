@@ -101,6 +101,10 @@ On `bank_transactions` (see [transactions.md](transactions.md#transaction-entity
 - **`sentToAccountantAt`** — nullable `DATETIME`, set **only** by
   [Mark as sent](#marking-as-sent) and cleared only by Mark as unsent; the generic transaction
   body rejects it (400, whitelist). Returned only for charges of provider-expense accounts.
+  **Absent, not `null`** (decided in #71) — on payments of provider-expense accounts and on
+  every transaction of other account types the `sent_to_accountant_at` key is absent from
+  transaction responses and ledger rows (never on the virtual opening row), so their responses
+  are unchanged; on a provider charge it is the ISO timestamp or `null` when unsent.
 - A 1:1 side table for the mark was rejected: it would add a join to every export.
 
 **Not added:** a `kind` column (the sign is enough, as in debt); a separate `provider` field;
@@ -140,6 +144,14 @@ any charge ↔ payment link (reconciliation territory).
   accounts included) for a **date range**, defaulting to the last full month — any range is
   allowed (within the [caps](#performance--security)).
 - The preview defaults to **unsent charges only**, with an option to include sent ones.
+- **Charges before `opening_date`** (decided in #71) — included: the preview filters only by
+  date range, active owner, `forAccountant` and sign.
+- **Preview shape** (decided in #71) — an envelope `{ "charges": [...] }`, one row per charge:
+  the charge's `id`, `date`, `description`, `amount` (in the account currency's exponent) and
+  `sent_to_accountant_at` (ISO timestamp or `null`) at the top level, and the provider under a
+  nested `account` object carrying only `id` (to link the provider detail page), `name`,
+  `bank_name`, `provider_tax_id` and `currency` — no owner fields, no `account_number`, no
+  balance. An empty range answers `{ "charges": [] }`.
 - A **CSV download** of exactly the previewed rows, **built client-side** from the preview
   response — no CSV route, no backend memory, no new dependency. Columns: date, provider
   (account name and `bank_name`), provider tax id, description, amount, currency. The format is
@@ -154,9 +166,15 @@ any charge ↔ payment link (reconciliation territory).
 - **Mark as unsent** — a per-charge undo on the provider detail page — clears the mark; the
   charge reappears in an unsent-only preview.
 - Editing or deleting a sent charge is **allowed with a warning**; an edit keeps the mark.
+  **Sign flip** (decided in #71) — a PATCH that turns a sent charge positive (a payment) clears
+  `sentToAccountantAt`, so a payment is never marked; flipping it back yields an unsent charge.
   Locking sent charges is left to the *Reconciliation* [Future epic](../README.md#future-epics).
 - The mark inherits the owner through its transaction's account, so the
   [Bank ownership contract](../README.md#bank-ownership-contract) is unchanged.
+- **Mark routes reply** (decided in #71) — both answer `200` with every posted id (after
+  de-duplication) and its resulting mark: `{ "charges": [ { "id": 7, "sent_to_accountant_at":
+  "2026-11-09T12:00:00.000Z" } ] }`. Re-marking an already-sent charge returns its original
+  timestamp; `mark-unsent` returns `null` for every id (an already-unsent charge is a no-op).
 
 ### Receipts / attachments
 
@@ -333,13 +351,36 @@ Hand-off:
 
 - `from` / `to` are required ISO dates; `from` after `to`, a missing date, a future date or a
   range over **366 days** → 400.
+- **Preview query rules** (decided in #71) — "future" means after UTC today + 1 day, the same
+  limit as transaction dates in [transactions.md](transactions.md), so a charge dated tomorrow
+  can be exported; `from == to` (a single day) is allowed; the cap counts the difference,
+  `to − from` ≤ 366 days (`2026-01-01` → `2027-01-02` is accepted); `include_sent` accepts only
+  `true` / `false` (default `false`), any other value → 400; a repeated parameter → 400;
+  unknown parameters are ignored.
 - More than **1000** charges in the preview → 400 ("narrow the range"), so a hand-off is never
   silently partial. An empty range → an empty list.
 - `transaction_ids`: an empty list → 400; more than **1000** ids → 400; duplicates are
-  de-duplicated.
+  de-duplicated. An entry that is not a positive integer → 400 (validation), not 404 (decided
+  in #71).
 - **All-or-nothing** — nothing is stamped or cleared when any id fails: an unknown, another
   owner's or wrong-context id → **404**; a payment or a charge of a non-`forAccountant` account
   → **400**.
+- **Accepted transactions** (decided in #71):
+
+  | Posted id | `mark-sent` | `mark-unsent` |
+  |---|---|---|
+  | Charge of a `forAccountant` provider-expense account (archived included) | stamped; an existing timestamp is kept | cleared |
+  | Charge of a provider-expense account with `forAccountant` off | 400 | cleared |
+  | Payment of a provider-expense account | 400 | 400 |
+  | Any transaction of a regular, debt or investment account | 400 | 400 |
+  | Unknown id, another owner's, or the wrong context | 404 | 404 |
+
+  `mark-unsent` answers 400 only for payments and other account types, so the marks kept by
+  edge case 6 stay undoable.
+- **Precedence** (decided in #71) — ownership first: when a request mixes 404 and 400 ids the
+  answer is 404, so nothing is revealed about ids the owner can't see. The 400 is the standard
+  `VALIDATION_FAILED` envelope, its message naming the rejected ids (e.g. "transactions 7, 9
+  are not hand-off charges"); only the owner's own ids appear in it.
 
 ### Permissions and caching
 
@@ -370,7 +411,13 @@ Same as [regular.md](regular.md#rules):
 3. **Ownership in the mark routes** — all ids are resolved in **one query** joined to
    `bank_accounts` and filtered by the active owner; any unresolved id → 404; the 400 cases
    (payments, non-`forAccountant` charges) are checked in the same pass; the update runs in one
-   DB transaction.
+   DB transaction. **Row lock** (decided in #71) — the resolving query locks the posted
+   transaction rows with `SELECT … FOR UPDATE OF t` (only `bank_transactions`, at most 1000
+   rows — not the accounts or details), so the 404 / 400 checks and the `UPDATE` see the same
+   rows: a concurrent `DELETE` or `PATCH` of one of those charges waits for the mark to commit
+   (a `PATCH` flipping the sign then clears the mark), so a payment is never stamped. A
+   `forAccountant` toggle racing with the mark is not locked out — harmless, since edge case 6
+   keeps existing marks either way.
 4. **Unchanged** — no owner fields in responses; whitelisted bodies, never logged; XSS
    escaping; no credentials; `provider_tax_id` shown in full, `account_number` masked in lists;
    **no rate limit** (authenticated users acting in their own context, as transactions).
@@ -452,7 +499,8 @@ dependency; the CSV is built in the browser and the preview is capped at 1000 ro
 9. **Empty range** — the CSV has just the header row; Mark as sent is disabled; an empty id list
    posted to the API → 400.
 10. **Invalid range** — `from` after `to`, a missing date or a future date → 400. "Last full
-    month" is computed from the browser's local date; the API receives explicit dates.
+    month" is computed from the browser's local date; the API receives explicit dates. A date
+    up to UTC today + 1 day is accepted; `from == to` is allowed (decided in #71).
 
 **Account and ledger**
 
