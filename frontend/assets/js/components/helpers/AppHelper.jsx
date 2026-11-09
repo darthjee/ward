@@ -29,6 +29,7 @@ import BankProviderList from '../resources/bank/providers/pages/BankProviderList
 import BankProviderNew from '../resources/bank/providers/pages/BankProviderNew.jsx';
 import BankProviderEdit from '../resources/bank/providers/pages/BankProviderEdit.jsx';
 import BankProviderDetail from '../resources/bank/providers/pages/BankProviderDetail.jsx';
+import BankProviderAccountant from '../resources/bank/providers/pages/BankProviderAccountant.jsx';
 
 const PAGES = new Map([
   ['register', <ModalRedirect mode="register" />],
@@ -56,6 +57,7 @@ const PAGES = new Map([
   ['bank-providers', <BankProviderList />],
   ['bank-provider-new', <BankProviderNew />],
   ['bank-provider-edit', <BankProviderEdit />],
+  ['bank-provider-accountant', <BankProviderAccountant />],
   ['bank-provider', <BankProviderDetail />],
   ['not-found', <NotFound />],
   ['home', <Home />],
