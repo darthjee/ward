@@ -21,7 +21,7 @@ export interface AccountTypeContext {
 
 /**
  * The extension point of the generic account routes. Each account `type`
- * (`regular`, `debt`, `investment`, later `provider_expense`) registers one
+ * (`regular`, `debt`, `investment`, `provider_expense`) registers one
  * handler; the generic `AccountService` only ever talks to handlers through
  * the registry and never names a specific type. A type's nested body and
  * response object is named after the type (e.g. `debt`).

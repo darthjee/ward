@@ -5,6 +5,7 @@ import { ACCOUNT_TYPE_HANDLERS, type AccountTypeHandler } from './account-types/
 import { AccountTypeRegistry } from './account-types/account-type.registry.js';
 import { DebtAccountHandler } from './account-types/debt-account.handler.js';
 import { InvestmentAccountHandler } from './account-types/investment-account.handler.js';
+import { ProviderExpenseAccountHandler } from './account-types/provider-expense-account.handler.js';
 import { RegularAccountHandler } from './account-types/regular-account.handler.js';
 import { AccountService } from './account.service.js';
 import { BankConfigModule } from './bank-config.module.js';
@@ -39,9 +40,10 @@ export { TransactionService } from './transaction.service.js';
     RegularAccountHandler,
     DebtAccountHandler,
     InvestmentAccountHandler,
+    ProviderExpenseAccountHandler,
     {
       provide: ACCOUNT_TYPE_HANDLERS,
-      inject: [RegularAccountHandler, DebtAccountHandler, InvestmentAccountHandler],
+      inject: [RegularAccountHandler, DebtAccountHandler, InvestmentAccountHandler, ProviderExpenseAccountHandler],
       useFactory: (...handlers: AccountTypeHandler[]): AccountTypeHandler[] => handlers,
     },
     AccountTypeRegistry,
