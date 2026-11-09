@@ -252,7 +252,7 @@ Additive: a new table, a newly accepted `type` value and a nested `debt` object 
 debt accounts. Regular accounts are unchanged. The only behaviour change is that
 `POST /accounts.json` with `type: debt` no longer answers 400 (the
 [regular.md](regular.md#accounts) "until the other type specs exist" rule, reconciled by #50:
-types without a registered handler still answer 400; `investment` gained its handler in #52).
+types without a registered handler still answer 400; `investment` gained its handler in #52 and `provider_expense` in #54).
 
 ### Memory footprint
 

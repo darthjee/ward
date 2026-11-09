@@ -83,6 +83,7 @@ folded, not repeated here.
 | `bank_transactions` | Bank | `account_id` is a **real** FK to `bank_accounts` (same module) with `ON DELETE RESTRICT`; index `(account_id, date, id)`. No owner columns: the owner is inherited through the account |
 | `bank_debt_details` | Bank | 1:1 with `bank_accounts`: `account_id` is both the PK and a **real** FK to `bank_accounts.id` with `ON DELETE CASCADE` (the details row goes with the account). No owner columns: the owner is inherited through the account. `instalment_amount` is `BIGINT` minor units |
 | `bank_investment_details` | Bank | 1:1 with `bank_accounts`: `account_id` is both the PK and a **real** FK to `bank_accounts.id` with `ON DELETE CASCADE` (the details row goes with the account). No owner columns: the owner is inherited through the account. `yield_rate` is `DECIMAL(7,4)`, `maturity_date` a `DATE`, `liquidity_days` an `INT` |
+| `bank_provider_expense_details` | Bank | 1:1 with `bank_accounts`: `account_id` is both the PK and a **real** FK to `bank_accounts.id` with `ON DELETE CASCADE` (the details row goes with the account). No owner columns: the owner is inherited through the account. `expected_amount` is `BIGINT` minor units; `for_accountant` a boolean (default `true`), `charge_frequency` a `VARCHAR(16)` (default `monthly`), `due_day` / `due_month` `TINYINT` |
 
 ## Build
 

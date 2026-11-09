@@ -306,7 +306,27 @@ Accounts:
 - Ranges → 400 when outside: `due_day` 1–31, `due_month` 1–12, `expected_amount` > 0 (and
   within the amount bound and currency decimals of [transactions.md](transactions.md#currency)),
   `provider_tax_id` at most 32 characters.
-- Unknown fields inside `provider_expense` are rejected by the whitelist `ValidationPipe`.
+- Unknown fields inside `provider_expense` are rejected by the whitelist `ValidationPipe`;
+  `provider_expense: null` → 400.
+- **Non-nullable fields** (decided in #54) — `charge_frequency` (default `monthly`) and
+  `for_accountant` (default `true`) never accept `null` (400); every other field accepts
+  `null` to clear it.
+- **Paired rule on the merged state** (decided in #54) — `charge_frequency` ↔ `due_month` is
+  checked on the stored details (or the defaults, on create) with the request merged on top,
+  not on the request body alone (as #50 does for debts):
+  - yearly with `due_month` 3: `{ due_day: 10 }` and `{ due_month: 7 }` are accepted;
+    `{ due_month: null }` → 400; `{ charge_frequency: "monthly" }` is accepted and clears
+    `due_month`; `{ charge_frequency: "monthly", due_month: 5 }` → 400;
+  - monthly: `{ due_month: 5 }` → 400; `{ charge_frequency: "yearly" }` → 400 (no month);
+    `{ charge_frequency: "yearly", due_month: 5 }` is accepted;
+  - on create, `{ charge_frequency: "yearly" }` without `due_month` → 400.
+- **`expected_amount` on a currency change** (decided in #54) — a `currency` change (allowed
+  only before any transaction) rescales the stored `expected_amount` like `opening_balance`,
+  keeping its decimal value (`200.00` BRL → `200` JPY); when it cannot be represented → 400
+  (`12.50` BRL → JPY). When the same PATCH sends `expected_amount`, the stored value is not
+  rescaled and the sent value is validated against the new currency (`null` clears it).
+- **`provider_tax_id`** (decided in #54) — free text, treated like `bank_name` / `branch`:
+  trimmed, blank → `null`, at most 32 characters, no format check (it is not always a CNPJ).
 - A transaction body with `sentToAccountantAt` / `sent_to_accountant_at` → 400.
 
 Hand-off:
@@ -395,7 +415,8 @@ Additive: a new table, a new nullable column, a newly accepted `type` value, a n
 `provider_expense` object present only on provider-expense accounts and three new routes.
 Other account types are unchanged. The only behaviour change is that `POST /accounts.json` with
 `type: provider_expense` no longer answers 400 (the [regular.md](regular.md#accounts) "until
-the other type specs exist" rule; reconciled by the fold sub-issue of #26).
+the other type specs exist" rule, reconciled by #50, #52 and #54: every type now has a
+registered handler, so only an unknown type answers 400).
 
 ### Memory footprint
 

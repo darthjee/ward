@@ -55,15 +55,15 @@ does not load the module. The specs (`docs/agents/specs/banking/accounts/regular
   `opening_date`); on the list it comes from one grouped query.
 - Each account type adds its nested object under its type name; `regular` has none, `debt`
   carries a `debt` object (see [Debt object](#debt-object)), `investment` carries an
-  `investment` object (see [Investment object](#investment-object)), and later types
-  (`provider_expense`) will follow the same pattern. Sending another type's nested object (e.g.
+  `investment` object (see [Investment object](#investment-object)), and `provider_expense`
+  carries a `provider_expense` object (see [Provider-expense object](#provider-expense-object)). Sending another type's nested object (e.g.
   `debt` on a regular account) → `400`.
 
 ## Accounts
 
 | Method | Route | Body | Success | Errors | Cache class |
 |---|---|---|---|---|---|
-| GET | `<base>/accounts.json?type=regular&archived=false` | — | `200` list of accounts of that `type` (`regular` default, `debt`, `investment`), sorted by name; `archived=true` also lists archived ones (with `archived_at` set) | `400` type without a handler, invalid `archived` | `user-scoped` |
+| GET | `<base>/accounts.json?type=regular&archived=false` | — | `200` list of accounts of that `type` (`regular` default, `debt`, `investment`, `provider_expense`), sorted by name; `archived=true` also lists archived ones (with `archived_at` set) | `400` type without a handler, invalid `archived` | `user-scoped` |
 | POST | `<base>/accounts.json` | `CreateAccountDto` | `201` account | `400` validation / type without a handler / wrong nested object / non-zero `opening_balance` on an investment; `409 ACCOUNT_NAME_TAKEN` | `never` |
 | GET | `<base>/accounts/:accountId.json` | — | `200` account (full number) | `404` | `user-scoped` |
 | PATCH | `<base>/accounts/:accountId.json` | `UpdateAccountDto` | `200` account | `400`; `404`; `409 ACCOUNT_ARCHIVED` (anything but `name` on an archived account), `CURRENCY_LOCKED` (currency change once the account has transactions), `ACCOUNT_NAME_TAKEN` | `never` |
@@ -75,9 +75,10 @@ does not load the module. The specs (`docs/agents/specs/banking/accounts/regular
 
 | Field | Rule |
 |---|---|
-| `type` | Optional, default `regular`; `regular`, `debt` and `investment` have handlers; any other type → `400` |
+| `type` | Optional, default `regular`; `regular`, `debt`, `investment` and `provider_expense` have handlers; any other type → `400` |
 | `debt` | Optional, only with `type: debt` (see [Debt object](#debt-object)) |
 | `investment` | Optional, only with `type: investment` (see [Investment object](#investment-object)) |
+| `provider_expense` | Optional, only with `type: provider_expense` (see [Provider-expense object](#provider-expense-object)) |
 | `name` | Required; trimmed, non-blank, at most 255 characters; unique per owner among active accounts, case-insensitively (accent-sensitive) |
 | `bank_name`, `branch`, `account_number` | Optional, at most 64 characters; trimmed, blank → `null` |
 | `currency` | Optional ISO 4217 code from `Intl.supportedValuesOf('currency')`; defaults to `BANK_DEFAULT_CURRENCY` |
@@ -147,6 +148,47 @@ spec is `docs/agents/specs/banking/accounts/debt.md`.
   date (any past or future date is accepted).
 - **`409 ACCOUNT_ARCHIVED`** — any `investment` field on an archived investment (a field
   failing the format checks above is still a `400`, rejected by the validation pipe first).
+
+### Provider-expense object
+
+`type: provider_expense` accounts carry a nested `provider_expense` object, stored 1:1 in
+`bank_provider_expense_details`; the spec is
+`docs/agents/specs/banking/accounts/provider-expense.md`. Charges and payments use the generic
+transaction routes unchanged.
+
+```json
+"provider_expense": {
+  "for_accountant": true, "provider_tax_id": "12.345.678/0001-90", "expected_amount": "149.90",
+  "charge_frequency": "monthly", "due_day": 10, "due_month": null
+}
+```
+
+- Present on list rows, the detail and the create / update / archive / unarchive responses of
+  provider-expense accounts; absent on other types. Unset fields are `null`;
+  `expected_amount` is a decimal string in the account's currency exponent. Loaded with one
+  query per type on the list (no N+1).
+- **Create** — optional; without it a row is still created (`for_accountant` `true`,
+  `charge_frequency` `monthly`, every other field `null`). The paired rule below applies to
+  the defaults with the request merged on top.
+- **PATCH** — merged partially (omitted fields unchanged, `null` clears); the paired
+  `charge_frequency` ↔ `due_month` rule is checked on the stored details with the request
+  merged on top. Switching to `monthly` clears `due_month` automatically; switching to
+  `yearly` requires a `due_month` (stored or sent).
+- **Currency change** (only before any transaction) — rescales the stored `expected_amount`
+  like `opening_balance` (`200.00` BRL → `200` JPY; `12.50` BRL → JPY → `400`), unless the
+  same PATCH sends `expected_amount`, which is then validated against the new currency.
+- **`provider_tax_id`** — free text, trimmed, blank → `null`, at most 32 characters, no
+  format check.
+- **`400`** — `provider_expense: null`, unknown fields inside it, `provider_expense` on another
+  type; `for_accountant` / `charge_frequency` `null` (not nullable); `charge_frequency` not
+  `monthly` / `yearly`; `due_month` missing when yearly or present when monthly (merged
+  state); `due_day` outside 1–31, `due_month` outside 1–12; `expected_amount` ≤ 0, over the
+  amount bound or with too many decimals for the currency; `provider_tax_id` over 32.
+- **`409 ACCOUNT_ARCHIVED`** — any `provider_expense` field on an archived provider-expense
+  account (a field failing the format checks above is still a `400`, rejected by the
+  validation pipe first).
+- The accountant hand-off (`sent_to_accountant_at`, preview, mark sent / unsent) is not
+  implemented yet (#71).
 
 ## Transactions
 
