@@ -18,6 +18,7 @@ import { StrictBody } from '../strict-validation.pipe.js';
 
 const SRC_ROOT = resolve(__dirname, '..', '..');
 const KNOWN_CONTROLLERS = [
+  'AccountantController',
   'AccountsController',
   'AdminController',
   'AuthController',

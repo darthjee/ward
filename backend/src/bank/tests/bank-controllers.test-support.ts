@@ -16,7 +16,12 @@ export function fakeLoader() {
     update: jest.fn(async () => ({ id: 2 })),
     delete: jest.fn(async () => undefined),
   };
-  const services = jest.fn(async () => ({ accounts, transactions }));
+  const accountant = {
+    preview: jest.fn(async () => ({ charges: [] })),
+    markSent: jest.fn(async () => ({ charges: [] })),
+    markUnsent: jest.fn(async () => ({ charges: [] })),
+  };
+  const services = jest.fn(async () => ({ accounts, accountant, transactions }));
 
-  return { loader: { services } as unknown as BankModuleLoader, services, accounts, transactions };
+  return { loader: { services } as unknown as BankModuleLoader, services, accounts, accountant, transactions };
 }

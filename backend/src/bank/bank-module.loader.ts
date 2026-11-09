@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import type { AccountService } from './account.service.js';
+import type { AccountantService } from './accountant.service.js';
 import type { TransactionService } from './transaction.service.js';
 import { LazyModuleLoaderService } from '../core/lazy-module-loader.service.js';
 
@@ -8,6 +9,7 @@ import { LazyModuleLoaderService } from '../core/lazy-module-loader.service.js';
  */
 export interface BankServices {
   accounts: AccountService;
+  accountant: AccountantService;
   transactions: TransactionService;
 }
 
@@ -39,6 +41,7 @@ export class BankModuleLoader {
 
     return {
       accounts: moduleRef.get(bank.AccountService),
+      accountant: moduleRef.get(bank.AccountantService),
       transactions: moduleRef.get(bank.TransactionService),
     };
   }

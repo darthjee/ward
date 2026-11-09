@@ -1,6 +1,8 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AccountBalancesQuery } from './account-balances.query.js';
+import { AccountantChargesQuery } from './accountant-charges.query.js';
+import { AccountantService } from './accountant.service.js';
 import { ACCOUNT_TYPE_HANDLERS, type AccountTypeHandler } from './account-types/account-type-handler.js';
 import { AccountTypeRegistry } from './account-types/account-type.registry.js';
 import { DebtAccountHandler } from './account-types/debt-account.handler.js';
@@ -20,6 +22,7 @@ import { TransactionService } from './transaction.service.js';
 // Re-exported so the resident `BankModuleLoader` reaches the service classes
 // only through its dynamic `import()` of this file.
 export { AccountService } from './account.service.js';
+export { AccountantService } from './accountant.service.js';
 export { TransactionService } from './transaction.service.js';
 
 /**
@@ -49,10 +52,12 @@ export { TransactionService } from './transaction.service.js';
     AccountTypeRegistry,
     AccountBalancesQuery,
     AccountService,
+    AccountantChargesQuery,
+    AccountantService,
     LedgerQuery,
     TransactionService,
   ],
-  exports: [AccountService, TransactionService],
+  exports: [AccountService, AccountantService, TransactionService],
 })
 // NestJS module classes are intentionally empty; all behavior lives in @Module().
 // eslint-disable-next-line @typescript-eslint/no-extraneous-class
