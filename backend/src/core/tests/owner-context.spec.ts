@@ -1,5 +1,5 @@
 import { IsNull } from 'typeorm';
-import { ownerWhere } from '../owner-context.js';
+import { ownerSqlWhere, ownerWhere } from '../owner-context.js';
 
 describe('ownerWhere', () => {
   describe('for a user owner', () => {
@@ -15,5 +15,44 @@ describe('ownerWhere', () => {
         organizationId: 3,
       });
     });
+  });
+});
+
+describe('ownerSqlWhere', () => {
+  describe('for a user owner', () => {
+    it('binds the user and requires no organization', () => {
+      expect(ownerSqlWhere({ kind: 'user', userId: 7 }, 'a')).toEqual({
+        sql: 'a.user_id = ? AND a.organization_id IS NULL',
+        params: [7],
+      });
+    });
+  });
+
+  describe('for an organization owner', () => {
+    it('binds the organization and requires no user', () => {
+      expect(ownerSqlWhere({ kind: 'organization', organizationId: 3 }, 'a')).toEqual({
+        sql: 'a.user_id IS NULL AND a.organization_id = ?',
+        params: [3],
+      });
+    });
+  });
+
+  describe('alias handling', () => {
+    it('prefixes both columns with the given alias', () => {
+      expect(ownerSqlWhere({ kind: 'user', userId: 1 }, 'bank_accounts').sql).toBe(
+        'bank_accounts.user_id = ? AND bank_accounts.organization_id IS NULL',
+      );
+    });
+
+    it('accepts underscores and digits after the first character', () => {
+      expect(ownerSqlWhere({ kind: 'user', userId: 1 }, '_acc2').sql).toContain('_acc2.user_id');
+    });
+
+    it.each(['', '1a', 'a.b', 'a b', 'a; DROP TABLE x', 'a--', '`a`', 'a OR 1=1'])(
+      'rejects the non-identifier alias %p',
+      (alias) => {
+        expect(() => ownerSqlWhere({ kind: 'user', userId: 1 }, alias)).toThrow('Invalid SQL alias');
+      },
+    );
   });
 });

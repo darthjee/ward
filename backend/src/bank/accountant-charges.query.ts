@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import type { EntityManager, Repository } from 'typeorm';
-import type { OwnerContext } from '../core/owner-context.js';
+import { ownerSqlWhere, type OwnerContext, type OwnerSqlWhere } from '../core/owner-context.js';
 import { Transaction } from './entities/transaction.entity.js';
 
 /** Most charges one preview returns; one more row is read to detect an overflow. */
@@ -52,18 +52,6 @@ interface RawResolvedRow {
   for_accountant: number | string | boolean | null;
 }
 
-interface SqlFragment {
-  sql: string;
-  params: unknown[];
-}
-
-// Mirrors `accountOwnerWhere`: both owner columns are always constrained.
-function ownerSql(owner: OwnerContext): SqlFragment {
-  return owner.kind === 'user'
-    ? { sql: 'a.user_id = ? AND a.organization_id IS NULL', params: [owner.userId] }
-    : { sql: 'a.user_id IS NULL AND a.organization_id = ?', params: [owner.organizationId] };
-}
-
 function placeholders(ids: number[]): string {
   return ids.map(() => '?').join(', ');
 }
@@ -75,7 +63,7 @@ function toDate(value: Date | string | null): Date | null {
 // Charges (negative amounts) of the owner's `for_accountant` provider accounts, archived
 // included, in the range; walks the owner's accounts, then their charges through the
 // `(account_id, date, id)` index. `DATE_FORMAT` keeps the `DATE` a plain string.
-function previewSql(owner: SqlFragment, includeSent: boolean): string {
+function previewSql(owner: OwnerSqlWhere, includeSent: boolean): string {
   return `SELECT t.id, DATE_FORMAT(t.date, '%Y-%m-%d') AS date, t.description, t.amount, t.sent_to_accountant_at,
          a.id AS account_id, a.name AS account_name, a.bank_name, d.provider_tax_id, a.currency
     FROM bank_accounts a
@@ -117,7 +105,7 @@ export class AccountantChargesQuery {
    * @returns {Promise<AccountantChargeRow[]>} The charges.
    */
   async preview(owner: OwnerContext, from: string, to: string, includeSent: boolean): Promise<AccountantChargeRow[]> {
-    const ownerFilter = ownerSql(owner);
+    const ownerFilter = ownerSqlWhere(owner, 'a');
     const rows: RawChargeRow[] = await this.transactionRepository.query(previewSql(ownerFilter, includeSent), [
       ...ownerFilter.params,
       from,
@@ -149,7 +137,7 @@ export class AccountantChargesQuery {
    * @returns {Promise<ResolvedMarkRow[]>} The owner's matching transactions.
    */
   async resolveForUpdate(manager: EntityManager, owner: OwnerContext, ids: number[]): Promise<ResolvedMarkRow[]> {
-    const ownerFilter = ownerSql(owner);
+    const ownerFilter = ownerSqlWhere(owner, 'a');
     const rows: RawResolvedRow[] = await manager.query(
       `SELECT t.id, t.amount, t.sent_to_accountant_at, a.type, d.for_accountant
          FROM bank_transactions t
@@ -171,6 +159,10 @@ export class AccountantChargesQuery {
 
   /**
    * Stamps the unsent ones among `ids`; already-sent ones keep their original timestamp.
+   *
+   * **Warning:** this UPDATE filters by id only, with no owner scope. Callers must
+   * first resolve and lock `ids` under the owner via {@link resolveForUpdate} in
+   * the same DB transaction, and pass only the ids it returned.
    * @param {EntityManager} manager - The manager of the running DB transaction.
    * @param {number[]} ids - The (already resolved and checked) transaction ids.
    * @param {Date} now - The timestamp to stamp.
@@ -186,6 +178,10 @@ export class AccountantChargesQuery {
 
   /**
    * Clears the mark of `ids` (already-unsent ones are a no-op).
+   *
+   * **Warning:** this UPDATE filters by id only, with no owner scope. Callers must
+   * first resolve and lock `ids` under the owner via {@link resolveForUpdate} in
+   * the same DB transaction, and pass only the ids it returned.
    * @param {EntityManager} manager - The manager of the running DB transaction.
    * @param {number[]} ids - The (already resolved and checked) transaction ids.
    * @returns {Promise<void>}
