@@ -7,6 +7,7 @@ import {
   negateAmount,
   parseAmount,
   subtractAmounts,
+  sumAmounts,
   toSignedAmount,
 } from '../../../../../../../assets/js/components/resources/bank/common/amounts.js';
 
@@ -265,6 +266,29 @@ describe('amounts', () => {
       it(`is false for ${value}`, () => {
         expect(isZeroAmount(value)).toBeFalse();
       });
+    });
+  });
+
+  describe('sumAmounts', () => {
+    it('sums BRL amounts exactly, in minor units', () => {
+      expect(sumAmounts(['0.10', '0.20', '-1.05', '100'], 'BRL')).toBe('99.25');
+    });
+
+    it('sums JPY amounts without decimals', () => {
+      expect(sumAmounts(['1000', '-250', '3'], 'JPY')).toBe('753');
+    });
+
+    it('sums three-decimal currencies', () => {
+      expect(sumAmounts(['1.005', '0.001'], 'BHD')).toBe('1.006');
+    });
+
+    it('returns zero for an empty list', () => {
+      expect(sumAmounts([], 'BRL')).toBe('0.00');
+      expect(sumAmounts([], 'JPY')).toBe('0');
+    });
+
+    it('stays exact beyond float precision', () => {
+      expect(sumAmounts(['99999999999.99', '0.01'], 'BRL')).toBe('100000000000.00');
     });
   });
 });

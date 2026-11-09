@@ -210,3 +210,21 @@ export function subtractAmounts(a, b, currency) {
 export function isZeroAmount(amount) {
   return /^-?0+(?:[.,]0*)?$/.test(String(amount ?? '').trim());
 }
+
+/**
+ * Sum decimal strings in a currency, exactly.
+ *
+ * @description Every amount is read as BigInt minor units with the currency's decimals
+ * (`currencyDigits`), so no float rounding happens. Used by the accountant hand-off's
+ * per-currency totals.
+ * @param {Array<string>} decimals - The decimal strings.
+ * @param {string} currency - ISO 4217 code.
+ * @returns {string} The sum as a decimal string with the currency's decimals (`'0.00'` for an
+ *   empty list in BRL, `'0'` in JPY).
+ */
+export function sumAmounts(decimals, currency) {
+  const digits = currencyDigits(currency);
+  const total = decimals.reduce((sum, amount) => sum + toMinorUnits(amount, digits), 0n);
+
+  return fromMinorUnits(total, digits);
+}

@@ -37,31 +37,92 @@ function renderForm(readOnly, form, handlers) {
   return LedgerFormHelper.render({ form, today: localToday(), idPrefix: 'ledger-' }, handlers);
 }
 
+/** Warning shown before changing or deleting a charge already sent to the accountant. */
+export const SENT_WARNING = 'This charge was already sent to the accountant; the copy they '
+  + 'hold will not change.';
+
 /**
- * Render the delete confirmation for the account or a transaction.
+ * Build the delete-transaction body, warning when the charge was already sent.
+ *
+ * @param {object} transaction - The transaction to delete.
+ * @returns {string} The body.
+ */
+function transactionBody(transaction) {
+  const body = `Delete the transaction “${transaction.description}”? This cannot be undone.`;
+
+  return transaction.sent_to_accountant_at ? `${body} ${SENT_WARNING}` : body;
+}
+
+/** Title, body and confirm label per confirmation kind. */
+const CONFIRM_KINDS = new Map([
+  ['account', {
+    title: 'Delete account',
+    body: () => 'Delete this account? This cannot be undone.',
+    confirmLabel: 'Delete',
+  }],
+  ['transaction', {
+    title: 'Delete transaction',
+    body: (confirmation) => transactionBody(confirmation.transaction),
+    confirmLabel: 'Delete',
+  }],
+  ['sentEdit', {
+    title: 'Save sent charge',
+    body: () => `${SENT_WARNING} Save the change anyway?`,
+    confirmLabel: 'Save',
+  }],
+]);
+
+/**
+ * Whether the open confirmation's action is in flight.
  *
  * @param {object|null} confirmation - The open confirmation.
- * @param {boolean} pending - Whether the delete is in flight.
+ * @param {object} state - Page state (`actionPending`, `form`).
+ * @returns {boolean} True while the confirmed action runs.
+ */
+function confirmPending(confirmation, state) {
+  if (confirmation?.kind === 'sentEdit') {
+    return Boolean(state.form.pending);
+  }
+
+  return state.actionPending === 'delete';
+}
+
+/**
+ * Render the confirmation for the open kind (delete account, delete transaction, save a sent
+ * charge).
+ *
+ * @param {object|null} confirmation - The open confirmation (`{ kind, transaction }`).
+ * @param {object} state - Page state.
  * @param {object} handlers - `onConfirm` / `onCancelConfirm`.
  * @returns {React.ReactElement} The modal.
  */
-function renderConfirm(confirmation, pending, handlers) {
-  const transaction = confirmation?.transaction;
-  const body = transaction
-    ? `Delete the transaction “${transaction.description}”? This cannot be undone.`
-    : 'Delete this account? This cannot be undone.';
+function renderConfirm(confirmation, state, handlers) {
+  const kind = CONFIRM_KINDS.get(confirmation?.kind) ?? CONFIRM_KINDS.get('account');
 
   return (
     <ConfirmModal
       show={Boolean(confirmation)}
-      title={transaction ? 'Delete transaction' : 'Delete account'}
-      pending={pending}
+      title={kind.title}
+      confirmLabel={kind.confirmLabel}
+      pending={confirmPending(confirmation, state)}
       onConfirm={handlers.onConfirm}
       onCancel={handlers.onCancelConfirm}
     >
-      {body}
+      {confirmation ? kind.body(confirmation) : null}
     </ConfirmModal>
   );
+}
+
+/**
+ * Bind the section's optional per-row slot to the page handlers and state.
+ *
+ * @param {Function|undefined} slot - `renderRowExtra(transaction, handlers, state)`.
+ * @param {object} handlers - Page handlers.
+ * @param {object} state - Page state.
+ * @returns {Function|undefined} The table's `renderRowExtra(transaction)`, or `undefined`.
+ */
+function bindRowExtra(slot, handlers, state) {
+  return slot ? (transaction) => slot(transaction, handlers, state) : undefined;
 }
 
 /**
@@ -98,6 +159,7 @@ function renderLoaded(state, handlers, options) {
         busy: Boolean(state.actionPending),
         page: state.page,
         firstPageHref: hrefFor(1),
+        renderRowExtra: bindRowExtra(options.renderRowExtra, handlers, state),
       }, handlers)}
       <BankPagination
         page={state.page}
@@ -105,7 +167,7 @@ function renderLoaded(state, handlers, options) {
         hrefFor={hrefFor}
         onNavigate={handlers.onNavigate}
       />
-      {renderConfirm(state.confirmation, state.actionPending === 'delete', handlers)}
+      {renderConfirm(state.confirmation, state, handlers)}
     </>
   );
 }
@@ -142,10 +204,12 @@ const AccountDetailHelper = {
    *   confirmation: (object|null)}} state - Page state.
    * @param {object} handlers - Page handlers (see `buildDetailHandlers`).
    * @param {{base: string, backLabel: string, renderHeader: Function,
-   *   renderShortcuts: Function}} options - The section base path, the back link label, the
-   *   header renderer (called with `{ account, hasTransactions, actionPending, context }` and
-   *   the handlers) and the optional shortcuts renderer (called with the account, the
-   *   handlers and the page state, which may carry section extras).
+   *   renderShortcuts: Function, renderRowExtra: Function}} options - The section base path,
+   *   the back link label, the header renderer (called with `{ account, hasTransactions,
+   *   actionPending, context }` and the handlers), the optional shortcuts renderer (called
+   *   with the account, the handlers and the page state, which may carry section extras) and
+   *   the optional per-row renderer (called with the transaction, the handlers and the page
+   *   state; rendered under the description, also on an archived account).
    * @returns {React.ReactElement} The rendered page.
    */
   render(state, handlers, options) {

@@ -42,3 +42,17 @@ export function monthName(month) {
 
   return new Intl.DateTimeFormat(undefined, { month: 'long' }).format(new Date(2000, month - 1, 1));
 }
+
+/**
+ * Build the last full calendar month before the browser's local today.
+ *
+ * @param {Date} [now] - The current instant (injectable for specs).
+ * @returns {{from: string, to: string}} The month's first and last local days, `YYYY-MM-DD`
+ *   (e.g. `2026-03-15` → `2026-02-01`..`2026-02-28`; January → the previous December).
+ */
+export function lastFullMonth(now = new Date()) {
+  const first = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const last = new Date(now.getFullYear(), now.getMonth(), 0);
+
+  return { from: localToday(first), to: localToday(last) };
+}

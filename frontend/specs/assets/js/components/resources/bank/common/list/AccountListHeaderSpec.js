@@ -27,4 +27,10 @@ describe('AccountListHeader', () => {
     expect(page.containsAttribute('href', '#/orgs/5/bank/debts?archived=true')).toBeTrue();
     expect(page.containsAttribute('href', '#/orgs/5/bank/debts/new')).toBeTrue();
   });
+
+  it('renders extra links beside the create button', () => {
+    const page = output({ children: React.createElement('a', { href: '#/bank/debts/extra' }, 'Extra link') });
+
+    expect(page.containsInOrder('Show archived', 'Extra link', 'New debt')).toBeTrue();
+  });
 });
