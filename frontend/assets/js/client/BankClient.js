@@ -1,81 +1,31 @@
 import ApiClient from './ApiClient.js';
-import pickDefined from './pickDefined.js';
+import TypedAccountsClient from './TypedAccountsClient.js';
+import { ACCOUNT_FIELDS, accountPath, whitelist } from './accountBodies.js';
 import { contextPath } from '../utils/context/ownerContext.js';
 
-const ACCOUNT_FIELDS = [
-  'name', 'bank_name', 'branch', 'account_number', 'currency', 'opening_date', 'opening_balance',
-  'notes',
-];
-
-const DEBT_FIELDS = [
-  'interest_rate', 'interest_period', 'instalment_amount', 'instalment_frequency', 'due_day',
-  'due_month', 'instalment_count',
-];
-
-const INVESTMENT_FIELDS = ['kind', 'yield_rate', 'yield_period', 'maturity_date', 'liquidity_days'];
-
 const TRANSACTION_FIELDS = ['date', 'amount', 'description', 'notes'];
-
-/**
- * Build a request body from a whitelist of keys.
- *
- * @description Only whitelisted, defined keys are kept, so owner fields (`user_id`,
- * `organization_id`) and unknown keys are never sent; `null` is kept (it clears a field).
- * @param {object} attrs - The caller's attributes.
- * @param {Array<string>} fields - The allowed `snake_case` keys.
- * @returns {object} The body.
- */
-function whitelist(attrs, fields) {
-  const source = new Map(Object.entries(attrs ?? {}));
-
-  return pickDefined(Object.fromEntries(fields.map((field) => [field, source.get(field)])));
-}
-
-/**
- * Build a typed account body (debt, investment): the whitelisted common fields plus, when
- * given, the nested `key` object whitelisted to `fields` (`null` kept to clear, `undefined`
- * dropped).
- *
- * @param {object} attrs - The caller's attributes (common fields and an optional `key` object).
- * @param {string} key - The nested object's key (`debt`, `investment`).
- * @param {Array<string>} fields - The nested object's allowed keys.
- * @returns {object} The body, never carrying `type`.
- */
-function nestedBody(attrs, key, fields) {
-  const body = whitelist(attrs, ACCOUNT_FIELDS);
-  const nested = new Map(Object.entries(attrs ?? {})).get(key);
-
-  return nested === undefined || nested === null ? body : { ...body, [key]: whitelist(nested, fields) };
-}
-
-/**
- * Build the context-aware path of an account.
- *
- * @param {object} context - The owner context.
- * @param {number|string} id - The account id.
- * @param {string} [suffix] - A path suffix, e.g. `/archive`.
- * @returns {string} The API path, with the `.json` suffix.
- */
-function accountPath(context, id, suffix = '') {
-  return contextPath(context, `/bank/accounts/${id}${suffix}.json`);
-}
 
 /**
  * HTTP client for the bank endpoints (accounts, transactions and settings), in both owner
  * contexts.
  *
- * @description Every method takes the owner context first and builds its path through
+ * @description The typed account calls (`createDebt`, `updateDebt`, `createInvestment`,
+ * `updateInvestment`, `createProviderExpense`, `updateProviderExpense`) come from
+ * {@link TypedAccountsClient}. Every method takes the owner context first and builds its path through
  * `contextPath` (`/bank/...` for Personal, `/orgs/:orgId/bank/...` for an organization). Every
  * method may resolve `undefined` when the session turned out to be expired (see
  * {@link ApiClient}).
  */
 const BankClient = {
+  ...TypedAccountsClient,
+
   /**
    * List the accounts of one type (regular by default).
    *
    * @param {object} context - The owner context.
    * @param {{archived: boolean, type: string}} [options] - `archived: true` includes archived
-   *   accounts; `type` is the account type (`'regular'`, `'debt'` or `'investment'`).
+   *   accounts; `type` is the account type (`'regular'`, `'debt'`, `'investment'` or
+   *   `'provider_expense'`).
    * @returns {Promise<Array<object>|undefined>} The accounts, sorted by name.
    */
   async listAccounts(context, { archived = false, type = 'regular' } = {}) {
@@ -130,62 +80,6 @@ const BankClient = {
    */
   async updateAccount(context, id, attrs) {
     return ApiClient.patchJson(accountPath(context, id), whitelist(attrs, ACCOUNT_FIELDS));
-  },
-
-  /**
-   * Create a debt account: `type: "debt"` with the common fields and the optional nested
-   * `debt` object.
-   *
-   * @param {object} context - The owner context.
-   * @param {object} attrs - The `snake_case` account fields, with an optional `debt` object.
-   * @returns {Promise<object|undefined>} The created debt account.
-   */
-  async createDebt(context, attrs) {
-    return ApiClient.postJson(
-      contextPath(context, '/bank/accounts.json'),
-      { type: 'debt', ...nestedBody(attrs, 'debt', DEBT_FIELDS) },
-    );
-  },
-
-  /**
-   * Update a debt account: the common fields and the nested `debt` object (merged partially
-   * by the backend); `type` is never sent.
-   *
-   * @param {object} context - The owner context.
-   * @param {number|string} id - The account id.
-   * @param {object} attrs - The `snake_case` fields to change, with an optional `debt` object.
-   * @returns {Promise<object|undefined>} The updated debt account.
-   */
-  async updateDebt(context, id, attrs) {
-    return ApiClient.patchJson(accountPath(context, id), nestedBody(attrs, 'debt', DEBT_FIELDS));
-  },
-
-  /**
-   * Create an investment account: `type: "investment"` with the common fields (the form sends
-   * `opening_balance: "0"`) and the optional nested `investment` object.
-   *
-   * @param {object} context - The owner context.
-   * @param {object} attrs - The `snake_case` account fields, with an optional `investment`.
-   * @returns {Promise<object|undefined>} The created investment account.
-   */
-  async createInvestment(context, attrs) {
-    return ApiClient.postJson(
-      contextPath(context, '/bank/accounts.json'),
-      { type: 'investment', ...nestedBody(attrs, 'investment', INVESTMENT_FIELDS) },
-    );
-  },
-
-  /**
-   * Update an investment account: the common fields and the nested `investment` object
-   * (merged partially by the backend, `null` clears); `type` is never sent.
-   *
-   * @param {object} context - The owner context.
-   * @param {number|string} id - The account id.
-   * @param {object} attrs - The `snake_case` fields to change, with an optional `investment`.
-   * @returns {Promise<object|undefined>} The updated investment account.
-   */
-  async updateInvestment(context, id, attrs) {
-    return ApiClient.patchJson(accountPath(context, id), nestedBody(attrs, 'investment', INVESTMENT_FIELDS));
   },
 
   /**
