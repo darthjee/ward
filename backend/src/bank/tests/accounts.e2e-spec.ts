@@ -174,7 +174,6 @@ describe('bank account routes (e2e)', () => {
     });
 
     it.each([
-      ['a type without a handler', { name: 'x', type: 'provider_expense' }],
       ['an unknown type', { name: 'x', type: 'savings' }],
       ['a missing name', {}],
       ['a blank name', { name: '' }],
@@ -270,8 +269,8 @@ describe('bank account routes (e2e)', () => {
       expect(AccountBalancesQuery.groupedCalls - before).toBe(1);
     });
 
-    it('rejects a type without a handler and an invalid archived flag', async () => {
-      await send(app, 'get', '/bank/accounts.json?type=provider_expense', ALICE).expect(400);
+    it('rejects an unknown type and an invalid archived flag', async () => {
+      await send(app, 'get', '/bank/accounts.json?type=savings', ALICE).expect(400);
       await send(app, 'get', '/bank/accounts.json?archived=maybe', ALICE).expect(400);
     });
 

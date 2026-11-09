@@ -11,6 +11,7 @@ import {
   trimToNull,
 } from './field-validators.js';
 import { InvestmentDetailsDto } from './investment-details.dto.js';
+import { ProviderExpenseDetailsDto } from './provider-expense-details.dto.js';
 import { MaxCodePoints, trimString } from '../../core/string-validators.js';
 
 /**
@@ -77,4 +78,11 @@ export class UpdateAccountDto {
   @ValidateNested()
   @Type(() => InvestmentDetailsDto)
     investment?: InvestmentDetailsDto;
+
+  /** Provider-expense details; only meaningful on a `provider_expense` account (checked by the handler). */
+  @IsOptionalNonNull()
+  @IsObject()
+  @ValidateNested()
+  @Type(() => ProviderExpenseDetailsDto)
+    provider_expense?: ProviderExpenseDetailsDto;
 }

@@ -6,6 +6,7 @@ const ACCOUNTS = 'bank_accounts';
 const TRANSACTIONS = 'bank_transactions';
 const DEBT_DETAILS = 'bank_debt_details';
 const INVESTMENT_DETAILS = 'bank_investment_details';
+const PROVIDER_EXPENSE_DETAILS = 'bank_provider_expense_details';
 
 interface Owner {
   userId?: number | null;
@@ -36,6 +37,12 @@ function insertDebtDetails(ds: DataSource, accountId: number): Promise<unknown> 
 
 function insertInvestmentDetails(ds: DataSource, accountId: number): Promise<unknown> {
   return ds.query(`INSERT INTO ${INVESTMENT_DETAILS} (account_id, kind, yield_rate, yield_period) VALUES (?, 'fund', 12.5, 'yearly')`, [
+    accountId,
+  ]);
+}
+
+function insertProviderExpenseDetails(ds: DataSource, accountId: number): Promise<unknown> {
+  return ds.query(`INSERT INTO ${PROVIDER_EXPENSE_DETAILS} (account_id, provider_tax_id, expected_amount) VALUES (?, '12.345.678/0001-90', 20000)`, [
     accountId,
   ]);
 }
@@ -225,8 +232,52 @@ describe('bank schema (MySQL)', () => {
     });
   });
 
+  describe('bank_provider_expense_details', () => {
+    it('creates the columns with their types, nullability and defaults', async () => {
+      expect(await columnInfo(ds, PROVIDER_EXPENSE_DETAILS, 'account_id')).toMatchObject({ type: 'int', nullable: false });
+      expect(await columnInfo(ds, PROVIDER_EXPENSE_DETAILS, 'for_accountant')).toMatchObject({
+        type: expect.stringMatching(/^tinyint/),
+        nullable: false,
+        default: '1',
+      });
+      expect(await columnInfo(ds, PROVIDER_EXPENSE_DETAILS, 'provider_tax_id')).toMatchObject({ type: 'varchar(32)', nullable: true });
+      expect(await columnInfo(ds, PROVIDER_EXPENSE_DETAILS, 'expected_amount')).toMatchObject({ type: 'bigint', nullable: true });
+      expect(await columnInfo(ds, PROVIDER_EXPENSE_DETAILS, 'due_day')).toMatchObject({ type: 'tinyint', nullable: true });
+      expect(await columnInfo(ds, PROVIDER_EXPENSE_DETAILS, 'charge_frequency')).toMatchObject({
+        type: 'varchar(16)',
+        nullable: false,
+        default: 'monthly',
+      });
+      expect(await columnInfo(ds, PROVIDER_EXPENSE_DETAILS, 'due_month')).toMatchObject({ type: 'tinyint', nullable: true });
+    });
+
+    it('uses account_id as the primary key', async () => {
+      const accountId = await insertAccount(ds, { userId: 1 }, 'Accountant');
+      await insertProviderExpenseDetails(ds, accountId);
+
+      await expect(insertProviderExpenseDetails(ds, accountId)).rejects.toThrow(/Duplicate entry/);
+    });
+
+    it('rejects details of an unknown account', async () => {
+      await expect(insertProviderExpenseDetails(ds, 999999)).rejects.toThrow(/foreign key constraint fails/);
+    });
+
+    it('deletes the details with their account (FK ON DELETE CASCADE)', async () => {
+      const accountId = await insertAccount(ds, { userId: 1 }, 'Accountant');
+      await insertProviderExpenseDetails(ds, accountId);
+
+      await ds.query(`DELETE FROM ${ACCOUNTS} WHERE id = ?`, [accountId]);
+
+      expect(await ds.query(`SELECT account_id FROM ${PROVIDER_EXPENSE_DETAILS}`)).toEqual([]);
+    });
+  });
+
   describe('down', () => {
-    it('drops bank_investment_details, bank_debt_details, then bank_transactions, then bank_accounts', async () => {
+    it('drops bank_provider_expense_details, bank_investment_details, bank_debt_details, then bank_transactions, then bank_accounts', async () => {
+      await ds.undoLastMigration();
+      expect(await tableNames(ds)).not.toContain(PROVIDER_EXPENSE_DETAILS);
+      expect(await tableNames(ds)).toContain(INVESTMENT_DETAILS);
+
       await ds.undoLastMigration();
       expect(await tableNames(ds)).not.toContain(INVESTMENT_DETAILS);
       expect(await tableNames(ds)).toContain(DEBT_DETAILS);

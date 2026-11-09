@@ -2,10 +2,11 @@ import { QueryFailedError } from 'typeorm';
 import { Account } from '../../entities/account.entity.js';
 import { DebtDetails } from '../../entities/debt-details.entity.js';
 import { InvestmentDetails } from '../../entities/investment-details.entity.js';
+import { ProviderExpenseDetails } from '../../entities/provider-expense-details.entity.js';
 import { Transaction } from '../../entities/transaction.entity.js';
 
 // In-memory stand-ins for the `bank_accounts` / `bank_transactions` / `bank_debt_details` /
-// `bank_investment_details` repositories, used by the bank e2e harness (no DB in `backend_tests`). They mimic the DB rules
+// `bank_investment_details` / `bank_provider_expense_details` repositories, used by the bank e2e harness (no DB in `backend_tests`). They mimic the DB rules
 // the services rely on: the per-owner, case-insensitive active-name unique indexes
 // (`ER_DUP_ENTRY`), the transactions' `ON DELETE RESTRICT` FK (`ER_ROW_IS_REFERENCED_2`) and the
 // details tables' `ON DELETE CASCADE` FK. Reads return copies, so a failed write
@@ -103,7 +104,7 @@ export type InMemoryBankRepo<T extends Row> = ReturnType<typeof createInMemoryBa
 
 type DetailsRow = { accountId: number; createdAt: Date; updatedAt: Date };
 
-// A 1:1 details table (`bank_debt_details`, `bank_investment_details`) is keyed by `account_id`
+// A 1:1 details table (`bank_debt_details`, `bank_investment_details`, `bank_provider_expense_details`) is keyed by `account_id`
 // (no `id`): `save()` upserts on it. `find()` counts its calls so specs can assert there is no N+1.
 export function createInMemoryDetailsRepo<T extends DetailsRow>(entity: new () => T) {
   const rows: T[] = [];
@@ -135,12 +136,14 @@ export function createInMemoryDetailsRepo<T extends DetailsRow>(entity: new () =
 export type InMemoryDetailsRepo<T extends DetailsRow> = ReturnType<typeof createInMemoryDetailsRepo<T>>;
 export type InMemoryDebtDetailsRepo = InMemoryDetailsRepo<DebtDetails>;
 export type InMemoryInvestmentDetailsRepo = InMemoryDetailsRepo<InvestmentDetails>;
+export type InMemoryProviderExpenseDetailsRepo = InMemoryDetailsRepo<ProviderExpenseDetails>;
 
 export interface InMemoryBankRepos {
   accounts: InMemoryBankRepo<Account>;
   transactions: InMemoryBankRepo<Transaction>;
   debtDetails: InMemoryDebtDetailsRepo;
   investmentDetails: InMemoryInvestmentDetailsRepo;
+  providerExpenseDetails: InMemoryProviderExpenseDetailsRepo;
 }
 
 function checkActiveName(account: Account, others: Account[]): void {
@@ -164,6 +167,7 @@ export function createInMemoryBankRepos(): InMemoryBankRepos {
   const transactions = createInMemoryBankRepo(Transaction);
   const debtDetails = createInMemoryDetailsRepo(DebtDetails);
   const investmentDetails = createInMemoryDetailsRepo(InvestmentDetails);
+  const providerExpenseDetails = createInMemoryDetailsRepo(ProviderExpenseDetails);
   const deleteAccount = accounts.delete;
 
   accounts.delete = async (where: Where) => {
@@ -177,12 +181,12 @@ export function createInMemoryBankRepos(): InMemoryBankRepos {
 
     const doomed = new Set(accounts.rows.filter((row) => matches(row, where)).map((row) => row.id));
     const result = await deleteAccount(where);
-    for (const details of [debtDetails, investmentDetails] as Array<{ rows: DetailsRow[] }>) {
+    for (const details of [debtDetails, investmentDetails, providerExpenseDetails] as Array<{ rows: DetailsRow[] }>) {
       details.rows.splice(0, details.rows.length, ...details.rows.filter((row) => !doomed.has(row.accountId)));
     }
 
     return result;
   };
 
-  return { accounts, transactions, debtDetails, investmentDetails };
+  return { accounts, transactions, debtDetails, investmentDetails, providerExpenseDetails };
 }

@@ -10,6 +10,8 @@ export const ACCOUNT_SHORT_FIELD_MAX_LENGTH = 64;
 export const DESCRIPTION_MAX_LENGTH = 255;
 /** Longest accepted `notes`, on accounts and transactions. */
 export const NOTES_MAX_LENGTH = 2000;
+/** Longest accepted `provider_tax_id` (`VARCHAR(32)`). */
+export const PROVIDER_TAX_ID_MAX_LENGTH = 32;
 /** Longest accepted `type` value (`VARCHAR(32)`). */
 export const ACCOUNT_TYPE_MAX_LENGTH = 32;
 /** Upper bound of an integer stored in a signed MySQL `int` column. */
