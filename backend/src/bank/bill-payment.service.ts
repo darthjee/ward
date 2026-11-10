@@ -2,11 +2,9 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import type { Repository } from 'typeorm';
 import { accountArchived } from './account-conflicts.js';
-import { accountOwnerWhere } from './account-fields.js';
 import { accountRefsById } from './account-refs.js';
-import { AccountTypeRegistry } from './account-types/account-type.registry.js';
 import { BillPaymentWriter, type PaymentTarget } from './bill-payment.writer.js';
-import { BILL_SOURCE_TYPES, billSourceOf, type BillSource } from './bill-schedule.js';
+import { BillSourceResolver } from './bill-source.resolver.js';
 import { BillService } from './bill.service.js';
 import { PayingAccountResolver } from './paying-account.resolver.js';
 import type { OwnerContext } from '../core/owner-context.js';
@@ -42,27 +40,27 @@ import { paymentCommand } from './payment-body.js';
 @Injectable()
 export class BillPaymentService {
   private readonly accountRepository: Repository<Account>;
-  private readonly registry: AccountTypeRegistry;
+  private readonly sources: BillSourceResolver;
   private readonly bills: BillService;
   private readonly payingAccounts: PayingAccountResolver;
   private readonly writer: BillPaymentWriter;
 
   /**
    * @param {Repository<Account>} accountRepository - The account repository.
-   * @param {AccountTypeRegistry} registry - Loads the source accounts' details.
+   * @param {BillSourceResolver} sources - Resolves path bill sources.
    * @param {BillService} bills - Owner-scoped one-off bill lookups.
    * @param {PayingAccountResolver} payingAccounts - Resolves body paying accounts.
    * @param {BillPaymentWriter} writer - The atomic payment writes.
    */
   constructor(
     @InjectRepository(Account) accountRepository: Repository<Account>,
-      registry: AccountTypeRegistry,
+      sources: BillSourceResolver,
       bills: BillService,
       payingAccounts: PayingAccountResolver,
       writer: BillPaymentWriter,
   ) {
     this.accountRepository = accountRepository;
-    this.registry = registry;
+    this.sources = sources;
     this.bills = bills;
     this.payingAccounts = payingAccounts;
     this.writer = writer;
@@ -79,7 +77,7 @@ export class BillPaymentService {
    * @throws {ConflictException} 409 when already paid or skipped.
    */
   async payOccurrence(owner: OwnerContext, accountId: number, dueDate: string, dto: PayOccurrenceDto): Promise<OccurrenceResponse> {
-    const source = await this.#source(owner, accountId);
+    const source = await this.sources.resolve(owner, accountId);
 
     if (!isIsoDate(dueDate) || !isNominalOccurrence(source.schedule, dueDate)) {
       throw ownerNotFound();
@@ -119,7 +117,7 @@ export class BillPaymentService {
    * @throws {ConflictException} 409 on an archived account (checks 5–6).
    */
   async undoOccurrence(owner: OwnerContext, accountId: number, dueDate: string): Promise<void> {
-    const account = (await this.#source(owner, accountId)).account;
+    const { account } = await this.sources.resolve(owner, accountId);
     const payment = isIsoDate(dueDate) ? await this.writer.find({ sourceAccountId: account.id, billId: null, nominal: dueDate }) : null;
 
     await this.#undo(account, payment);
@@ -137,18 +135,6 @@ export class BillPaymentService {
     const { bill, provider } = await this.bills.findOwned(owner, id);
 
     await this.#undo(provider, await this.writer.find({ sourceAccountId: provider.id, billId: bill.id, nominal: bill.dueDate }));
-  }
-
-  async #source(owner: OwnerContext, accountId: number): Promise<BillSource> {
-    const account = await this.accountRepository.findOneBy({ ...accountOwnerWhere(owner), id: accountId });
-
-    if (!account || !BILL_SOURCE_TYPES.includes(account.type)) {
-      throw ownerNotFound();
-    }
-
-    const details = await this.registry.loadDetails([account], this.accountRepository.manager);
-
-    return billSourceOf(account, details.get(account.id));
   }
 
   async #record(

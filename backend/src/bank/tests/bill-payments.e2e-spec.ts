@@ -381,6 +381,91 @@ describe('bill payments (e2e)', () => {
         });
       });
     });
+
+    describe('bill history', () => {
+      const history = (accountId: number | string, query = '') =>
+        send(app, 'get', `${base(orgId)}/accounts/${accountId}/bill-payments.json${query}`, ALICE);
+
+      it('keeps off-schedule payments after a schedule edit, listed but absent from the calendar, back when changed back', async () => {
+        const checking = await regular(orgId);
+        const loan = await debt(orgId);
+        await pay(orgId, loan.id, '2026-01-10', paid(checking.id)).expect(201);
+        const patchDueDay = (dueDay: number) =>
+          send(app, 'patch', `${base(orgId)}/accounts/${loan.id}.json`, ALICE, { debt: { due_day: dueDay } }).expect(200);
+
+        await patchDueDay(15);
+        const moved = await history(loan.id).expect(200);
+        expect(moved.body.payments).toEqual([{
+          id: expect.any(Number),
+          status: 'paid',
+          paid_on: '2026-01-12',
+          amount: '490.00',
+          paying_account: { id: checking.id, name: checking.name },
+          due_date: '2026-01-10',
+          bill: null,
+          off_schedule: true,
+        }]);
+        expect(await calendarRow(orgId, loan.id)).toMatchObject({ nominal_date: '2026-01-15', payment: null });
+
+        await patchDueDay(10);
+        expect((await history(loan.id).expect(200)).body.payments[0].off_schedule).toBe(false);
+        expect(await calendarRow(orgId, loan.id)).toMatchObject({ nominal_date: '2026-01-10', status: 'paid' });
+      });
+
+      it('lists derived and one-off rows of a provider, newest due date first, with no owner fields', async () => {
+        const checking = await regular(orgId);
+        const fee = await provider(orgId);
+        const bill = await createBill(orgId, fee.id, checking.id, { due_date: '2026-03-01' });
+        await pay(orgId, fee.id, '2026-01-05', { status: 'skipped' }).expect(201);
+        await pay(orgId, fee.id, '2026-02-05', paid(checking.id)).expect(201);
+        await send(app, 'post', billPaymentPath(orgId, bill.id), ALICE, { status: 'skipped' }).expect(201);
+
+        const response = await history(fee.id).expect(200);
+
+        expect(response.body.payments.map((row: Body) => [row.due_date, row.status, row.bill, row.off_schedule])).toEqual([
+          ['2026-03-01', 'skipped', { id: bill.id, description: 'IPVA' }, false],
+          ['2026-02-05', 'paid', null, false],
+          ['2026-01-05', 'skipped', null, false],
+        ]);
+        expect(response.body.pagination).toEqual({ page: 1, per_page: 50, total_pages: 1, total_count: 3 });
+        expect(response.headers['x-skip-cache']).toBe('true');
+        expect(response.headers['cache-control']).toBe('private, no-store');
+        expect(ownerKeysIn(response.body)).toEqual([]);
+      });
+
+      it('paginates 50 per page and answers 400 for an invalid page', async () => {
+        const loan = await debt(orgId);
+        for (let index = 0; index < 51; index++) {
+          const year = 2026 + Math.floor(index / 12);
+          const month = String((index % 12) + 1).padStart(2, '0');
+          await pay(orgId, loan.id, `${year}-${month}-10`, { status: 'skipped' }).expect(201);
+        }
+
+        const second = await history(loan.id, '?page=2').expect(200);
+
+        expect(second.body.payments).toHaveLength(1);
+        expect(second.body.pagination).toEqual({ page: 2, per_page: 50, total_pages: 2, total_count: 51 });
+        expect((await history(loan.id, '?page=3').expect(200)).body.payments).toEqual([]);
+        await history(loan.id, '?page=0').expect(400);
+        await history(loan.id, '?page=x').expect(400);
+      });
+
+      it('keeps the history of an archived account readable, like its ledger', async () => {
+        const loan = await debt(orgId);
+        await pay(orgId, loan.id, '2026-01-10', { status: 'skipped' }).expect(201);
+        await archive(orgId, loan.id);
+
+        expect((await history(loan.id).expect(200)).body.payments).toHaveLength(1);
+      });
+
+      it('answers the uniform 404 for a regular or investment account', async () => {
+        const checking = await regular(orgId);
+        const investment = await createAccount(app, ALICE, orgId, { type: 'investment', name: uniqueName('CDB'), opening_balance: '0' });
+
+        expect((await history(checking.id).expect(404)).body).toEqual(NOT_FOUND_BODY);
+        expect((await history(investment.id).expect(404)).body).toEqual(NOT_FOUND_BODY);
+      });
+    });
   });
 
   describe('owner contexts', () => {
@@ -418,13 +503,14 @@ describe('bill payments (e2e)', () => {
       ['a global admin who is not a member', ADMIN, true, ALICE_ORG, 'aliceOrg'],
     ];
 
-    it.each(CASES)('answers the uniform 404 on all four routes for %s', async (_label, user, admin, orgId, key) => {
+    it.each(CASES)('answers the uniform 404 on all five routes for %s', async (_label, user, admin, orgId, key) => {
       const ids = owned[key] ?? { debt: 999999, bill: 999999 };
       const responses = [
         await send(app, 'post', occurrencePath(orgId, ids.debt, '2026-01-10'), user, { status: 'skipped' }, admin),
         await send(app, 'delete', occurrencePath(orgId, ids.debt, '2026-01-10'), user, undefined, admin),
         await send(app, 'post', billPaymentPath(orgId, ids.bill), user, { status: 'skipped' }, admin),
         await send(app, 'delete', billPaymentPath(orgId, ids.bill), user, undefined, admin),
+        await send(app, 'get', `${base(orgId)}/accounts/${ids.debt}/bill-payments.json`, user, undefined, admin),
       ];
 
       for (const response of responses) {
@@ -441,6 +527,7 @@ describe('bill payments (e2e)', () => {
       for (const path of [occurrencePath(null, 'abc', '2026-01-10'), occurrencePath(null, checking.id, '2026-01-10'), billPaymentPath(null, 'abc')]) {
         expect((await send(app, 'post', path, ALICE, { status: 'skipped' }).expect(404)).body).toEqual(NOT_FOUND_BODY);
       }
+      expect((await send(app, 'get', '/bank/accounts/abc/bill-payments.json', ALICE).expect(404)).body).toEqual(NOT_FOUND_BODY);
     });
   });
 });

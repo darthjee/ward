@@ -2,6 +2,7 @@ import { AccountService } from '../account.service.js';
 import { AccountantService } from '../accountant.service.js';
 import { BankModuleLoader } from '../bank-module.loader.js';
 import { BankModule } from '../bank.module.js';
+import { BillHistoryService } from '../bill-history.service.js';
 import { BillPaymentService } from '../bill-payment.service.js';
 import { BillService } from '../bill.service.js';
 import { CalendarService } from '../calendar.service.js';
@@ -11,6 +12,7 @@ describe('BankModuleLoader', () => {
   it('loads BankModule through the lazy loader and resolves its services', async () => {
     const accounts = { name: 'accounts' };
     const accountant = { name: 'accountant' };
+    const billHistory = { name: 'billHistory' };
     const billPayments = { name: 'billPayments' };
     const bills = { name: 'bills' };
     const calendar = { name: 'calendar' };
@@ -18,6 +20,7 @@ describe('BankModuleLoader', () => {
     const byToken = new Map<unknown, object>([
       [AccountService, accounts],
       [AccountantService, accountant],
+      [BillHistoryService, billHistory],
       [BillPaymentService, billPayments],
       [BillService, bills],
       [CalendarService, calendar],
@@ -38,6 +41,7 @@ describe('BankModuleLoader', () => {
     expect(moduleRef.get).toHaveBeenCalledWith(CalendarService);
     expect(moduleRef.get).toHaveBeenCalledWith(BillService);
     expect(moduleRef.get).toHaveBeenCalledWith(BillPaymentService);
-    expect(services).toEqual({ accounts, accountant, billPayments, bills, calendar, transactions });
+    expect(moduleRef.get).toHaveBeenCalledWith(BillHistoryService);
+    expect(services).toEqual({ accounts, accountant, billHistory, billPayments, bills, calendar, transactions });
   });
 });

@@ -1,5 +1,6 @@
-import { Delete, HttpCode, HttpStatus, Param, Post } from '@nestjs/common';
+import { Delete, Get, HttpCode, HttpStatus, Param, Post, Query } from '@nestjs/common';
 import { BankModuleLoader } from './bank-module.loader.js';
+import type { BillHistoryResponse } from './bill-history.service.js';
 import { CacheClass } from '../core/cache-class.js';
 import { CachePolicy } from '../core/cache-policy.decorator.js';
 import { CurrentOwner } from '../core/current-owner.decorator.js';
@@ -9,12 +10,15 @@ import { parseId } from '../core/parse-id.js';
 import { StrictBody } from '../core/strict-validation.pipe.js';
 import { PayOccurrenceDto } from './dto/pay-occurrence.dto.js';
 import type { OccurrenceResponse } from './occurrence-response.js';
+import { parsePage } from './pagination.js';
 
 /**
- * Pay / skip / undo routes of bill occurrences, mounted under `bank/…` and
- * `orgs/:orgId/bank/…`. Thin: parses the ids (malformed → uniform 404), loads
- * the lazy `BankModule` and delegates to its `BillPaymentService`. Every route
- * is `never`. Bodies only through `@StrictBody()`, never logged.
+ * Pay / skip / undo routes of bill occurrences and the bill history, mounted
+ * under `bank/…` and `orgs/:orgId/bank/…`. Thin: parses the ids (malformed →
+ * uniform 404) and the page (invalid → 400), loads the lazy `BankModule` and
+ * delegates to its `BillPaymentService` / `BillHistoryService`. The history
+ * GET is `user-scoped`, every write `never`. Bodies only through
+ * `@StrictBody()`, never logged.
  */
 @OwnerScopedController('bank')
 export class BillPaymentsController {
@@ -25,6 +29,26 @@ export class BillPaymentsController {
    */
   constructor(loader: BankModuleLoader) {
     this.loader = loader;
+  }
+
+  /**
+   * `GET <base>/accounts/:accountId/bill-payments.json?page=N`.
+   * @param {OwnerContext} owner - The resolved owner.
+   * @param {string} rawAccountId - The raw `:accountId`.
+   * @param {unknown} rawPage - The raw `page` query value.
+   * @returns {Promise<BillHistoryResponse>} `{ payments, pagination }`.
+   */
+  @Get('accounts/:accountId/bill-payments.json')
+  async history(
+    @CurrentOwner() owner: OwnerContext,
+      @Param('accountId') rawAccountId: string,
+      @Query('page') rawPage: unknown,
+  ): Promise<BillHistoryResponse> {
+    const accountId = parseId(rawAccountId);
+    const page = parsePage(rawPage);
+    const { billHistory } = await this.loader.services();
+
+    return billHistory.history(owner, accountId, page);
   }
 
   /**
