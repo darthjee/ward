@@ -12,6 +12,8 @@ import { AccountService } from './account.service.js';
 import { AccountantChargesQuery } from './accountant-charges.query.js';
 import { AccountantService } from './accountant.service.js';
 import { BankConfigModule } from './bank-config.module.js';
+import { CalendarQuery } from './calendar.query.js';
+import { CalendarService } from './calendar.service.js';
 import { Account } from './entities/account.entity.js';
 import { BillPayment } from './entities/bill-payment.entity.js';
 import { Bill } from './entities/bill.entity.js';
@@ -27,6 +29,7 @@ import { TransactionService } from './transaction.service.js';
 // only through its dynamic `import()` of this file.
 export { AccountService } from './account.service.js';
 export { AccountantService } from './accountant.service.js';
+export { CalendarService } from './calendar.service.js';
 export { TransactionService } from './transaction.service.js';
 
 /**
@@ -68,10 +71,12 @@ export { TransactionService } from './transaction.service.js';
     AccountService,
     AccountantChargesQuery,
     AccountantService,
+    CalendarQuery,
+    CalendarService,
     LedgerQuery,
     TransactionService,
   ],
-  exports: [AccountService, AccountantService, TransactionService],
+  exports: [AccountService, AccountantService, CalendarService, TransactionService],
 })
 // NestJS module classes are intentionally empty; all behavior lives in @Module().
 // eslint-disable-next-line @typescript-eslint/no-extraneous-class

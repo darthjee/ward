@@ -4,6 +4,7 @@ import { AccountantController } from './accountant.controller.js';
 import { AccountsController } from './accounts.controller.js';
 import { BankConfigModule } from './bank-config.module.js';
 import { BankModuleLoader } from './bank-module.loader.js';
+import { CalendarController } from './calendar.controller.js';
 import { Account } from './entities/account.entity.js';
 import { BillPayment } from './entities/bill-payment.entity.js';
 import { Bill } from './entities/bill.entity.js';
@@ -40,7 +41,7 @@ import { LazyModuleLoaderService } from '../core/lazy-module-loader.service.js';
     ProviderExpenseDetails,
     Transaction,
   ]), BankConfigModule],
-  controllers: [AccountsController, TransactionsController, SettingsController, AccountantController],
+  controllers: [AccountsController, TransactionsController, SettingsController, AccountantController, CalendarController],
   providers: [LazyModuleLoaderService, BankModuleLoader],
 })
 // NestJS module classes are intentionally empty; all behavior lives in @Module().
