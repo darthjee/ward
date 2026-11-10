@@ -57,11 +57,14 @@ export function createInMemoryBankRepo<T extends Row>(
   checkWrite: (row: T, rows: T[]) => void = () => undefined,
 ) {
   const rows: T[] = [];
+  // The `lock.mode` of every locked `findOne`, so specs can assert a read was taken under a row lock.
+  const locks: string[] = [];
   let nextId = 1;
   const copy = (row: T): T => Object.assign(new entity(), row);
 
   const repo = {
     rows,
+    locks,
     create: (fields: Partial<T>): T => Object.assign(new entity(), fields),
     find: async ({ where = {}, order = {} }: { where?: Where | Where[]; order?: Record<string, 'ASC' | 'DESC'> } = {}) =>
       rows
@@ -83,6 +86,10 @@ export function createInMemoryBankRepo<T extends Row>(
     findOneBy: async (where: Where): Promise<T | null> => {
       const row = rows.find((candidate) => matches(candidate, where));
       return row ? copy(row) : null;
+    },
+    findOne: async ({ where, lock }: { where: Where; lock?: { mode: string } }): Promise<T | null> => {
+      if (lock) locks.push(lock.mode);
+      return repo.findOneBy(where);
     },
     existsBy: async (where: Where): Promise<boolean> => rows.some((row) => matches(row, where)),
     save: async (entityToSave: T): Promise<T> => {

@@ -3,6 +3,7 @@ import {
   ALICE,
   ALICE_ORG,
   base,
+  beforeNextTransaction,
   BOB,
   BOB_ORG,
   buildBankTestApp,
@@ -307,6 +308,47 @@ describe('one-off bills (e2e)', () => {
         expect(response.body.error.code).toBe('BILL_PAID');
         const shown = await send(app, 'get', billPath(orgId, bill.id), ALICE).expect(200);
         expect(shown.body.payment).toMatchObject({ status: 'paid', amount: '150.50' });
+      });
+    });
+
+    describe('races past the pre-checks (payment read under the bill row lock)', () => {
+      it('answers 409 on delete when a payment is recorded meanwhile, keeping the bill and the payment', async () => {
+        const { fee, bill } = await createBill(orgId);
+        const locks = repos.bills.locks.length;
+        beforeNextTransaction(app, () => addPayment(fee.id, bill.id, 'paid'));
+
+        const response = await send(app, 'delete', billPath(orgId, bill.id), ALICE).expect(409);
+
+        expect(response.body.error.code).toBe('BILL_PAID');
+        expect(repos.bills.locks.slice(locks)).toEqual(['pessimistic_write']);
+        expect(repos.bills.rows.some((row) => row.id === bill.id)).toBe(true);
+        expect(repos.billPayments.rows.find((row) => row.billId === bill.id)).toMatchObject({ status: 'paid', sourceAccountId: fee.id });
+      });
+
+      it('answers 409 on a provider change when a payment is recorded meanwhile, leaving the payment on its provider', async () => {
+        const { fee, bill } = await createBill(orgId);
+        const other = await provider(orgId);
+        beforeNextTransaction(app, () => addPayment(fee.id, bill.id, 'paid'));
+
+        const response = await send(app, 'patch', billPath(orgId, bill.id), ALICE, { provider_account_id: other.id }).expect(409);
+
+        expect(response.body.error.code).toBe('BILL_PAID');
+        expect(repos.bills.rows.find((row) => row.id === bill.id)).toMatchObject({ providerAccountId: fee.id });
+        expect(repos.billPayments.rows.find((row) => row.billId === bill.id)).toMatchObject({ sourceAccountId: fee.id });
+      });
+
+      it('answers the uniform 404 when the bill is deleted or moved meanwhile', async () => {
+        const { bill } = await createBill(orgId);
+        beforeNextTransaction(app, () => repos.bills.delete({ id: bill.id }));
+        expect((await send(app, 'patch', billPath(orgId, bill.id), ALICE, { description: 'Late' }).expect(404)).body).toEqual(NOT_FOUND_BODY);
+
+        const moved = await createBill(orgId);
+        const other = await provider(orgId);
+        beforeNextTransaction(app, () => {
+          (repos.bills.rows.find((row) => row.id === moved.bill.id) as { providerAccountId: number }).providerAccountId = other.id;
+        });
+        expect((await send(app, 'delete', billPath(orgId, moved.bill.id), ALICE).expect(404)).body).toEqual(NOT_FOUND_BODY);
+        expect(repos.bills.rows.some((row) => row.id === moved.bill.id)).toBe(true);
       });
     });
 

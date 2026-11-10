@@ -29,19 +29,19 @@ export class PayingAccountResolver {
    * @param {OwnerContext} owner - The resolved owner.
    * @param {number} id - The body's account id.
    * @param {string} currency - The currency the paying account must have.
-   * @param {EntityManager} [manager] - A transactional manager, when inside one.
+   * @param {EntityManager} [manager] - A transactional manager, when inside one:
+   *   the account row is then share-locked (`pessimistic_read`) until the
+   *   transaction ends, so it cannot be archived (or deleted) under a write
+   *   that relies on it.
    * @returns {Promise<Account>} The paying account.
    * @throws {UnprocessableEntityException} 422 "account not found" (unknown,
    *   another owner or context, not `regular`, archived) or "currency mismatch".
    */
   async resolve(owner: OwnerContext, id: number, currency: string, manager?: EntityManager): Promise<Account> {
-    const repository = manager ? manager.getRepository(Account) : this.accountRepository;
-    const account = await repository.findOneBy({
-      ...accountOwnerWhere(owner),
-      id,
-      type: PAYING_ACCOUNT_TYPE,
-      archivedAt: IsNull(),
-    });
+    const where = { ...accountOwnerWhere(owner), id, type: PAYING_ACCOUNT_TYPE, archivedAt: IsNull() };
+    const account = manager
+      ? await manager.getRepository(Account).findOne({ where, lock: { mode: 'pessimistic_read' } })
+      : await this.accountRepository.findOneBy(where);
 
     if (!account) {
       throw accountNotFoundInBody();

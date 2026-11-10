@@ -83,8 +83,9 @@ export class BillPaymentService {
       throw ownerNotFound();
     }
 
-    const target = { sourceAccountId: source.account.id, billId: null, nominal: dueDate, label: source.account.name };
-    const payment = await this.#record(owner, target, dto, source.kind, source.account.currency);
+    const { account } = source;
+    const target = { sourceAccountId: account.id, billId: null, nominal: dueDate, label: account.name, currency: account.currency };
+    const payment = await this.#record(owner, target, dto, source.kind);
 
     return this.#respond(derivedInput(source, { nominal: dueDate, effective: shiftWeekend(dueDate) }, payment));
   }
@@ -100,8 +101,8 @@ export class BillPaymentService {
    */
   async payBill(owner: OwnerContext, id: number, dto: PayOccurrenceDto): Promise<OccurrenceResponse> {
     const { bill, provider } = await this.bills.findOwned(owner, id);
-    const target = { sourceAccountId: provider.id, billId: bill.id, nominal: bill.dueDate, label: bill.description };
-    const payment = await this.#record(owner, target, dto, 'bill', provider.currency);
+    const target = { sourceAccountId: provider.id, billId: bill.id, nominal: bill.dueDate, label: bill.description, currency: provider.currency };
+    const payment = await this.#record(owner, target, dto, 'bill');
     const refs = await accountRefsById([bill.payingAccountId, payment.payingAccountId], this.accountRepository.manager);
 
     return buildOccurrence(billInput(bill, provider, payment, refs), refs, todayUtc(new Date())).response;
@@ -142,15 +143,16 @@ export class BillPaymentService {
     target: PaymentTarget,
     dto: PayOccurrenceDto,
     kind: OccurrenceInput['kind'],
-    currency: string,
   ): Promise<BillPayment> {
-    const command = paymentCommand(dto, kind, currency);
+    const command = paymentCommand(dto, kind, target.currency);
 
+    // Pre-checked here for the public order (404, 400, 422, then 409), and
+    // re-checked under a lock inside the writer's transaction.
     if (command.status === 'paid') {
-      await this.payingAccounts.resolve(owner, command.payingAccountId, currency);
+      await this.payingAccounts.resolve(owner, command.payingAccountId, target.currency);
     }
 
-    return this.writer.record(target, command);
+    return this.writer.record(owner, target, command);
   }
 
   async #undo(source: Account, payment: BillPayment | null): Promise<void> {

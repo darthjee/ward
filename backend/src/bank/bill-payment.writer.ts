@@ -2,9 +2,13 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, IsNull, type EntityManager, type Repository } from 'typeorm';
 import { occurrenceAlreadyPaid } from './bill-conflicts.js';
+import type { OwnerContext } from '../core/owner-context.js';
+import { ownerNotFound } from '../core/parse-id.js';
 import { BillPayment } from './entities/bill-payment.entity.js';
+import { Bill } from './entities/bill.entity.js';
 import { Transaction } from './entities/transaction.entity.js';
 import { isMysqlError, MYSQL_DUPLICATE_ENTRY } from './mysql-errors.js';
+import { PayingAccountResolver } from './paying-account.resolver.js';
 import type { PaymentCommand } from './payment-body.js';
 import { paymentDescription } from './payment-description.js';
 
@@ -18,6 +22,8 @@ export interface PaymentTarget {
   nominal: string;
   /** The bill description, or the source account's name (for the transactions' description). */
   label: string;
+  /** The source account's currency (the paying account must match it). */
+  currency: string;
 }
 
 /**
@@ -26,16 +32,28 @@ export interface PaymentTarget {
  * — and undone — in **one** DB transaction, so a failure saves none of them.
  * The ledger entries are ordinary transactions: a provider charge (negative,
  * unsent) feeds the accountant hand-off like any hand-entered charge.
+ *
+ * The caller's checks run before the transaction (for the public check
+ * order); the ones a concurrent request could invalidate are repeated inside
+ * it, under row locks: a one-off bill is locked `FOR UPDATE` (the same lock
+ * `BillService` takes to edit / delete it, so the two serialize) and the
+ * paying account is share-locked while it is re-validated.
  */
 @Injectable()
 export class BillPaymentWriter {
   private readonly paymentRepository: Repository<BillPayment>;
+  private readonly payingAccounts: PayingAccountResolver;
 
   /**
    * @param {Repository<BillPayment>} paymentRepository - The bill payment repository.
+   * @param {PayingAccountResolver} payingAccounts - Re-validates the paying account inside the transaction.
    */
-  constructor(@InjectRepository(BillPayment) paymentRepository: Repository<BillPayment>) {
+  constructor(
+  @InjectRepository(BillPayment) paymentRepository: Repository<BillPayment>,
+    payingAccounts: PayingAccountResolver,
+  ) {
     this.paymentRepository = paymentRepository;
+    this.payingAccounts = payingAccounts;
   }
 
   /**
@@ -54,18 +72,24 @@ export class BillPaymentWriter {
    * Records a payment or a skip. `paid` writes a payment (+) on the source
    * account, a withdrawal (−) on the paying account and, when asked, a charge
    * (−) on the source, all dated `paid_on`; `skipped` writes only the row.
+   * @param {OwnerContext} owner - The resolved owner (for the paying-account re-check).
    * @param {PaymentTarget} target - The occurrence.
    * @param {PaymentCommand} command - The validated request.
    * @returns {Promise<BillPayment>} The new payment row.
+   * @throws {NotFoundException} 404 when the one-off bill is gone (or moved) by the time of the write.
+   * @throws {UnprocessableEntityException} 422 when the paying account no longer qualifies (e.g. archived meanwhile).
    * @throws {ConflictException} 409 when the occurrence already has a payment (also on a race).
    */
-  async record(target: PaymentTarget, command: PaymentCommand): Promise<BillPayment> {
+  async record(owner: OwnerContext, target: PaymentTarget, command: PaymentCommand): Promise<BillPayment> {
     if (await this.find(target)) {
       throw occurrenceAlreadyPaid();
     }
 
     try {
-      return await this.paymentRepository.manager.transaction((manager) => this.#write(manager, target, command));
+      return await this.paymentRepository.manager.transaction(async (manager) => {
+        await this.#recheck(manager, owner, target, command);
+        return this.#write(manager, target, command);
+      });
     } catch (error) {
       if (isMysqlError(error, MYSQL_DUPLICATE_ENTRY)) {
         throw occurrenceAlreadyPaid();
@@ -92,6 +116,23 @@ export class BillPaymentWriter {
 
       await manager.getRepository(BillPayment).delete({ id: payment.id });
     });
+  }
+
+  async #recheck(manager: EntityManager, owner: OwnerContext, target: PaymentTarget, command: PaymentCommand): Promise<void> {
+    if (target.billId !== null) {
+      const bill = await manager.getRepository(Bill).findOne({
+        where: { id: target.billId, providerAccountId: target.sourceAccountId },
+        lock: { mode: 'pessimistic_write' },
+      });
+
+      if (!bill) {
+        throw ownerNotFound();
+      }
+    }
+
+    if (command.status === 'paid') {
+      await this.payingAccounts.resolve(owner, command.payingAccountId, target.currency, manager);
+    }
   }
 
   async #write(manager: EntityManager, target: PaymentTarget, command: PaymentCommand): Promise<BillPayment> {

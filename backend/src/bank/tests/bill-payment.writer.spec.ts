@@ -1,27 +1,34 @@
-import { BadRequestException, ConflictException } from '@nestjs/common';
+import { BadRequestException, ConflictException, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import { QueryFailedError } from 'typeorm';
 import { BillPaymentWriter, type PaymentTarget } from '../bill-payment.writer.js';
 import type { PayOccurrenceDto } from '../dto/pay-occurrence.dto.js';
 import { BillPayment } from '../entities/bill-payment.entity.js';
+import { Bill } from '../entities/bill.entity.js';
 import { Transaction } from '../entities/transaction.entity.js';
 import { paymentCommand, type PaymentCommand } from '../payment-body.js';
 import { paymentDescription } from '../payment-description.js';
+import { PERSONAL } from './account.test-support.js';
 
-const TARGET: PaymentTarget = { sourceAccountId: 3, billId: null, nominal: '2026-01-10', label: 'Loan' };
+const TARGET: PaymentTarget = { sourceAccountId: 3, billId: null, nominal: '2026-01-10', label: 'Loan', currency: 'BRL' };
 const PAID: PaymentCommand = { status: 'paid', paidOn: '2026-01-12', amount: 1000n, payingAccountId: 9, recordCharge: true };
 
 // A fake transactional manager: writes are staged and only "committed" into `committed` when the
 // work resolves; a write numbered `failOn` throws, as MySQL would, and nothing is committed.
+// `lockedBill` is what the locked bill read inside the transaction finds; `resolve` stands in for
+// the paying-account re-check.
 function fakeDatabase(failOn?: number, error: Error = new Error('write failed')) {
   const committed: Array<{ entity: string; row: Record<string, unknown> }> = [];
   let writes = 0;
   let nextId = 100;
   const findOneBy = jest.fn(async () => null);
+  const findOne = jest.fn(async (_options?: unknown): Promise<Bill | null> => Object.assign(new Bill(), { id: 7 }));
+  const resolve = jest.fn(async () => ({}));
 
   const transaction = async <R>(work: (manager: unknown) => Promise<R>): Promise<R> => {
     const staged: typeof committed = [];
     const manager = {
       getRepository: (entity: unknown) => ({
+        findOne: (options: unknown) => (entity === Bill ? findOne(options) : Promise.reject(new Error('unexpected read'))),
         create: (fields: Record<string, unknown>) => ({ ...fields }),
         save: async (row: Record<string, unknown>) => {
           writes += 1;
@@ -45,14 +52,14 @@ function fakeDatabase(failOn?: number, error: Error = new Error('write failed'))
 
   const repository = { findOneBy, manager: { transaction } };
 
-  return { writer: new BillPaymentWriter(repository as never), committed, findOneBy };
+  return { writer: new BillPaymentWriter(repository as never, { resolve } as never), committed, findOneBy, findOne, resolve };
 }
 
 describe('BillPaymentWriter', () => {
   it('writes the payment, the withdrawal, the charge and the row in one transaction', async () => {
     const { writer, committed } = fakeDatabase();
 
-    const row = await writer.record(TARGET, PAID);
+    const row = await writer.record(PERSONAL, TARGET, PAID);
 
     expect(committed.map(({ entity, row: written }) => [entity, written.accountId ?? null, written.amount])).toEqual([
       ['transaction', 3, 1000n],
@@ -67,11 +74,11 @@ describe('BillPaymentWriter', () => {
 
   it('records no charge without record_charge, and only the row for a skip', async () => {
     const paid = fakeDatabase();
-    await paid.writer.record(TARGET, { ...PAID, recordCharge: false });
+    await paid.writer.record(PERSONAL, TARGET, { ...PAID, recordCharge: false });
     expect(paid.committed.map(({ entity }) => entity)).toEqual(['transaction', 'transaction', 'payment']);
 
     const skipped = fakeDatabase();
-    const row = await skipped.writer.record(TARGET, { status: 'skipped' });
+    const row = await skipped.writer.record(PERSONAL, TARGET, { status: 'skipped' });
     expect(skipped.committed.map(({ entity }) => entity)).toEqual(['payment']);
     expect(row).toMatchObject({ status: 'skipped', paidOn: null, amount: null, payingAccountId: null });
   });
@@ -79,7 +86,7 @@ describe('BillPaymentWriter', () => {
   it.each([1, 2, 3, 4])('rolls everything back when write #%i fails', async (failOn) => {
     const { writer, committed } = fakeDatabase(failOn);
 
-    await expect(writer.record(TARGET, PAID)).rejects.toThrow('write failed');
+    await expect(writer.record(PERSONAL, TARGET, PAID)).rejects.toThrow('write failed');
 
     expect(committed).toEqual([]);
   });
@@ -88,7 +95,7 @@ describe('BillPaymentWriter', () => {
     const duplicate = new QueryFailedError('INSERT', [], Object.assign(new Error('dup'), { code: 'ER_DUP_ENTRY' }));
     const { writer, committed } = fakeDatabase(4, duplicate);
 
-    await expect(writer.record(TARGET, PAID)).rejects.toBeInstanceOf(ConflictException);
+    await expect(writer.record(PERSONAL, TARGET, PAID)).rejects.toBeInstanceOf(ConflictException);
     expect(committed).toEqual([]);
   });
 
@@ -96,8 +103,40 @@ describe('BillPaymentWriter', () => {
     const { writer, committed, findOneBy } = fakeDatabase();
     findOneBy.mockResolvedValueOnce(Object.assign(new BillPayment(), { id: 1 }) as never);
 
-    await expect(writer.record(TARGET, PAID)).rejects.toBeInstanceOf(ConflictException);
+    await expect(writer.record(PERSONAL, TARGET, PAID)).rejects.toBeInstanceOf(ConflictException);
     expect(committed).toEqual([]);
+  });
+
+  it('re-validates the paying account inside the transaction, through its manager, before any write', async () => {
+    const { writer, committed, resolve, findOne } = fakeDatabase();
+    resolve.mockRejectedValueOnce(new UnprocessableEntityException('account not found'));
+
+    await expect(writer.record(PERSONAL, TARGET, PAID)).rejects.toBeInstanceOf(UnprocessableEntityException);
+
+    expect(resolve).toHaveBeenCalledWith(PERSONAL, 9, 'BRL', expect.objectContaining({ getRepository: expect.any(Function) }));
+    expect(findOne).not.toHaveBeenCalled();
+    expect(committed).toEqual([]);
+  });
+
+  it('skips the paying-account re-check for a skip', async () => {
+    const { writer, resolve } = fakeDatabase();
+
+    await writer.record(PERSONAL, TARGET, { status: 'skipped' });
+
+    expect(resolve).not.toHaveBeenCalled();
+  });
+
+  it('locks a one-off bill row FOR UPDATE inside the transaction, and answers 404 when it is gone', async () => {
+    const bill = { ...TARGET, billId: 7 };
+    const ok = fakeDatabase();
+    await ok.writer.record(PERSONAL, bill, PAID);
+    expect(ok.findOne).toHaveBeenCalledWith({ where: { id: 7, providerAccountId: 3 }, lock: { mode: 'pessimistic_write' } });
+
+    const gone = fakeDatabase();
+    gone.findOne.mockResolvedValueOnce(null);
+    await expect(gone.writer.record(PERSONAL, bill, PAID)).rejects.toBeInstanceOf(NotFoundException);
+    expect(gone.resolve).not.toHaveBeenCalled();
+    expect(gone.committed).toEqual([]);
   });
 
   it('looks a one-off payment up by bill id', async () => {
@@ -126,7 +165,7 @@ describe('BillPaymentWriter', () => {
   it('rethrows other errors untouched', async () => {
     const { writer } = fakeDatabase(1, new TypeError('boom'));
 
-    await expect(writer.record(TARGET, PAID)).rejects.toBeInstanceOf(TypeError);
+    await expect(writer.record(PERSONAL, TARGET, PAID)).rejects.toBeInstanceOf(TypeError);
   });
 });
 

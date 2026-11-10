@@ -121,6 +121,27 @@ export async function buildBankTestApp(config: Record<string, string> = {}): Pro
   return { app, repos };
 }
 
+type TransactionFn = <R>(work: (manager: unknown) => Promise<R>) => Promise<R>;
+
+/**
+ * Runs `interleave` right before the next DB transaction opens — i.e. after
+ * the service's pre-checks — standing in for a concurrent request that slips
+ * in between the pre-check and the write.
+ * @param {INestApplication} app - The app.
+ * @param {() => unknown} interleave - The concurrent change.
+ * @returns {void}
+ */
+export function beforeNextTransaction(app: INestApplication, interleave: () => unknown): void {
+  const { manager } = app.get<{ manager: { transaction: TransactionFn } }>(getDataSourceToken());
+  const original = manager.transaction;
+
+  manager.transaction = async (work) => {
+    manager.transaction = original;
+    await interleave();
+    return original(work);
+  };
+}
+
 type Method = 'get' | 'post' | 'patch' | 'delete';
 
 /**

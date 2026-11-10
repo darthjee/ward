@@ -167,22 +167,22 @@ export class BillService {
    * @throws {ConflictException} 409 when a paid bill changes provider.
    */
   async update(owner: OwnerContext, id: number, dto: UpdateBillDto): Promise<BillResponse> {
-    const { bill, provider: stored } = await this.findOwned(owner, id);
+    const { provider: stored } = await this.findOwned(owner, id);
     const moved = dto.provider_account_id !== undefined && dto.provider_account_id !== stored.id;
     const provider = moved ? await this.#bodyProvider(owner, dto.provider_account_id as number) : stored;
-    const payment = await this.paymentRepository.findOneBy({ billId: bill.id });
-
-    if (moved && payment?.status === 'paid') {
-      throw billPaid();
-    }
-
-    await this.#applyPaying(owner, bill, dto.paying_account_id, provider.currency, moved);
-    bill.amount = dto.amount === undefined
-      ? convertAmountInput('amount', bill.amount, stored.currency, provider.currency)
-      : parseBillAmount(dto.amount, provider.currency);
-    Object.assign(bill, { providerAccountId: provider.id }, definedFields(dto));
-
     const saved = await this.billRepository.manager.transaction(async (manager) => {
+      const { bill, payment } = await this.#lockedBill(manager, id, stored.id);
+
+      if (moved && payment?.status === 'paid') {
+        throw billPaid();
+      }
+
+      await this.#applyPaying(owner, bill, dto.paying_account_id, provider.currency, moved, manager);
+      bill.amount = dto.amount === undefined
+        ? convertAmountInput('amount', bill.amount, stored.currency, provider.currency)
+        : parseBillAmount(dto.amount, provider.currency);
+      Object.assign(bill, { providerAccountId: provider.id }, definedFields(dto));
+
       const result = await manager.getRepository(Bill).save(bill);
       if (payment) {
         await manager.getRepository(BillPayment).save(Object.assign(payment, { sourceAccountId: provider.id, dueDate: bill.dueDate }));
@@ -202,16 +202,17 @@ export class BillService {
    * @throws {ConflictException} 409 when the bill is paid.
    */
   async delete(owner: OwnerContext, id: number): Promise<void> {
-    const { bill } = await this.findOwned(owner, id);
-    const payment = await this.paymentRepository.findOneBy({ billId: bill.id });
-
-    if (payment?.status === 'paid') {
-      throw billPaid();
-    }
+    const { provider } = await this.findOwned(owner, id);
 
     await this.billRepository.manager.transaction(async (manager) => {
-      await manager.getRepository(BillPayment).delete({ billId: bill.id });
-      await manager.getRepository(Bill).delete({ id: bill.id });
+      const { payment } = await this.#lockedBill(manager, id, provider.id);
+
+      if (payment?.status === 'paid') {
+        throw billPaid();
+      }
+
+      await manager.getRepository(BillPayment).delete({ billId: id });
+      await manager.getRepository(Bill).delete({ id });
     });
   }
 
@@ -229,13 +230,35 @@ export class BillService {
     return provider;
   }
 
-  async #applyPaying(owner: OwnerContext, bill: Bill, sent: number | null | undefined, currency: string, moved: boolean): Promise<void> {
+  /**
+   * Re-reads the bill inside the write's transaction, locked `FOR UPDATE` (the
+   * lock `BillPaymentWriter` takes to pay it, so a concurrent pay serializes
+   * with the edit / delete), and its payment row under that lock.
+   */
+  async #lockedBill(manager: EntityManager, id: number, providerAccountId: number): Promise<{ bill: Bill; payment: BillPayment | null }> {
+    const bill = await manager.getRepository(Bill).findOne({ where: { id, providerAccountId }, lock: { mode: 'pessimistic_write' } });
+
+    if (!bill) {
+      throw ownerNotFound();
+    }
+
+    return { bill, payment: await manager.getRepository(BillPayment).findOneBy({ billId: id }) };
+  }
+
+  async #applyPaying(
+    owner: OwnerContext,
+    bill: Bill,
+    sent: number | null | undefined,
+    currency: string,
+    moved: boolean,
+    manager: EntityManager,
+  ): Promise<void> {
     if (sent !== undefined) {
       bill.payingAccountId = sent;
     }
 
     if (bill.payingAccountId !== null && (sent !== undefined || moved)) {
-      await this.payingAccounts.resolve(owner, bill.payingAccountId, currency);
+      await this.payingAccounts.resolve(owner, bill.payingAccountId, currency, manager);
     }
   }
 

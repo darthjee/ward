@@ -6,6 +6,7 @@ import {
   ALICE,
   ALICE_ORG,
   base,
+  beforeNextTransaction,
   BOB,
   BOB_ORG,
   buildBankTestApp,
@@ -265,6 +266,60 @@ describe('bill payments (e2e)', () => {
         const mismatch = await pay(orgId, fee.id, '2026-01-05', paid(usd.id)).expect(422);
         expect(mismatch.body.error).toEqual({ code: 'CURRENCY_MISMATCH', message: 'currency mismatch' });
         expect(repos.billPayments.rows.some((row) => row.sourceAccountId === fee.id)).toBe(false);
+      });
+    });
+
+    describe('races past the pre-checks (re-checked under row locks inside the write)', () => {
+      const archiveNow = (id: number) => () => {
+        (repos.accounts.rows.find((row) => row.id === id) as { archivedAt: Date | null }).archivedAt = new Date();
+      };
+
+      it('answers 404 when the one-off bill is deleted meanwhile, writing nothing', async () => {
+        const checking = await regular(orgId);
+        const fee = await provider(orgId, { due_day: null });
+        const bill = await createBill(orgId, fee.id, checking.id);
+        const locks = repos.bills.locks.length;
+        beforeNextTransaction(app, () => repos.bills.delete({ id: bill.id }));
+
+        const response = await send(app, 'post', billPaymentPath(orgId, bill.id), ALICE, paid(checking.id)).expect(404);
+
+        expect(response.body).toEqual(NOT_FOUND_BODY);
+        expect(repos.bills.locks.slice(locks)).toEqual(['pessimistic_write']);
+        expect(ledgerOf(fee.id)).toEqual([]);
+        expect(ledgerOf(checking.id)).toEqual([]);
+        expect(repos.billPayments.rows.some((row) => row.billId === bill.id)).toBe(false);
+      });
+
+      it('answers 422 when the paying account is archived meanwhile, on a derived occurrence and a one-off bill', async () => {
+        const checking = await regular(orgId);
+        const loan = await debt(orgId);
+        const locks = repos.accounts.locks.length;
+        beforeNextTransaction(app, archiveNow(checking.id));
+
+        const derived = await pay(orgId, loan.id, '2026-01-10', paid(checking.id)).expect(422);
+
+        expect(withoutTimestamp(derived)).toEqual(ACCOUNT_NOT_FOUND);
+        expect(repos.accounts.locks.slice(locks)).toEqual(['pessimistic_read']);
+        expect(ledgerOf(checking.id)).toEqual([]);
+        expect(repos.billPayments.rows.some((row) => row.sourceAccountId === loan.id)).toBe(false);
+
+        const other = await regular(orgId);
+        const fee = await provider(orgId, { due_day: null });
+        const bill = await createBill(orgId, fee.id, other.id);
+        beforeNextTransaction(app, archiveNow(other.id));
+        const oneOff = await send(app, 'post', billPaymentPath(orgId, bill.id), ALICE, paid(other.id)).expect(422);
+        expect(withoutTimestamp(oneOff)).toEqual(ACCOUNT_NOT_FOUND);
+        expect(ledgerOf(fee.id)).toEqual([]);
+        expect(repos.billPayments.rows.some((row) => row.billId === bill.id)).toBe(false);
+      });
+
+      it('does not re-check a paying account for a skip', async () => {
+        const loan = await debt(orgId);
+        const locks = repos.accounts.locks.length;
+
+        await pay(orgId, loan.id, '2026-01-10', { status: 'skipped' }).expect(201);
+
+        expect(repos.accounts.locks.length).toBe(locks);
       });
     });
 

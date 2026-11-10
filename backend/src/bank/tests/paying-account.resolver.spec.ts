@@ -46,16 +46,26 @@ describe('PayingAccountResolver', () => {
     await expect(resolver.resolve(PERSONAL, 1, 'BRL')).rejects.toEqual(currencyMismatch());
   });
 
-  it('reads through the given transactional manager', async () => {
+  it('reads through the given transactional manager, share-locking the row', async () => {
     const { resolver, findOneBy } = setup(null);
     const managerFind = jest.fn(async () => buildAccount());
-    const manager = { getRepository: jest.fn(() => ({ findOneBy: managerFind })) };
+    const manager = { getRepository: jest.fn(() => ({ findOne: managerFind })) };
 
     await resolver.resolve(PERSONAL, 1, 'BRL', manager as never);
 
     expect(manager.getRepository).toHaveBeenCalledWith(Account);
-    expect(managerFind).toHaveBeenCalled();
+    expect(managerFind).toHaveBeenCalledWith({
+      where: expect.objectContaining({ userId: 7, id: 1, type: 'regular' }),
+      lock: { mode: 'pessimistic_read' },
+    });
     expect(findOneBy).not.toHaveBeenCalled();
+  });
+
+  it('answers the generic 422 when the locked read finds nothing', async () => {
+    const { resolver } = setup(null);
+    const manager = { getRepository: () => ({ findOne: async () => null }) };
+
+    await expect(resolver.resolve(PERSONAL, 1, 'BRL', manager as never)).rejects.toEqual(accountNotFoundInBody());
   });
 });
 
