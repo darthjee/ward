@@ -4,6 +4,7 @@ import { AccountantController } from './accountant.controller.js';
 import { AccountsController } from './accounts.controller.js';
 import { BankConfigModule } from './bank-config.module.js';
 import { BankModuleLoader } from './bank-module.loader.js';
+import { BillPaymentsController } from './bill-payments.controller.js';
 import { BillsController } from './bills.controller.js';
 import { CalendarController } from './calendar.controller.js';
 import { Account } from './entities/account.entity.js';
@@ -48,6 +49,7 @@ import { LazyModuleLoaderService } from '../core/lazy-module-loader.service.js';
     SettingsController,
     AccountantController,
     BillsController,
+    BillPaymentsController,
     CalendarController,
   ],
   providers: [LazyModuleLoaderService, BankModuleLoader],
