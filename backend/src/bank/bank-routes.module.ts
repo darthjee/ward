@@ -5,6 +5,8 @@ import { AccountsController } from './accounts.controller.js';
 import { BankConfigModule } from './bank-config.module.js';
 import { BankModuleLoader } from './bank-module.loader.js';
 import { Account } from './entities/account.entity.js';
+import { BillPayment } from './entities/bill-payment.entity.js';
+import { Bill } from './entities/bill.entity.js';
 import { DebtDetails } from './entities/debt-details.entity.js';
 import { InvestmentDetails } from './entities/investment-details.entity.js';
 import { ProviderExpenseDetails } from './entities/provider-expense-details.entity.js';
@@ -29,7 +31,15 @@ import { LazyModuleLoaderService } from '../core/lazy-module-loader.service.js';
  * caches the loaded module).
  */
 @Module({
-  imports: [TypeOrmModule.forFeature([Account, DebtDetails, InvestmentDetails, ProviderExpenseDetails, Transaction]), BankConfigModule],
+  imports: [TypeOrmModule.forFeature([
+    Account,
+    Bill,
+    BillPayment,
+    DebtDetails,
+    InvestmentDetails,
+    ProviderExpenseDetails,
+    Transaction,
+  ]), BankConfigModule],
   controllers: [AccountsController, TransactionsController, SettingsController, AccountantController],
   providers: [LazyModuleLoaderService, BankModuleLoader],
 })

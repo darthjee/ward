@@ -13,6 +13,8 @@ interface Owner {
   organizationId?: number | null;
 }
 
+const BILLS = 'bank_bills';
+const BILL_PAYMENTS = 'bank_bill_payments';
 const SCHEDULE_TABLES = [DEBT_DETAILS, PROVIDER_EXPENSE_DETAILS];
 
 async function insertAccount(ds: DataSource, owner: Owner, name: string, archived = false): Promise<number> {
@@ -47,6 +49,33 @@ function insertProviderExpenseDetails(ds: DataSource, accountId: number): Promis
   return ds.query(`INSERT INTO ${PROVIDER_EXPENSE_DETAILS} (account_id, provider_tax_id, expected_amount) VALUES (?, '12.345.678/0001-90', 20000)`, [
     accountId,
   ]);
+}
+
+async function insertBill(ds: DataSource, providerId: number, payingId: number | null = null): Promise<number> {
+  const result: { insertId: number } = await ds.query(
+    `INSERT INTO ${BILLS} (provider_account_id, paying_account_id, due_date, amount, description) VALUES (?, ?, '2026-03-10', 5000, 'Tax')`,
+    [providerId, payingId],
+  );
+  return result.insertId;
+}
+
+async function insertPayment(ds: DataSource, fields: Record<string, unknown>): Promise<number> {
+  const row = { bill_id: null, due_date: '2026-03-10', status: 'skipped', ...fields };
+  const columns = Object.keys(row);
+  const result: { insertId: number } = await ds.query(
+    `INSERT INTO ${BILL_PAYMENTS} (${columns.join(', ')}) VALUES (${columns.map(() => '?').join(', ')})`,
+    Object.values(row),
+  );
+  return result.insertId;
+}
+
+async function indexColumns(ds: DataSource, table: string, index: string): Promise<string[]> {
+  const rows: Array<{ column: string }> = await ds.query(
+    `SELECT COLUMN_NAME AS \`column\` FROM information_schema.STATISTICS
+      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND INDEX_NAME = ? ORDER BY SEQ_IN_INDEX`,
+    [table, index],
+  );
+  return rows.map(({ column }) => column);
 }
 
 describe('bank schema (MySQL)', () => {
@@ -289,6 +318,98 @@ describe('bank schema (MySQL)', () => {
     });
   });
 
+  describe('bank_bills', () => {
+    it('creates the columns and the (provider_account_id, due_date) index', async () => {
+      expect(await columnInfo(ds, BILLS, 'provider_account_id')).toMatchObject({ type: 'int', nullable: false });
+      expect(await columnInfo(ds, BILLS, 'paying_account_id')).toMatchObject({ type: 'int', nullable: true });
+      expect(await columnInfo(ds, BILLS, 'due_date')).toMatchObject({ type: 'date', nullable: false });
+      expect(await columnInfo(ds, BILLS, 'amount')).toMatchObject({ type: 'bigint', nullable: false });
+      expect(await columnInfo(ds, BILLS, 'description')).toMatchObject({ type: 'varchar(255)', nullable: false });
+      expect(await columnInfo(ds, BILLS, 'notes')).toMatchObject({ type: 'text', nullable: true });
+      expect(await indexColumns(ds, BILLS, 'idx_bank_bills_provider_due')).toEqual(['provider_account_id', 'due_date']);
+    });
+
+    it('deletes the bills with their provider (CASCADE) and nulls a deleted paying account (SET NULL)', async () => {
+      const provider = await insertAccount(ds, { userId: 1 }, 'Provider');
+      const paying = await insertAccount(ds, { userId: 1 }, 'Checking');
+      const kept = await insertAccount(ds, { userId: 1 }, 'Other provider');
+      await insertBill(ds, provider);
+      const keptBill = await insertBill(ds, kept, paying);
+
+      await ds.query(`DELETE FROM ${ACCOUNTS} WHERE id IN (?, ?)`, [provider, paying]);
+
+      expect(await ds.query(`SELECT id, paying_account_id AS payingId FROM ${BILLS}`)).toEqual([{ id: keptBill, payingId: null }]);
+    });
+
+    it('rejects a bill of an unknown provider', async () => {
+      await expect(insertBill(ds, 999999)).rejects.toThrow(/foreign key constraint fails/);
+    });
+  });
+
+  describe('bank_bill_payments', () => {
+    it('creates the columns, the keys and the (source_account_id, due_date) index', async () => {
+      expect(await columnInfo(ds, BILL_PAYMENTS, 'status')).toMatchObject({ type: 'varchar(16)', nullable: false });
+      expect(await columnInfo(ds, BILL_PAYMENTS, 'paid_on')).toMatchObject({ type: 'date', nullable: true });
+      expect(await columnInfo(ds, BILL_PAYMENTS, 'amount')).toMatchObject({ type: 'bigint', nullable: true });
+      expect(await columnInfo(ds, BILL_PAYMENTS, 'derived_due_date')).toMatchObject({ type: 'date', nullable: true });
+      expect(await indexColumns(ds, BILL_PAYMENTS, 'idx_bank_bill_payments_source_due')).toEqual(['source_account_id', 'due_date']);
+      expect(await indexColumns(ds, BILL_PAYMENTS, 'uq_bank_bill_payments_bill')).toEqual(['bill_id']);
+      expect(await indexColumns(ds, BILL_PAYMENTS, 'uq_bank_bill_payments_derived')).toEqual(['source_account_id', 'derived_due_date']);
+    });
+
+    it('rejects two derived payments for the same account and nominal date', async () => {
+      const source = await insertAccount(ds, { userId: 1 }, 'Loan');
+      await insertPayment(ds, { source_account_id: source });
+
+      await expect(insertPayment(ds, { source_account_id: source })).rejects.toThrow(/Duplicate entry/);
+      await expect(insertPayment(ds, { source_account_id: source, due_date: '2026-04-10' })).resolves.toBeGreaterThan(0);
+    });
+
+    it('allows one-off payments of different bills on the same provider and date, but one per bill', async () => {
+      const provider = await insertAccount(ds, { userId: 1 }, 'Provider');
+      const first = await insertBill(ds, provider);
+      const second = await insertBill(ds, provider);
+      await insertPayment(ds, { source_account_id: provider });
+
+      await insertPayment(ds, { source_account_id: provider, bill_id: first });
+      await expect(insertPayment(ds, { source_account_id: provider, bill_id: second })).resolves.toBeGreaterThan(0);
+      await expect(insertPayment(ds, { source_account_id: provider, bill_id: first, due_date: '2026-05-01' })).rejects.toThrow(
+        /Duplicate entry/,
+      );
+    });
+
+    it('cascades from the source account and the bill, and nulls the paying account and transactions', async () => {
+      const source = await insertAccount(ds, { userId: 1 }, 'Provider');
+      const paying = await insertAccount(ds, { userId: 1 }, 'Checking');
+      const bill = await insertBill(ds, source);
+      await insertTransaction(ds, source);
+      const [{ id: transactionId }]: Array<{ id: number }> = await ds.query(`SELECT id FROM ${TRANSACTIONS}`);
+      const kept = await insertPayment(ds, {
+        source_account_id: source,
+        status: 'paid',
+        paid_on: '2026-03-10',
+        amount: 5000,
+        paying_account_id: paying,
+        payment_transaction_id: transactionId,
+        withdrawal_transaction_id: transactionId,
+        charge_transaction_id: transactionId,
+      });
+      await insertPayment(ds, { source_account_id: source, bill_id: bill });
+
+      await ds.query(`DELETE FROM ${BILLS} WHERE id = ?`, [bill]);
+      await ds.query(`DELETE FROM ${TRANSACTIONS} WHERE id = ?`, [transactionId]);
+      await ds.query(`DELETE FROM ${ACCOUNTS} WHERE id = ?`, [paying]);
+
+      expect(await ds.query(
+        `SELECT id, paying_account_id AS paying, payment_transaction_id AS p, withdrawal_transaction_id AS w,
+                charge_transaction_id AS c FROM ${BILL_PAYMENTS}`,
+      )).toEqual([{ id: kept, paying: null, p: null, w: null, c: null }]);
+
+      await ds.query(`DELETE FROM ${ACCOUNTS} WHERE id = ?`, [source]);
+      expect(await ds.query(`SELECT id FROM ${BILL_PAYMENTS}`)).toEqual([]);
+    });
+  });
+
   describe('schedule fields', () => {
     it.each(SCHEDULE_TABLES)('adds bills_from, show_in_calendar and paying_account_id to %s', async (table) => {
       expect(await columnInfo(ds, table, 'bills_from')).toMatchObject({ type: 'date', nullable: true, default: null });
@@ -353,7 +474,12 @@ describe('bank schema (MySQL)', () => {
   });
 
   describe('down', () => {
-    it('drops the schedule fields, then sent_to_accountant_at, then bank_provider_expense_details, bank_investment_details, bank_debt_details, then bank_transactions, then bank_accounts', async () => {
+    it('drops the bill tables, then the schedule fields, then sent_to_accountant_at, then bank_provider_expense_details, bank_investment_details, bank_debt_details, then bank_transactions, then bank_accounts', async () => {
+      await ds.undoLastMigration();
+      expect(await tableNames(ds)).not.toContain(BILL_PAYMENTS);
+      expect(await tableNames(ds)).not.toContain(BILLS);
+      expect(await columnInfo(ds, DEBT_DETAILS, 'bills_from')).toBeDefined();
+
       await ds.undoLastMigration();
       for (const table of SCHEDULE_TABLES) {
         expect(await columnInfo(ds, table, 'bills_from')).toBeUndefined();

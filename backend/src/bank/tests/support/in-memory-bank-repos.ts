@@ -1,5 +1,7 @@
 import { QueryFailedError } from 'typeorm';
 import { Account } from '../../entities/account.entity.js';
+import { BillPayment } from '../../entities/bill-payment.entity.js';
+import { Bill } from '../../entities/bill.entity.js';
 import { DebtDetails } from '../../entities/debt-details.entity.js';
 import { InvestmentDetails } from '../../entities/investment-details.entity.js';
 import { ProviderExpenseDetails } from '../../entities/provider-expense-details.entity.js';
@@ -141,6 +143,8 @@ export type InMemoryProviderExpenseDetailsRepo = InMemoryDetailsRepo<ProviderExp
 export interface InMemoryBankRepos {
   accounts: InMemoryBankRepo<Account>;
   transactions: InMemoryBankRepo<Transaction>;
+  bills: InMemoryBankRepo<Bill>;
+  billPayments: InMemoryBankRepo<BillPayment>;
   debtDetails: InMemoryDebtDetailsRepo;
   investmentDetails: InMemoryInvestmentDetailsRepo;
   providerExpenseDetails: InMemoryProviderExpenseDetailsRepo;
@@ -162,6 +166,23 @@ function checkActiveName(account: Account, others: Account[]): void {
   }
 }
 
+// The two unique keys of `bank_bill_payments`: `(bill_id)` for one-offs, and
+// `(source_account_id, derived_due_date)` for derived occurrences (bill_id NULL).
+function checkBillPaymentKeys(payment: BillPayment, others: BillPayment[]): void {
+  const clash = others.some((other) =>
+    payment.billId !== null && payment.billId !== undefined
+      ? other.billId === payment.billId
+      : (other.billId === null || other.billId === undefined) &&
+        other.sourceAccountId === payment.sourceAccountId &&
+        other.dueDate === payment.dueDate);
+
+  if (clash) {
+    throw mysqlError('ER_DUP_ENTRY');
+  }
+}
+
+const TRANSACTION_REFS = ['paymentTransactionId', 'withdrawalTransactionId', 'chargeTransactionId'] as const;
+
 export function createInMemoryBankRepos(): InMemoryBankRepos {
   const accounts = createInMemoryBankRepo(Account, checkActiveName);
   const transactions = createInMemoryBankRepo(Transaction);
@@ -172,7 +193,34 @@ export function createInMemoryBankRepos(): InMemoryBankRepos {
   const debtDetails = createInMemoryDetailsRepo(DebtDetails);
   const investmentDetails = createInMemoryDetailsRepo(InvestmentDetails);
   const providerExpenseDetails = createInMemoryDetailsRepo(ProviderExpenseDetails);
+  const bills = createInMemoryBankRepo(Bill);
+  const billPayments = createInMemoryBankRepo(BillPayment, checkBillPaymentKeys);
   const deleteAccount = accounts.delete;
+  const deleteBill = bills.delete;
+  const deleteTransaction = transactions.delete;
+  const keep = <T>(rows: T[], predicate: (row: T) => boolean): void => {
+    rows.splice(0, rows.length, ...rows.filter(predicate));
+  };
+
+  // `bank_bill_payments.bill_id` is ON DELETE CASCADE.
+  bills.delete = async (where: Where) => {
+    const doomed = new Set(bills.rows.filter((row) => matches(row, where)).map((row) => row.id));
+    const result = await deleteBill(where);
+    keep(billPayments.rows, (row) => row.billId === null || row.billId === undefined || !doomed.has(row.billId));
+    return result;
+  };
+
+  // The payment rows' transaction references are ON DELETE SET NULL.
+  transactions.delete = async (where: Where) => {
+    const doomed = new Set(transactions.rows.filter((row) => matches(row, where)).map((row) => row.id));
+    const result = await deleteTransaction(where);
+    for (const payment of billPayments.rows) {
+      for (const ref of TRANSACTION_REFS) {
+        if (payment[ref] !== null && doomed.has(payment[ref])) payment[ref] = null;
+      }
+    }
+    return result;
+  };
 
   accounts.delete = async (where: Where) => {
     const referenced = accounts.rows
@@ -188,9 +236,15 @@ export function createInMemoryBankRepos(): InMemoryBankRepos {
     for (const details of [debtDetails, investmentDetails, providerExpenseDetails] as Array<{ rows: DetailsRow[] }>) {
       details.rows.splice(0, details.rows.length, ...details.rows.filter((row) => !doomed.has(row.accountId)));
     }
+    // Bills and payments cascade from their provider / source account; paying accounts are SET NULL.
+    keep(bills.rows, (row) => !doomed.has(row.providerAccountId));
+    keep(billPayments.rows, (row) => !doomed.has(row.sourceAccountId));
+    for (const row of [...bills.rows, ...billPayments.rows, ...debtDetails.rows, ...providerExpenseDetails.rows]) {
+      if (row.payingAccountId !== null && doomed.has(row.payingAccountId)) row.payingAccountId = null;
+    }
 
     return result;
   };
 
-  return { accounts, transactions, debtDetails, investmentDetails, providerExpenseDetails };
+  return { accounts, transactions, bills, billPayments, debtDetails, investmentDetails, providerExpenseDetails };
 }

@@ -8,6 +8,8 @@ import { PasswordResetToken } from '../../../auth/entities/password-reset-token.
 import { RefreshToken } from '../../../auth/entities/refresh-token.entity.js';
 import { User } from '../../../auth/entities/user.entity.js';
 import { Account } from '../../../bank/entities/account.entity.js';
+import { BillPayment } from '../../../bank/entities/bill-payment.entity.js';
+import { Bill } from '../../../bank/entities/bill.entity.js';
 import { DebtDetails } from '../../../bank/entities/debt-details.entity.js';
 import { InvestmentDetails } from '../../../bank/entities/investment-details.entity.js';
 import { ProviderExpenseDetails } from '../../../bank/entities/provider-expense-details.entity.js';
@@ -35,6 +37,7 @@ import { BankCreateInvestmentDetails20261108120019 } from '../../migrations/2026
 import { BankCreateProviderExpenseDetails20261108120020 } from '../../migrations/20261108120020-bank-create-provider-expense-details.js';
 import { BankAddTransactionsSentToAccountantAt20261108120021 } from '../../migrations/20261108120021-bank-add-transactions-sent-to-accountant-at.js';
 import { BankAddScheduleFields20261108120022 } from '../../migrations/20261108120022-bank-add-schedule-fields.js';
+import { BankCreateBills20261108120023 } from '../../migrations/20261108120023-bank-create-bills.js';
 
 type MigrationClass = new () => MigrationInterface;
 type MysqlOptions = MysqlConnectionOptions;
@@ -68,6 +71,7 @@ export const MIGRATIONS: ReadonlyArray<{ file: string; migration: MigrationClass
   { file: '20261108120020-bank-create-provider-expense-details', migration: BankCreateProviderExpenseDetails20261108120020 },
   { file: '20261108120021-bank-add-transactions-sent-to-accountant-at', migration: BankAddTransactionsSentToAccountantAt20261108120021 },
   { file: '20261108120022-bank-add-schedule-fields', migration: BankAddScheduleFields20261108120022 },
+  { file: '20261108120023-bank-create-bills', migration: BankCreateBills20261108120023 },
 ];
 
 /** Every entity the app maps, so repositories resolve against the test database. */
@@ -75,6 +79,8 @@ export const ENTITIES = [
   Account,
   AccountEditLockout,
   AuthorizationRequest,
+  Bill,
+  BillPayment,
   DebtDetails,
   InvestmentDetails,
   Organization,
