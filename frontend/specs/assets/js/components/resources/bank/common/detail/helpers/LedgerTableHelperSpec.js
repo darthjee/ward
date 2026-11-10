@@ -107,6 +107,21 @@ describe('LedgerTableHelper', () => {
     expect(page.containsInOrder('Coffee', 'Salary', 'Opening balance')).toBeTrue();
   });
 
+  it('renders the optional per-row slot under the description', () => {
+    const renderRowExtra = jasmine.createSpy('renderRowExtra').and.callFake((row) => (row.id === 2 ? 'EXTRA' : null));
+    const page = output({ renderRowExtra });
+
+    expect(page.containsInOrder('Coffee', 'beans', 'EXTRA', formatMoney('-12.50', 'BRL'), 'Salary')).toBeTrue();
+    expect(renderRowExtra).toHaveBeenCalledWith(ROWS[1]);
+  });
+
+  it('keeps the per-row slot on an archived account, without Edit / Delete', () => {
+    const page = output({ readOnly: true, renderRowExtra: () => 'EXTRA' });
+
+    expect(page.containsInOrder('Coffee', 'EXTRA')).toBeTrue();
+    expect(page.contains('Delete')).toBeFalse();
+  });
+
   it('disables Delete while an action is in flight', () => {
     expect(output({ busy: true }).contains('disabled=""')).toBeTrue();
   });

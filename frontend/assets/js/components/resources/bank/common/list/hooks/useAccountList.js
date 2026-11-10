@@ -5,13 +5,14 @@ import { hashQuery } from '../../../../../../utils/routing/hashQuery.js';
 import { currentHash } from '../../currentHash.js';
 
 /**
- * State of an accounts list page (Accounts, Debts or Investments): the accounts of one type, with the
- * *Show archived* filter read from the hash query (`?archived=true`).
+ * State of an accounts list page (Accounts, Debts, Investments or Providers): the accounts of
+ * one type, with the *Show archived* filter read from the hash query (`?archived=true`).
  *
  * @description The page is remounted on a context change (see AppHelper), so the first context
  * is kept to avoid reloading on every hash change (each route resolution builds a new context
  * object).
- * @param {string} type - The account type listed (`'regular'`, `'debt'` or `'investment'`).
+ * @param {string} type - The account type listed (`'regular'`, `'debt'`, `'investment'` or
+ *   `'provider_expense'`).
  * @returns {{context: object, accounts: (Array<object>|null), error: (object|null),
  *   archived: boolean, notFound: boolean, handlers: {onRetry: Function, onDismiss: Function}}}
  *   The list state and its alert handlers.

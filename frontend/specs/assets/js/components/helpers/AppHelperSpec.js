@@ -20,6 +20,11 @@ import BankInvestmentList from '../../../../../assets/js/components/resources/ba
 import BankInvestmentNew from '../../../../../assets/js/components/resources/bank/investments/pages/BankInvestmentNew.jsx';
 import BankInvestmentEdit from '../../../../../assets/js/components/resources/bank/investments/pages/BankInvestmentEdit.jsx';
 import BankInvestmentDetail from '../../../../../assets/js/components/resources/bank/investments/pages/BankInvestmentDetail.jsx';
+import BankProviderList from '../../../../../assets/js/components/resources/bank/providers/pages/BankProviderList.jsx';
+import BankProviderNew from '../../../../../assets/js/components/resources/bank/providers/pages/BankProviderNew.jsx';
+import BankProviderEdit from '../../../../../assets/js/components/resources/bank/providers/pages/BankProviderEdit.jsx';
+import BankProviderDetail from '../../../../../assets/js/components/resources/bank/providers/pages/BankProviderDetail.jsx';
+import BankProviderAccountant from '../../../../../assets/js/components/resources/bank/providers/pages/BankProviderAccountant.jsx';
 import HashRouteResolver from '../../../../../assets/js/utils/routing/HashRouteResolver.js';
 import ModalRedirect from '../../../../../assets/js/components/common/ModalRedirect.jsx';
 import ResetPasswordLanding from '../../../../../assets/js/components/resources/accounts/pages/ResetPasswordLanding.jsx';
@@ -90,6 +95,11 @@ describe('AppHelper', () => {
     ['bank-investment-new', BankInvestmentNew],
     ['bank-investment-edit', BankInvestmentEdit],
     ['bank-investment', BankInvestmentDetail],
+    ['bank-providers', BankProviderList],
+    ['bank-provider-new', BankProviderNew],
+    ['bank-provider-edit', BankProviderEdit],
+    ['bank-provider', BankProviderDetail],
+    ['bank-provider-accountant', BankProviderAccountant],
   ].forEach(([key, Page]) => {
     it(`maps the ${key} key to its page`, () => {
       expect(partsOf(key).page.type).toBe(Page);

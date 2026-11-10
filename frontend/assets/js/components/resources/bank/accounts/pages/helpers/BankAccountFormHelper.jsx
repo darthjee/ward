@@ -2,7 +2,7 @@ import AccountFormHelper, {
   ARCHIVED_NOTICE,
   SETTINGS_WARNING,
 } from '../../../common/form/helpers/AccountFormHelper.jsx';
-import AccountFormInput from '../../../common/form/AccountFormInput.jsx';
+import BankExtrasHelper from '../../../common/form/helpers/BankExtrasHelper.jsx';
 
 export { ARCHIVED_NOTICE, SETTINGS_WARNING };
 
@@ -14,12 +14,7 @@ export { ARCHIVED_NOTICE, SETTINGS_WARNING };
  * @returns {React.ReactElement} The fields.
  */
 function renderBankExtras(state, handlers) {
-  return (
-    <>
-      <AccountFormInput name="branch" label="Branch" state={state} onChange={handlers.onFieldChange} />
-      <AccountFormInput name="account_number" label="Account number" state={state} onChange={handlers.onFieldChange} />
-    </>
-  );
+  return BankExtrasHelper.render(state, handlers);
 }
 
 /**

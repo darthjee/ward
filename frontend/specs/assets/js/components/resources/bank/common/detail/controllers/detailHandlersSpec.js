@@ -56,6 +56,26 @@ describe('buildDetailHandlers', () => {
       expect(event.preventDefault).toHaveBeenCalled();
       expect(deps.ledgerController.submit).toHaveBeenCalledWith(deps.form, { currency: 'BRL', page: 2 });
     });
+
+    it('asks before saving an edit of a charge already sent to the accountant', () => {
+      const event = { preventDefault: jasmine.createSpy('preventDefault') };
+      const form = { editing: { id: 3, sent_to_accountant_at: '2026-05-01T10:00:00Z' }, values: CLEAN, baseline: CLEAN };
+
+      build({ form }).onSubmit(event);
+
+      expect(event.preventDefault).toHaveBeenCalled();
+      expect(deps.setConfirmation).toHaveBeenCalledWith({ kind: 'sentEdit' });
+      expect(deps.ledgerController.submit).not.toHaveBeenCalled();
+    });
+
+    it('submits an edit of an unsent charge without asking', () => {
+      const form = { editing: { id: 3, sent_to_accountant_at: null }, values: CLEAN, baseline: CLEAN };
+
+      build({ form }).onSubmit({ preventDefault: () => undefined });
+
+      expect(deps.setConfirmation).not.toHaveBeenCalled();
+      expect(deps.ledgerController.submit).toHaveBeenCalled();
+    });
   });
 
   describe('unsaved form confirmation', () => {
@@ -174,6 +194,17 @@ describe('buildDetailHandlers', () => {
       build({ confirmation: { kind: 'transaction', transaction: ROW } }).onConfirm();
 
       expect(deps.detailController.deleteTransaction).toHaveBeenCalledWith(ROW);
+    });
+
+    it('saves the sent charge once confirmed, then closes the modal', async () => {
+      const form = { editing: { id: 3, sent_to_accountant_at: '2026-05-01T10:00:00Z' }, values: CLEAN, baseline: CLEAN };
+      deps.ledgerController.submit.and.resolveTo();
+
+      await build({ form, confirmation: { kind: 'sentEdit' } }).onConfirm();
+
+      expect(deps.ledgerController.submit).toHaveBeenCalledWith(form, { currency: 'BRL', page: 2 });
+      expect(deps.setConfirmation).toHaveBeenCalledWith(null);
+      expect(deps.detailController.deleteAccount).not.toHaveBeenCalled();
     });
 
     it('cancels the confirmation', () => {

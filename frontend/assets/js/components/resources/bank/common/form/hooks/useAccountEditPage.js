@@ -25,7 +25,8 @@ export function mergeLoadedAccount(fields, account, locked, fieldsFrom = fieldsF
 }
 
 /**
- * State and handlers of an account edit page (`<ui><base>/:accountId/edit`, Accounts or Debts).
+ * State and handlers of an account edit page (`<ui><base>/:accountId/edit`, Accounts, Debts,
+ * Investments or Providers).
  *
  * @description Prefilled from the account and ledger page 1, whose `total_count` locks the
  * currency once the account has transactions. An archived account can only be renamed. A `409`

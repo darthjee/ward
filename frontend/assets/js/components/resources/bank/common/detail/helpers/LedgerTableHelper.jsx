@@ -56,6 +56,7 @@ function renderRow(transaction, state, handlers) {
       <td className="text-break">
         {transaction.description}
         {renderNotes(transaction.notes)}
+        {state.renderRowExtra ? state.renderRowExtra(transaction) : null}
       </td>
       <td className="text-end text-nowrap">{formatMoney(transaction.amount, state.currency)}</td>
       <td className="text-end text-nowrap">{formatMoney(transaction.balance, state.currency)}</td>
@@ -97,7 +98,9 @@ const LedgerTableHelper = {
    * "No transactions on this page" with a link to page 1.
    *
    * @param {{ledger: object, currency: string, editingId: (number|null), readOnly: boolean,
-   *   busy: boolean, page: number, firstPageHref: string}} state - Table state.
+   *   busy: boolean, page: number, firstPageHref: string, renderRowExtra: Function}} state -
+   *   Table state; the optional `renderRowExtra(transaction)` adds content under a row's
+   *   description (also on an archived account).
    * @param {{onEdit: Function, onDeleteTransaction: Function}} handlers - Row handlers.
    * @returns {React.ReactElement} The rendered ledger.
    */

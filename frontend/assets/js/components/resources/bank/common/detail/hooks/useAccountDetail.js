@@ -20,14 +20,15 @@ import { pageFromHash } from '../../pageQuery.js';
  * create on another page goes to `<base>/:accountId?page=1`. An account of another type is
  * redirected to its own section (see `guardAccountType`). `reload` and `ledgerForm` let a
  * section add its own page pieces (e.g. Investments' Update value form, which posts directly,
- * asks before discarding the inline form's unsaved changes and reloads).
+ * asks before discarding the inline form's unsaved changes and reloads); `setError` lets them
+ * report into the page alert (e.g. Providers' Mark as unsent).
  * @param {string} base - The section base path (e.g. `'/bank/accounts'`, `'/bank/debts'`).
  * @returns {{context: object, notFound: boolean, state: object, handlers: object,
- *   reload: Function, ledgerForm: {form: object, actions: object}}} The owner context, whether
- *   to show Not-found, the helper state (`context`, `accountId`, `page`, `data`, `loadError`,
- *   `error`, `form`, `actionPending`, `confirmation`), every handler (see
- *   `buildDetailHandlers`), the account + ledger reload and the inline form's state and
- *   actions.
+ *   reload: Function, setError: Function, ledgerForm: {form: object, actions: object}}} The
+ *   owner context, whether to show Not-found, the helper state (`context`, `accountId`,
+ *   `page`, `data`, `loadError`, `error`, `form`, `actionPending`, `confirmation`), every
+ *   handler (see `buildDetailHandlers`), the account + ledger reload, the page alert's error
+ *   setter and the inline form's state and actions.
  */
 export default function useAccountDetail(base) {
   const { context: routeContext } = useOwnerContext();
@@ -90,6 +91,7 @@ export default function useAccountDetail(base) {
     },
     handlers,
     reload,
+    setError,
     ledgerForm: { form, actions },
   };
 }

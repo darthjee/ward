@@ -34,7 +34,8 @@ export const ROUTES_ORG_ONLY = [
  * Context-aware routes, valid both as Personal (`/x`) and under an organization (`/orgs/<id>/x`).
  * Modules register their own paths here (e.g. `['/bank/accounts', 'bank-accounts']`).
  * `Route` matches by equal segment count and the first match wins, so `/bank/accounts/new` is
- * listed before `/bank/accounts/:accountId` (likewise for `/bank/debts/new` and `/bank/investments/new`).
+ * listed before `/bank/accounts/:accountId` (likewise for `/bank/debts/new` and `/bank/investments/new`), and both
+ * `/bank/providers/new` and `/bank/providers/accountant` come before `/bank/providers/:accountId`.
  *
  * @type {Array<Array<string>>}
  */
@@ -51,13 +52,19 @@ export const ROUTES_CONTEXT = [
   ['/bank/investments/new', 'bank-investment-new'],
   ['/bank/investments/:accountId/edit', 'bank-investment-edit'],
   ['/bank/investments/:accountId', 'bank-investment'],
+  ['/bank/providers', 'bank-providers'],
+  ['/bank/providers/new', 'bank-provider-new'],
+  ['/bank/providers/accountant', 'bank-provider-accountant'],
+  ['/bank/providers/:accountId/edit', 'bank-provider-edit'],
+  ['/bank/providers/:accountId', 'bank-provider'],
 ];
 
 /**
  * Section registry for context switches: an ordered `[path prefix, list path]` list of
  * context-relative paths. A switch made from a page under a prefix lands on that section's list
  * in the new context; anything else lands on the new context's landing page. Each bank submenu
- * (Debts, Investments, then #55 Providers, #57 Calendar) adds its own row here.
+ * (Debts, Investments, Providers, then #57 Calendar) adds its own row here; the Providers
+ * prefix also covers its hand-off page (`/bank/providers/accountant`).
  *
  * @type {Array<Array<string>>}
  */
@@ -65,4 +72,5 @@ export const SECTIONS_CONTEXT = [
   ['/bank/accounts', '/bank/accounts'],
   ['/bank/debts', '/bank/debts'],
   ['/bank/investments', '/bank/investments'],
+  ['/bank/providers', '/bank/providers'],
 ];

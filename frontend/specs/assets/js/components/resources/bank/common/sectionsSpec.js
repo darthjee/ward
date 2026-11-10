@@ -1,5 +1,5 @@
 import {
-  ACCOUNTS_BASE, DEBTS_BASE, INVESTMENTS_BASE, SECTION_BY_TYPE, TYPE_BY_SECTION,
+  ACCOUNTS_BASE, DEBTS_BASE, INVESTMENTS_BASE, PROVIDERS_BASE, SECTION_BY_TYPE, TYPE_BY_SECTION,
 } from '../../../../../../../assets/js/components/resources/bank/common/sections.js';
 
 describe('bank sections', () => {
@@ -7,6 +7,7 @@ describe('bank sections', () => {
     expect(ACCOUNTS_BASE).toBe('/bank/accounts');
     expect(DEBTS_BASE).toBe('/bank/debts');
     expect(INVESTMENTS_BASE).toBe('/bank/investments');
+    expect(PROVIDERS_BASE).toBe('/bank/providers');
   });
 
   it('maps each account type to its section and back', () => {
@@ -16,6 +17,8 @@ describe('bank sections', () => {
     expect(TYPE_BY_SECTION.get('/bank/debts')).toBe('debt');
     expect(SECTION_BY_TYPE.get('investment')).toBe('/bank/investments');
     expect(TYPE_BY_SECTION.get('/bank/investments')).toBe('investment');
+    expect(SECTION_BY_TYPE.get('provider_expense')).toBe('/bank/providers');
+    expect(TYPE_BY_SECTION.get('/bank/providers')).toBe('provider_expense');
     expect(SECTION_BY_TYPE.has('unknown')).toBeFalse();
   });
 });
