@@ -14,6 +14,7 @@ import {
 import type { ProviderExpenseDetailsDto } from '../dto/provider-expense-details.dto.js';
 import type { Account } from '../entities/account.entity.js';
 import { ProviderExpenseDetails } from '../entities/provider-expense-details.entity.js';
+import { todayUtc } from '../ledger-date.js';
 
 /**
  * Handler of `provider_expense` accounts (see
@@ -103,7 +104,7 @@ export class ProviderExpenseAccountHandler implements AccountTypeHandler {
   }
 
   #merge(base: ProviderExpenseState, nested: unknown, currency: string): ProviderExpenseState {
-    const merged = nested === undefined ? base : mergeProviderExpenseState(base, nested as ProviderExpenseDetailsDto, currency);
+    const merged = nested === undefined ? base : mergeProviderExpenseState(base, nested as ProviderExpenseDetailsDto, currency, todayUtc(new Date()));
     assertProviderExpensePairs(merged);
 
     return merged;

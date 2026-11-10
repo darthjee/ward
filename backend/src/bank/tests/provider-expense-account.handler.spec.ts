@@ -4,6 +4,7 @@ import { ProviderExpenseAccountHandler } from '../account-types/provider-expense
 import { defaultProviderExpenseState, type ProviderExpenseState } from '../account-types/provider-expense-details.js';
 import type { ProviderExpenseDetailsDto } from '../dto/provider-expense-details.dto.js';
 import { ProviderExpenseDetails } from '../entities/provider-expense-details.entity.js';
+import { todayUtc } from '../ledger-date.js';
 
 const BRL = { currency: 'BRL' };
 
@@ -16,6 +17,9 @@ function stored(overrides: Partial<ProviderExpenseState> = {}): ProviderExpenseD
     dueDay: 10,
     chargeFrequency: 'yearly',
     dueMonth: 3,
+    billsFrom: null,
+    showInCalendar: true,
+    payingAccountId: null,
     createdAt: new Date(),
     updatedAt: new Date(),
     ...overrides,
@@ -46,6 +50,9 @@ describe('ProviderExpenseAccountHandler', () => {
         dueDay: null,
         chargeFrequency: 'monthly',
         dueMonth: null,
+        billsFrom: null,
+        showInCalendar: true,
+        payingAccountId: null,
       });
     });
 
@@ -64,6 +71,9 @@ describe('ProviderExpenseAccountHandler', () => {
         dueDay: 31,
         chargeFrequency: 'yearly',
         dueMonth: 12,
+        billsFrom: todayUtc(new Date()),
+        showInCalendar: true,
+        payingAccountId: null,
       });
     });
 
@@ -101,11 +111,18 @@ describe('ProviderExpenseAccountHandler', () => {
         dueDay: 10,
         chargeFrequency: 'yearly',
         dueMonth: 3,
+        billsFrom: null,
+        showInCalendar: true,
+        payingAccountId: null,
       });
     });
 
     it('falls back to the defaults when there is no stored row', () => {
-      expect(handler.validateUpdate(pe({ due_day: 5 }), undefined, BRL)).toEqual({ ...defaultProviderExpenseState(), dueDay: 5 });
+      expect(handler.validateUpdate(pe({ due_day: 5 }), undefined, BRL)).toEqual({
+        ...defaultProviderExpenseState(),
+        dueDay: 5,
+        billsFrom: todayUtc(new Date()),
+      });
     });
 
     it('clears nullable fields sent as null and flips for_accountant', () => {

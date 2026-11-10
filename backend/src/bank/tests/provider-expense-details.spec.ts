@@ -20,7 +20,12 @@ const YEARLY: ProviderExpenseState = {
   dueDay: 10,
   chargeFrequency: 'yearly',
   dueMonth: 3,
+  billsFrom: '2026-01-01',
+  showInCalendar: true,
+  payingAccountId: null,
 };
+
+const TODAY = '2026-11-10';
 
 const dto = (fields: Partial<ProviderExpenseDetailsDto>): ProviderExpenseDetailsDto => fields as ProviderExpenseDetailsDto;
 
@@ -34,6 +39,9 @@ describe('provider-expense details helpers', () => {
         dueDay: null,
         chargeFrequency: 'monthly',
         dueMonth: null,
+        billsFrom: null,
+        showInCalendar: true,
+        payingAccountId: null,
       });
     });
   });
@@ -52,9 +60,9 @@ describe('provider-expense details helpers', () => {
 
   describe('parseExpectedAmount', () => {
     it('parses into minor units of the currency', () => {
-      expect(parseExpectedAmount('200', 'BRL')).toBe(20000n);
-      expect(parseExpectedAmount('200.5', 'BRL')).toBe(20050n);
-      expect(parseExpectedAmount('200', 'JPY')).toBe(200n);
+      expect(parseExpectedAmount('200', 'BRL', TODAY)).toBe(20000n);
+      expect(parseExpectedAmount('200.5', 'BRL', TODAY)).toBe(20050n);
+      expect(parseExpectedAmount('200', 'JPY', TODAY)).toBe(200n);
     });
 
     it.each([
@@ -69,31 +77,31 @@ describe('provider-expense details helpers', () => {
     });
 
     it('names the field in its errors', () => {
-      expect(() => parseExpectedAmount('0', 'BRL')).toThrow(EXPECTED_AMOUNT_FIELD);
+      expect(() => parseExpectedAmount('0', 'BRL', TODAY)).toThrow(EXPECTED_AMOUNT_FIELD);
     });
   });
 
   describe('rescaleProviderExpenseState', () => {
     it('keeps the decimal value in the new exponent (200.00 BRL -> 200 JPY)', () => {
-      expect(rescaleProviderExpenseState(YEARLY, 'BRL', 'JPY')).toEqual({ ...YEARLY, expectedAmount: 200n });
+      expect(rescaleProviderExpenseState(YEARLY, 'BRL', 'JPY', TODAY)).toEqual({ ...YEARLY, expectedAmount: 200n });
     });
 
     it('rejects an unrepresentable amount (12.50 BRL -> JPY)', () => {
-      expect(() => rescaleProviderExpenseState({ ...YEARLY, expectedAmount: 1250n }, 'BRL', 'JPY')).toThrow(BadRequestException);
+      expect(() => rescaleProviderExpenseState({ ...YEARLY, expectedAmount: 1250n }, 'BRL', 'JPY', TODAY)).toThrow(BadRequestException);
     });
 
     it('is a copy and a no-op without an amount or a currency change', () => {
       const noAmount = { ...YEARLY, expectedAmount: null };
 
-      expect(rescaleProviderExpenseState(noAmount, 'BRL', 'JPY')).toEqual(noAmount);
-      expect(rescaleProviderExpenseState(YEARLY, 'BRL', 'BRL')).toEqual(YEARLY);
-      expect(rescaleProviderExpenseState(YEARLY, 'BRL', 'BRL')).not.toBe(YEARLY);
+      expect(rescaleProviderExpenseState(noAmount, 'BRL', 'JPY', TODAY)).toEqual(noAmount);
+      expect(rescaleProviderExpenseState(YEARLY, 'BRL', 'BRL', TODAY)).toEqual(YEARLY);
+      expect(rescaleProviderExpenseState(YEARLY, 'BRL', 'BRL', TODAY)).not.toBe(YEARLY);
     });
   });
 
   describe('mergeProviderExpenseState', () => {
     it('copies sent fields and keeps omitted ones', () => {
-      expect(mergeProviderExpenseState(YEARLY, dto({ due_day: 5, for_accountant: true }), 'BRL')).toEqual({
+      expect(mergeProviderExpenseState(YEARLY, dto({ due_day: 5, for_accountant: true }), 'BRL', TODAY)).toEqual({
         ...YEARLY,
         dueDay: 5,
         forAccountant: true,
@@ -101,24 +109,24 @@ describe('provider-expense details helpers', () => {
     });
 
     it('clears nullable fields sent as null', () => {
-      expect(mergeProviderExpenseState(YEARLY, dto({ provider_tax_id: null, expected_amount: null, due_day: null }), 'BRL'))
+      expect(mergeProviderExpenseState(YEARLY, dto({ provider_tax_id: null, expected_amount: null, due_day: null }), 'BRL', TODAY))
         .toMatchObject({ providerTaxId: null, expectedAmount: null, dueDay: null });
     });
 
     it('parses expected_amount against the given currency', () => {
-      expect(mergeProviderExpenseState(YEARLY, dto({ expected_amount: '99.9' }), 'BRL')).toMatchObject({ expectedAmount: 9990n });
-      expect(() => mergeProviderExpenseState(YEARLY, dto({ expected_amount: '99.9' }), 'JPY')).toThrow(BadRequestException);
+      expect(mergeProviderExpenseState(YEARLY, dto({ expected_amount: '99.9' }), 'BRL', TODAY)).toMatchObject({ expectedAmount: 9990n });
+      expect(() => mergeProviderExpenseState(YEARLY, dto({ expected_amount: '99.9' }), 'JPY', TODAY)).toThrow(BadRequestException);
     });
 
     it('clears due_month on a merged monthly frequency', () => {
-      expect(mergeProviderExpenseState(YEARLY, dto({ charge_frequency: 'monthly' }), 'BRL')).toMatchObject({
+      expect(mergeProviderExpenseState(YEARLY, dto({ charge_frequency: 'monthly' }), 'BRL', TODAY)).toMatchObject({
         chargeFrequency: 'monthly',
         dueMonth: null,
       });
     });
 
     it('rejects a sent non-null due_month on a merged monthly frequency', () => {
-      expect(() => mergeProviderExpenseState(defaultProviderExpenseState(), dto({ due_month: 5 }), 'BRL')).toThrow(
+      expect(() => mergeProviderExpenseState(defaultProviderExpenseState(), dto({ due_month: 5 }), 'BRL', TODAY)).toThrow(
         BadRequestException,
       );
     });
@@ -134,7 +142,7 @@ describe('provider-expense details helpers', () => {
 
   describe('serializeProviderExpenseState', () => {
     it('serializes snake_case with the amount in the currency exponent', () => {
-      expect(serializeProviderExpenseState(YEARLY, 'BRL')).toEqual({
+      expect(serializeProviderExpenseState(YEARLY, 'BRL', TODAY)).toEqual({
         for_accountant: false,
         provider_tax_id: '12.345.678/0001-90',
         expected_amount: '200.00',
@@ -142,11 +150,11 @@ describe('provider-expense details helpers', () => {
         due_day: 10,
         due_month: 3,
       });
-      expect(serializeProviderExpenseState({ ...YEARLY, expectedAmount: 200n }, 'JPY')).toMatchObject({ expected_amount: '200' });
+      expect(serializeProviderExpenseState({ ...YEARLY, expectedAmount: 200n }, 'JPY', TODAY)).toMatchObject({ expected_amount: '200' });
     });
 
     it('returns unset fields as null', () => {
-      expect(serializeProviderExpenseState(defaultProviderExpenseState(), 'BRL')).toEqual({
+      expect(serializeProviderExpenseState(defaultProviderExpenseState(), 'BRL', TODAY)).toEqual({
         for_accountant: true,
         provider_tax_id: null,
         expected_amount: null,

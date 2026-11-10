@@ -1,6 +1,6 @@
 import { Transform } from 'class-transformer';
 import { IsBoolean, IsIn, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
-import { IsOptionalNonNull, PROVIDER_TAX_ID_MAX_LENGTH, RATE_PERIODS, trimToNull } from './field-validators.js';
+import { IsCalendarDate, IsOptionalNonNull, MAX_INT_COLUMN, PROVIDER_TAX_ID_MAX_LENGTH, RATE_PERIODS, trimToNull } from './field-validators.js';
 import { MaxCodePoints } from '../../core/string-validators.js';
 import type { ProviderChargeFrequency } from '../entities/provider-expense-details.entity.js';
 
@@ -47,4 +47,18 @@ export class ProviderExpenseDetailsDto {
   @Min(1)
   @Max(12)
     due_month?: number | null;
+
+  @IsOptional()
+  @IsCalendarDate()
+    bills_from?: string | null;
+
+  @IsOptionalNonNull()
+  @IsBoolean()
+    show_in_calendar?: boolean;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(MAX_INT_COLUMN)
+    paying_account_id?: number | null;
 }

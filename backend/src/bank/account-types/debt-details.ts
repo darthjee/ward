@@ -1,6 +1,13 @@
 import { BadRequestException } from '@nestjs/common';
 import { normaliseRate } from './rate.js';
 import { convertAmountInput, parseAmountInput } from '../amount-input.js';
+import {
+  applyBillsFromLifecycle,
+  defaultScheduleState,
+  SCHEDULE_COPIED_FIELDS,
+  scheduleStateOf,
+  type ScheduleState,
+} from './schedule-fields.js';
 import { formatAmount } from '../currency.js';
 import type { DebtDetailsDto } from '../dto/debt-details.dto.js';
 import type { DebtDetails, DebtPeriod } from '../entities/debt-details.entity.js';
@@ -12,7 +19,7 @@ import type { DebtDetails, DebtPeriod } from '../entities/debt-details.entity.js
 export type DebtState = Pick<
   DebtDetails,
   'interestRate' | 'interestPeriod' | 'instalmentAmount' | 'instalmentFrequency' | 'dueDay' | 'dueMonth' | 'instalmentCount'
->;
+> & ScheduleState;
 
 /**
  * The nested `debt` response object (snake_case). A type alias (not an
@@ -39,6 +46,7 @@ const COPIED_FIELDS = [
   ['due_day', 'dueDay'],
   ['due_month', 'dueMonth'],
   ['instalment_count', 'instalmentCount'],
+  ...SCHEDULE_COPIED_FIELDS,
 ] as const;
 
 /**
@@ -54,6 +62,7 @@ export function defaultDebtState(): DebtState {
     dueDay: null,
     dueMonth: null,
     instalmentCount: null,
+    ...defaultScheduleState(),
   };
 }
 
@@ -68,7 +77,16 @@ export function debtStateOf(details: DebtState | undefined): DebtState {
 
   const { interestRate, interestPeriod, instalmentAmount, instalmentFrequency, dueDay, dueMonth, instalmentCount } = details;
 
-  return { interestRate, interestPeriod, instalmentAmount, instalmentFrequency, dueDay, dueMonth, instalmentCount };
+  return {
+    interestRate,
+    interestPeriod,
+    instalmentAmount,
+    instalmentFrequency,
+    dueDay,
+    dueMonth,
+    instalmentCount,
+    ...scheduleStateOf(details),
+  };
 }
 
 /**
@@ -110,15 +128,17 @@ export function rescaleDebtState(state: DebtState, from: string, to: string): De
 /**
  * Merges the sent `debt` fields onto `base` (`null` clears a field, an absent
  * one is unchanged). A merged `monthly` frequency clears `due_month`, unless
- * the request sends a non-null `due_month` (→ 400).
+ * the request sends a non-null `due_month` (→ 400). Setting `due_day` for the
+ * first time sets an unset, unsent `bills_from` to `today`.
  * @param {DebtState} base - The stored (or default) details.
  * @param {DebtDetailsDto} dto - The validated nested body.
  * @param {string} currency - The account's (final) currency.
+ * @param {string} today - Today (UTC), `YYYY-MM-DD`.
  * @returns {DebtState} The merged details.
  * @throws {BadRequestException} When `instalment_amount` is invalid, or
  *   `due_month` is sent with a `monthly` frequency.
  */
-export function mergeDebtState(base: DebtState, dto: DebtDetailsDto, currency: string): DebtState {
+export function mergeDebtState(base: DebtState, dto: DebtDetailsDto, currency: string, today: string): DebtState {
   const merged: DebtState = { ...base };
 
   for (const [field, property] of COPIED_FIELDS) {
@@ -138,6 +158,8 @@ export function mergeDebtState(base: DebtState, dto: DebtDetailsDto, currency: s
 
     merged.dueMonth = null;
   }
+
+  applyBillsFromLifecycle(base, merged, dto, today);
 
   return merged;
 }

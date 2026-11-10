@@ -14,6 +14,7 @@ import {
 import type { DebtDetailsDto } from '../dto/debt-details.dto.js';
 import type { Account } from '../entities/account.entity.js';
 import { DebtDetails } from '../entities/debt-details.entity.js';
+import { todayUtc } from '../ledger-date.js';
 
 /**
  * Handler of `debt` accounts (see `docs/agents/specs/banking/accounts/debt.md`):
@@ -101,7 +102,7 @@ export class DebtAccountHandler implements AccountTypeHandler {
   }
 
   #merge(base: DebtState, nested: unknown, currency: string): DebtState {
-    const merged = nested === undefined ? base : mergeDebtState(base, nested as DebtDetailsDto, currency);
+    const merged = nested === undefined ? base : mergeDebtState(base, nested as DebtDetailsDto, currency, todayUtc(new Date()));
     assertDebtPairs(merged);
 
     return merged;

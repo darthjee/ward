@@ -1,6 +1,6 @@
 import type { DataSource } from 'typeorm';
 import { columnInfo, indexNames, tableNames } from './schema-inspection.js';
-import { createTestDataSource, resetDatabase } from './test-data-source.js';
+import { createTestDataSource, resetDatabase, runMigrationsUpTo } from './test-data-source.js';
 
 const ACCOUNTS = 'bank_accounts';
 const TRANSACTIONS = 'bank_transactions';
@@ -12,6 +12,8 @@ interface Owner {
   userId?: number | null;
   organizationId?: number | null;
 }
+
+const SCHEDULE_TABLES = [DEBT_DETAILS, PROVIDER_EXPENSE_DETAILS];
 
 async function insertAccount(ds: DataSource, owner: Owner, name: string, archived = false): Promise<number> {
   const result: { insertId: number } = await ds.query(
@@ -287,8 +289,79 @@ describe('bank schema (MySQL)', () => {
     });
   });
 
+  describe('schedule fields', () => {
+    it.each(SCHEDULE_TABLES)('adds bills_from, show_in_calendar and paying_account_id to %s', async (table) => {
+      expect(await columnInfo(ds, table, 'bills_from')).toMatchObject({ type: 'date', nullable: true, default: null });
+      expect(await columnInfo(ds, table, 'show_in_calendar')).toMatchObject({
+        type: expect.stringMatching(/^tinyint/),
+        nullable: false,
+        default: '1',
+      });
+      expect(await columnInfo(ds, table, 'paying_account_id')).toMatchObject({ type: 'int', nullable: true, default: null });
+    });
+
+    it.each(SCHEDULE_TABLES)('defaults show_in_calendar to true on %s', async (table) => {
+      const accountId = await insertAccount(ds, { userId: 1 }, 'Source');
+      await ds.query(`INSERT INTO ${table} (account_id) VALUES (?)`, [accountId]);
+
+      expect(await ds.query(`SELECT show_in_calendar AS shown, bills_from AS billsFrom FROM ${table}`)).toEqual([
+        { shown: 1, billsFrom: null },
+      ]);
+    });
+
+    it.each(SCHEDULE_TABLES)('rejects an unknown paying account on %s', async (table) => {
+      const accountId = await insertAccount(ds, { userId: 1 }, 'Source');
+
+      await expect(ds.query(`INSERT INTO ${table} (account_id, paying_account_id) VALUES (?, 999999)`, [accountId])).rejects.toThrow(
+        /foreign key constraint fails/,
+      );
+    });
+
+    it.each(SCHEDULE_TABLES)('sets paying_account_id to NULL when the paying account is deleted on %s', async (table) => {
+      const accountId = await insertAccount(ds, { userId: 1 }, 'Source');
+      const payingId = await insertAccount(ds, { userId: 1 }, 'Checking');
+      await ds.query(`INSERT INTO ${table} (account_id, paying_account_id) VALUES (?, ?)`, [accountId, payingId]);
+
+      await ds.query(`DELETE FROM ${ACCOUNTS} WHERE id = ?`, [payingId]);
+
+      expect(await ds.query(`SELECT paying_account_id AS payingId FROM ${table}`)).toEqual([{ payingId: null }]);
+    });
+  });
+
+  describe('schedule fields backfill', () => {
+    beforeEach(async () => {
+      await resetDatabase(ds);
+      await runMigrationsUpTo(ds, 'BankAddTransactionsSentToAccountantAt20261108120021');
+    });
+
+    it.each(SCHEDULE_TABLES)('sets bills_from to today on %s rows with a due_day, NULL otherwise', async (table) => {
+      const scheduled = await insertAccount(ds, { userId: 1 }, 'Scheduled');
+      const unscheduled = await insertAccount(ds, { userId: 1 }, 'Unscheduled');
+      await ds.query(`INSERT INTO ${table} (account_id, due_day) VALUES (?, 10), (?, NULL)`, [scheduled, unscheduled]);
+
+      await ds.runMigrations();
+
+      const rows: Array<{ id: number; billsFrom: string | null }> = await ds.query(
+        `SELECT account_id AS id, DATE_FORMAT(bills_from, '%Y-%m-%d') AS billsFrom FROM ${table} ORDER BY account_id`,
+      );
+      const [{ today }]: Array<{ today: string }> = await ds.query("SELECT DATE_FORMAT(UTC_DATE(), '%Y-%m-%d') AS today");
+      expect(rows).toEqual([
+        { id: scheduled, billsFrom: today },
+        { id: unscheduled, billsFrom: null },
+      ]);
+    });
+  });
+
   describe('down', () => {
-    it('drops sent_to_accountant_at, then bank_provider_expense_details, bank_investment_details, bank_debt_details, then bank_transactions, then bank_accounts', async () => {
+    it('drops the schedule fields, then sent_to_accountant_at, then bank_provider_expense_details, bank_investment_details, bank_debt_details, then bank_transactions, then bank_accounts', async () => {
+      await ds.undoLastMigration();
+      for (const table of SCHEDULE_TABLES) {
+        expect(await columnInfo(ds, table, 'bills_from')).toBeUndefined();
+        expect(await columnInfo(ds, table, 'show_in_calendar')).toBeUndefined();
+        expect(await columnInfo(ds, table, 'paying_account_id')).toBeUndefined();
+      }
+      expect(await columnInfo(ds, TRANSACTIONS, 'sent_to_accountant_at')).toBeDefined();
+
       await ds.undoLastMigration();
       expect(await columnInfo(ds, TRANSACTIONS, 'sent_to_accountant_at')).toBeUndefined();
       expect(await tableNames(ds)).toContain(PROVIDER_EXPENSE_DETAILS);
