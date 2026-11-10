@@ -90,6 +90,9 @@ point here.
     account with another currency → 422 "currency mismatch".
 - Setting `dueDay` for the first time while `bills_from` is `null` and not sent sets
   `bills_from` to today (server UTC).
+- (decided in #56) A `null` `bills_from` with `dueDay` set is treated as **no schedule** (no
+  occurrences). A currency-changing account PATCH re-checks a stored default paying account
+  (422 "currency mismatch" when it no longer matches).
 
 ## One-off bills
 
@@ -106,6 +109,13 @@ point here.
 | `notes` | no | yes | Free text, max 2000 characters |
 
 - Changing `providerAccountId` re-checks the currency of the paying account (422 on mismatch).
+- (decided in #56) **Editing a bill that has a payment row** — changing the provider of a `paid`
+  bill → **409 `BILL_PAID`** (undo first). Otherwise the payment row follows the bill: its
+  source account and due date are updated in the same DB transaction. A provider change also
+  rescales a stored amount into the new provider's currency exponent (400 when it cannot be
+  represented).
+- (decided in #56) An **archived provider** in a bill body → 422 "account not found", like any
+  other invalid body reference.
 - A one-off bill has no owner columns: its owner is its provider account's owner.
 
 ### Expected amount and currency
@@ -182,13 +192,16 @@ One `bank_bill_payments` row per occurrence. Paying writes the row and its ledge
 | `billId` | Nullable; set for one-offs. Real FK to `bank_bills`, `ON DELETE CASCADE` |
 | `dueDate` | The **nominal** due date |
 | `status` | `paid` \| `skipped` |
-| `paidOn` | `DATE`, `paid` only; not after today (same rule as transaction dates in [transactions.md](accounts/transactions.md#edge-cases)) |
+| `paidOn` | `DATE`, `paid` only; at most UTC today + 1 day, the same rule as transaction dates in [transactions.md](accounts/transactions.md#edge-cases), so the payment transactions are always valid (decided in #56) |
 | `amount` | `BIGINT` minor units, > 0, `paid` only |
 | `payingAccountId` | `paid` only. Real FK, `ON DELETE SET NULL` |
 | `paymentTransactionId`, `withdrawalTransactionId`, `chargeTransactionId` | Nullable references to the transactions the payment created. Real FKs, `ON DELETE SET NULL` |
 
 - **Uniqueness** — `(source_account_id, due_date)` where `bill_id` is null (derived
-  occurrences); `(bill_id)` for one-offs.
+  occurrences); `(bill_id)` for one-offs. (decided in #56) The derived key is enforced by an
+  indexed **virtual** generated column `derived_due_date` (`due_date` when `bill_id` is null)
+  with `UNIQUE (source_account_id, derived_due_date)`; MySQL refuses a stored generated column
+  whose base column carries an `ON DELETE CASCADE` FK.
 - The row carries no owner columns: it inherits the owner from its source account.
 
 ### Ledger effect of `paid`
@@ -203,6 +216,9 @@ One `bank_bill_payments` row per occurrence. Paying writes the row and its ledge
   This resolves the charge-vs-payment question #32 flagged.
 - The transactions are **ordinary transactions**: dated `paidOn`, described
   `"<bill description | account name> — <nominal due date>"`, and editable later like any other.
+  (decided in #56) When the text would exceed 255 characters, only the label is truncated (by
+  code points); the ` — YYYY-MM-DD` suffix is always kept, so a long name never makes the
+  payment fail.
 - **Paid amount ≠ expected** — allowed; the actual amount is recorded. **No partial payments**:
   one payment per occurrence, which closes it.
 
@@ -213,6 +229,17 @@ One `bank_bill_payments` row per occurrence. Paying writes the row and its ledge
 - **Undo** — deleting the payment row also deletes the transactions it created **that still
   exist**, in the same DB transaction; the occurrence becomes open / overdue again. Skips are
   undone the same way.
+  - (decided in #56) Undo answers `204`; undoing when there is no payment → 404.
+  - (decided in #56) **Archived accounts** — undoing a `paid` payment whose source account or
+    paying account is archived → **409 `ACCOUNT_ARCHIVED`**, consistent with the read-only
+    ledger; the user unarchives first. Undoing a skip is allowed, unless the source account is
+    archived (→ 404: the occurrence does not exist). A one-off whose provider is archived → 404,
+    like any hidden occurrence.
+  - (decided in #56) **Sent charge** — undo deletes the recorded charge even when it was already
+    sent to the accountant ("the transactions it created that still exist"); the frontend (#57)
+    warns, as #55 does for a manual delete.
+  - (decided in #56) Undo finds the row by account and nominal date with **no schedule check**,
+    so an off-schedule payment can still be undone; paying keeps the strict 404.
 - **Deleting a one-off bill** with a `paid` payment → **409** (undo the payment first). A bill
   that is unpaid or skipped is hard-deleted together with its payment row.
 
@@ -241,6 +268,40 @@ One `bank_bill_payments` row per occurrence. Paying writes the row and its ledge
   `show_in_calendar` and `paying_account_id` (see
   [Schedule fields](#schedule-fields-on-source-accounts)). No other existing route changes.
 
+### Responses (decided in #56)
+
+- **Calendar envelope** — `calendar.json` answers `{ occurrences: [...], totals: [...] }`. The
+  occurrences are in the [occurrence shape](#occurrence-shape), sorted by `effective_date`
+  ascending; ties are broken by `kind`, then source account id, then bill id.
+- **Overdue envelope** — `calendar/overdue.json` answers the same envelope, oldest first.
+- **Totals** — one entry per currency, never summed across currencies, sorted by currency code.
+  Amounts are decimal strings in the currency's exponent; a currency with no rows has no entry,
+  and an empty range answers `totals: []`.
+  - `calendar.json`: `{ currency, expected, paid, open }`. `expected` sums the expected amounts
+    in the range; `paid` sums the actual paid amounts; `open` sums the expected amounts of open
+    and overdue occurrences. Occurrences with no expected amount count toward neither `expected`
+    nor `open`; skipped ones toward neither `paid` nor `open`.
+  - `calendar/overdue.json`: `{ currency, open }` only.
+- **Pagination** — `bills.json` and `bill-payments.json` reuse the ledger's `pagination` block
+  (`page`, `per_page` 50, `total_pages`, `total_count`; an invalid `page` → 400).
+  - `bills.json` answers `{ bills, pagination }`, newest `due_date` first, then `id` newest
+    first. It takes an optional `provider_account_id` filter: an unknown, another owner's or
+    non-provider id answers an empty list (never 404, no probing); a malformed one (not a
+    positive integer) → 400. Bills of archived providers are left out.
+  - `bill-payments.json` answers `{ payments, pagination }`, newest `due_date` first, then `id`.
+    Each row is `{ id, status, paid_on, amount, paying_account, due_date, bill, off_schedule }`.
+    `off_schedule` is `true` when `due_date` is not a nominal occurrence of the account's
+    current schedule pattern (`due_day`, `due_month`, frequency, `bills_from`; `archived` and
+    `show_in_calendar` are ignored, and with no `due_day` every derived row is off-schedule).
+    The history of an archived account stays readable (`200`), like its ledger.
+- **Bill response** — `{ id, provider_account: { id, name }, paying_account: { id, name } | null,
+  due_date, amount, currency, description, notes, payment, created_at, updated_at }`, where
+  `currency` is the provider's and `payment` has the occurrence's payment shape (or `null`). No
+  owner fields.
+- **Pay / skip** — `201` with the updated occurrence, in the occurrence shape. Check order: path
+  404, then body 400, then paying-account 422, then the 409 for an existing payment
+  (`OCCURRENCE_ALREADY_PAID`).
+
 ### Validation
 
 - **Payment body** — `status` (`paid` | `skipped`); for `paid` also `paid_on`, `amount`,
@@ -261,7 +322,8 @@ One `bank_bill_payments` row per occurrence. Paying writes the row and its ledge
 - **Paying twice** → **409** (the unique key); undo first.
 - **Currency mismatch** → **422 "currency mismatch"**.
 - `calendar.json`: missing or invalid `from` / `to`, `from > to`, or a range over 366 days →
-  400.
+  400. (decided in #56) The cap is `to − from ≤ 366` days, the same rule as the accountant
+  hand-off; a repeated parameter → 400 too; the errors carry `VALIDATION_FAILED`.
 
 ### Permissions and caching
 

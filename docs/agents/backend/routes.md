@@ -9,6 +9,7 @@ entity/event-focused `docs/agents/modules/` pages.
   tools
 - [Bank](routes/bank.md) — `/bank/*.json` and `/orgs/:orgId/bank/*.json`: accounts
   (regular, debt, investment and provider-expense), transactions and the paginated ledger,
-  the accountant hand-off, settings
+  the accountant hand-off, bills and the calendar (one-off bills, pay / skip / undo, bill
+  history), settings
 
 Future backend modules add their own entry here as they land.
