@@ -23,6 +23,7 @@ const KNOWN_CONTROLLERS = [
   'AdminController',
   'AuthController',
   'AuthorizationRequestController',
+  'BillsController',
   'CalendarController',
   'HealthController',
   'OrganizationController',

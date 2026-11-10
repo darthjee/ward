@@ -26,6 +26,8 @@ export const ErrorCodes = {
   CURRENCY_LOCKED: 'CURRENCY_LOCKED',
   ACCOUNT_NOT_FOUND: 'ACCOUNT_NOT_FOUND',
   CURRENCY_MISMATCH: 'CURRENCY_MISMATCH',
+  BILL_PAID: 'BILL_PAID',
+  OCCURRENCE_ALREADY_PAID: 'OCCURRENCE_ALREADY_PAID',
 } as const;
 
 // Message used for every unexpected (non-HTTP) error — the real message and

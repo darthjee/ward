@@ -74,6 +74,12 @@ export function createInMemoryBankRepo<T extends Row>(
           return 0;
         })
         .map(copy),
+    async findAndCount(options: { where?: Where; order?: Record<string, 'ASC' | 'DESC'>; skip?: number; take?: number }) {
+      const all = await repo.find(options);
+      const start = options.skip ?? 0;
+
+      return [all.slice(start, options.take === undefined ? undefined : start + options.take), all.length] as [T[], number];
+    },
     findOneBy: async (where: Where): Promise<T | null> => {
       const row = rows.find((candidate) => matches(candidate, where));
       return row ? copy(row) : null;
