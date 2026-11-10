@@ -6,8 +6,11 @@ import {
   defaultScheduleState,
   SCHEDULE_COPIED_FIELDS,
   scheduleStateOf,
+  serializeScheduleFields,
+  type ScheduleResponse,
   type ScheduleState,
 } from './schedule-fields.js';
+import type { AccountRef } from '../account-refs.js';
 import { formatAmount } from '../currency.js';
 import type { DebtDetailsDto } from '../dto/debt-details.dto.js';
 import type { DebtDetails, DebtPeriod } from '../entities/debt-details.entity.js';
@@ -33,7 +36,7 @@ export type DebtResponse = {
   due_day: number | null;
   due_month: number | null;
   instalment_count: number | null;
-};
+} & ScheduleResponse;
 
 /** The body field named in `instalment_amount` errors. */
 export const INSTALMENT_AMOUNT_FIELD = 'debt.instalment_amount';
@@ -184,9 +187,14 @@ export function assertDebtPairs(state: DebtState): void {
 /**
  * @param {DebtState} state - The details.
  * @param {string} currency - The account currency.
+ * @param {AccountRef | null} [payingAccount] - The default paying account's ref, if loaded.
  * @returns {DebtResponse} The nested `debt` response object.
  */
-export function serializeDebtState(state: DebtState, currency: string): DebtResponse {
+export function serializeDebtState(
+  state: DebtState,
+  currency: string,
+  payingAccount: AccountRef | null = null,
+): DebtResponse {
   return {
     interest_rate: state.interestRate === null ? null : normaliseRate(String(state.interestRate)),
     interest_period: state.interestPeriod,
@@ -195,5 +203,6 @@ export function serializeDebtState(state: DebtState, currency: string): DebtResp
     due_day: state.dueDay,
     due_month: state.dueMonth,
     instalment_count: state.instalmentCount,
+    ...serializeScheduleFields(state, payingAccount),
   };
 }

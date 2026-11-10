@@ -284,6 +284,9 @@ describe('DebtAccountHandler', () => {
         due_day: 10,
         due_month: 3,
         instalment_count: 12,
+        bills_from: null,
+        show_in_calendar: true,
+        paying_account: null,
       });
       expect(handler.serialize(stored({ instalmentAmount: 500n }), buildAccount({ currency: 'JPY' })))
         .toMatchObject({ instalment_amount: '500' });
@@ -298,6 +301,9 @@ describe('DebtAccountHandler', () => {
         due_day: null,
         due_month: null,
         instalment_count: null,
+        bills_from: null,
+        show_in_calendar: true,
+        paying_account: null,
       });
     });
   });

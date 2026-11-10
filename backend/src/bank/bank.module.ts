@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AccountBalancesQuery } from './account-balances.query.js';
+import { AccountScheduleValidator } from './account-schedule.validator.js';
 import { ACCOUNT_TYPE_HANDLERS, type AccountTypeHandler } from './account-types/account-type-handler.js';
 import { AccountTypeRegistry } from './account-types/account-type.registry.js';
 import { DebtAccountHandler } from './account-types/debt-account.handler.js';
@@ -17,6 +18,7 @@ import { InvestmentDetails } from './entities/investment-details.entity.js';
 import { ProviderExpenseDetails } from './entities/provider-expense-details.entity.js';
 import { Transaction } from './entities/transaction.entity.js';
 import { LedgerQuery } from './ledger.query.js';
+import { PayingAccountResolver } from './paying-account.resolver.js';
 import { TransactionService } from './transaction.service.js';
 
 // Re-exported so the resident `BankModuleLoader` reaches the service classes
@@ -51,6 +53,8 @@ export { TransactionService } from './transaction.service.js';
     },
     AccountTypeRegistry,
     AccountBalancesQuery,
+    PayingAccountResolver,
+    AccountScheduleValidator,
     AccountService,
     AccountantChargesQuery,
     AccountantService,

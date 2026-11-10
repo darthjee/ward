@@ -10,10 +10,12 @@ import type { ProviderExpenseDetailsDto } from '../dto/provider-expense-details.
 
 const TODAY = '2026-11-10';
 
-const debtMerge = (base: ReturnType<typeof defaultDebtState>, fields: Partial<DebtDetailsDto>) =>
-  mergeDebtState(base, fields as DebtDetailsDto, 'BRL', TODAY);
-const providerMerge = (base: ReturnType<typeof defaultProviderExpenseState>, fields: Partial<ProviderExpenseDetailsDto>) =>
-  mergeProviderExpenseState(base, fields as ProviderExpenseDetailsDto, 'BRL', TODAY);
+type State = Record<string, unknown>;
+type Merge = (base: State, fields: Partial<DebtDetailsDto & ProviderExpenseDetailsDto>) => State;
+
+const debtMerge: Merge = (base, fields) => mergeDebtState(base as never, fields as DebtDetailsDto, 'BRL', TODAY);
+const providerMerge: Merge = (base, fields) =>
+  mergeProviderExpenseState(base as never, fields as ProviderExpenseDetailsDto, 'BRL', TODAY);
 
 describe('schedule fields', () => {
   describe('defaultScheduleState / scheduleStateOf', () => {
@@ -52,10 +54,10 @@ describe('schedule fields', () => {
     });
   });
 
-  describe.each([
+  describe.each<[string, () => State, Merge]>([
     ['debt', defaultDebtState, debtMerge],
     ['provider_expense', defaultProviderExpenseState, providerMerge],
-  ] as const)('%s merge', (_type, defaults, merge) => {
+  ])('%s merge', (_type, defaults, merge) => {
     const base = defaults();
 
     it('sets bills_from to today when due_day is first set', () => {

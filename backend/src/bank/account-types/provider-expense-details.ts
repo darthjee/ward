@@ -5,8 +5,11 @@ import {
   defaultScheduleState,
   SCHEDULE_COPIED_FIELDS,
   scheduleStateOf,
+  serializeScheduleFields,
+  type ScheduleResponse,
   type ScheduleState,
 } from './schedule-fields.js';
+import type { AccountRef } from '../account-refs.js';
 import { formatAmount } from '../currency.js';
 import type { ProviderExpenseDetailsDto } from '../dto/provider-expense-details.dto.js';
 import type { ProviderChargeFrequency, ProviderExpenseDetails } from '../entities/provider-expense-details.entity.js';
@@ -33,7 +36,7 @@ export type ProviderExpenseResponse = {
   charge_frequency: ProviderChargeFrequency;
   due_day: number | null;
   due_month: number | null;
-};
+} & ScheduleResponse;
 
 /** The body field named in `expected_amount` errors. */
 export const EXPECTED_AMOUNT_FIELD = 'provider_expense.expected_amount';
@@ -177,9 +180,14 @@ export function assertProviderExpensePairs(state: ProviderExpenseState): void {
 /**
  * @param {ProviderExpenseState} state - The details.
  * @param {string} currency - The account currency.
+ * @param {AccountRef | null} [payingAccount] - The default paying account's ref, if loaded.
  * @returns {ProviderExpenseResponse} The nested `provider_expense` response object.
  */
-export function serializeProviderExpenseState(state: ProviderExpenseState, currency: string): ProviderExpenseResponse {
+export function serializeProviderExpenseState(
+  state: ProviderExpenseState,
+  currency: string,
+  payingAccount: AccountRef | null = null,
+): ProviderExpenseResponse {
   return {
     for_accountant: state.forAccountant,
     provider_tax_id: state.providerTaxId,
@@ -187,5 +195,6 @@ export function serializeProviderExpenseState(state: ProviderExpenseState, curre
     charge_frequency: state.chargeFrequency,
     due_day: state.dueDay,
     due_month: state.dueMonth,
+    ...serializeScheduleFields(state, payingAccount),
   };
 }

@@ -24,6 +24,8 @@ export const ErrorCodes = {
   ACCOUNT_HAS_TRANSACTIONS: 'ACCOUNT_HAS_TRANSACTIONS',
   ACCOUNT_ARCHIVED: 'ACCOUNT_ARCHIVED',
   CURRENCY_LOCKED: 'CURRENCY_LOCKED',
+  ACCOUNT_NOT_FOUND: 'ACCOUNT_NOT_FOUND',
+  CURRENCY_MISMATCH: 'CURRENCY_MISMATCH',
 } as const;
 
 // Message used for every unexpected (non-HTTP) error — the real message and

@@ -1,3 +1,5 @@
+import type { AccountRef } from '../account-refs.js';
+
 // Pure helpers of the bill schedule fields shared by the debt and
 // provider-expense details (see `docs/agents/specs/banking/bills.md`,
 // "Schedule fields on source accounts").
@@ -23,7 +25,18 @@ export type ScheduleStart = { dueDay: number | null; billsFrom: string | null };
 export const SCHEDULE_COPIED_FIELDS = [
   ['bills_from', 'billsFrom'],
   ['show_in_calendar', 'showInCalendar'],
+  ['paying_account_id', 'payingAccountId'],
 ] as const;
+
+/** The schedule fields of the nested response object: the paying account by id and name only. */
+export type ScheduleResponse = {
+  bills_from: string | null;
+  show_in_calendar: boolean;
+  paying_account: AccountRef | null;
+};
+
+/** A loaded details row, with its default paying account's ref (see `withPayingAccounts`). */
+export type WithPayingAccount = { payingAccount?: AccountRef | null };
 
 /**
  * @returns {ScheduleState} The schedule of a new account: shown in the
@@ -64,4 +77,17 @@ export function applyBillsFromLifecycle(
   if (firstDueDay && base.billsFrom === null && input.bills_from === undefined) {
     merged.billsFrom = today;
   }
+}
+
+/**
+ * @param {ScheduleState} state - The schedule fields.
+ * @param {AccountRef | null} payingAccount - The default paying account's ref, if loaded.
+ * @returns {ScheduleResponse} The schedule fields of the nested response object.
+ */
+export function serializeScheduleFields(state: ScheduleState, payingAccount: AccountRef | null): ScheduleResponse {
+  return {
+    bills_from: state.billsFrom,
+    show_in_calendar: state.showInCalendar,
+    paying_account: state.payingAccountId === null ? null : payingAccount,
+  };
 }

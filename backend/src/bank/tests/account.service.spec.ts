@@ -18,6 +18,8 @@ import { DebtDetails } from '../entities/debt-details.entity.js';
 import { InvestmentDetails } from '../entities/investment-details.entity.js';
 import { ProviderExpenseDetails } from '../entities/provider-expense-details.entity.js';
 
+const NO_SCHEDULE_CHECK = { validate: async () => undefined } as never;
+
 function mysqlError(code: string): QueryFailedError {
   return new QueryFailedError('q', [], Object.assign(new Error(code), { code }));
 }
@@ -44,7 +46,7 @@ function setup(stored: Account | null = buildAccount()) {
   const registry = new AccountTypeRegistry([new RegularAccountHandler()]);
   const service = new AccountService(accountRepository as never, registry, balances as never, {
     defaultCurrency: 'BRL',
-  });
+  }, NO_SCHEDULE_CHECK);
 
   return { service, accountRepository, balances, transactionalSave, manager };
 }
@@ -429,7 +431,7 @@ function setupDebt(account: Account = buildAccount({ type: 'debt' }), details: o
     hasTransactions: jest.fn(async () => false),
   };
   const registry = new AccountTypeRegistry([new RegularAccountHandler(), new DebtAccountHandler()]);
-  const service = new AccountService(accountRepository as never, registry, balances as never, { defaultCurrency: 'BRL' });
+  const service = new AccountService(accountRepository as never, registry, balances as never, { defaultCurrency: 'BRL' }, NO_SCHEDULE_CHECK);
 
   return { service, accountRepository, balances, accountSave, detailsSave, detailsFind };
 }
@@ -564,6 +566,9 @@ describe('AccountService with debt accounts', () => {
       due_day: 10,
       due_month: 3,
       instalment_count: null,
+      bills_from: null,
+      show_in_calendar: true,
+      paying_account: null,
     };
 
     it('lists debts with their debt object, loading details in one query', async () => {
@@ -629,7 +634,7 @@ function setupInvestment(
   };
   const investmentHandler = new InvestmentAccountHandler();
   const registry = new AccountTypeRegistry([new RegularAccountHandler(), new DebtAccountHandler(), investmentHandler]);
-  const service = new AccountService(accountRepository as never, registry, balances as never, { defaultCurrency: 'BRL' });
+  const service = new AccountService(accountRepository as never, registry, balances as never, { defaultCurrency: 'BRL' }, NO_SCHEDULE_CHECK);
 
   return { service, accountRepository, balances, accountSave, detailsSave, detailsFind, investmentHandler, manager };
 }
@@ -817,7 +822,7 @@ function setupProviderExpense(
     new InvestmentAccountHandler(),
     new ProviderExpenseAccountHandler(),
   ]);
-  const service = new AccountService(accountRepository as never, registry, balances as never, { defaultCurrency: 'BRL' });
+  const service = new AccountService(accountRepository as never, registry, balances as never, { defaultCurrency: 'BRL' }, NO_SCHEDULE_CHECK);
 
   return { service, accountRepository, balances, accountSave, detailsSave, detailsFind, manager };
 }
@@ -939,6 +944,9 @@ describe('AccountService with provider-expense accounts', () => {
         charge_frequency: 'yearly',
         due_day: 10,
         due_month: 3,
+        bills_from: null,
+        show_in_calendar: true,
+        paying_account: null,
       });
     });
 

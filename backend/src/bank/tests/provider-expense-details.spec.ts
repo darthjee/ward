@@ -60,9 +60,9 @@ describe('provider-expense details helpers', () => {
 
   describe('parseExpectedAmount', () => {
     it('parses into minor units of the currency', () => {
-      expect(parseExpectedAmount('200', 'BRL', TODAY)).toBe(20000n);
-      expect(parseExpectedAmount('200.5', 'BRL', TODAY)).toBe(20050n);
-      expect(parseExpectedAmount('200', 'JPY', TODAY)).toBe(200n);
+      expect(parseExpectedAmount('200', 'BRL')).toBe(20000n);
+      expect(parseExpectedAmount('200.5', 'BRL')).toBe(20050n);
+      expect(parseExpectedAmount('200', 'JPY')).toBe(200n);
     });
 
     it.each([
@@ -77,25 +77,25 @@ describe('provider-expense details helpers', () => {
     });
 
     it('names the field in its errors', () => {
-      expect(() => parseExpectedAmount('0', 'BRL', TODAY)).toThrow(EXPECTED_AMOUNT_FIELD);
+      expect(() => parseExpectedAmount('0', 'BRL')).toThrow(EXPECTED_AMOUNT_FIELD);
     });
   });
 
   describe('rescaleProviderExpenseState', () => {
     it('keeps the decimal value in the new exponent (200.00 BRL -> 200 JPY)', () => {
-      expect(rescaleProviderExpenseState(YEARLY, 'BRL', 'JPY', TODAY)).toEqual({ ...YEARLY, expectedAmount: 200n });
+      expect(rescaleProviderExpenseState(YEARLY, 'BRL', 'JPY')).toEqual({ ...YEARLY, expectedAmount: 200n });
     });
 
     it('rejects an unrepresentable amount (12.50 BRL -> JPY)', () => {
-      expect(() => rescaleProviderExpenseState({ ...YEARLY, expectedAmount: 1250n }, 'BRL', 'JPY', TODAY)).toThrow(BadRequestException);
+      expect(() => rescaleProviderExpenseState({ ...YEARLY, expectedAmount: 1250n }, 'BRL', 'JPY')).toThrow(BadRequestException);
     });
 
     it('is a copy and a no-op without an amount or a currency change', () => {
       const noAmount = { ...YEARLY, expectedAmount: null };
 
-      expect(rescaleProviderExpenseState(noAmount, 'BRL', 'JPY', TODAY)).toEqual(noAmount);
-      expect(rescaleProviderExpenseState(YEARLY, 'BRL', 'BRL', TODAY)).toEqual(YEARLY);
-      expect(rescaleProviderExpenseState(YEARLY, 'BRL', 'BRL', TODAY)).not.toBe(YEARLY);
+      expect(rescaleProviderExpenseState(noAmount, 'BRL', 'JPY')).toEqual(noAmount);
+      expect(rescaleProviderExpenseState(YEARLY, 'BRL', 'BRL')).toEqual(YEARLY);
+      expect(rescaleProviderExpenseState(YEARLY, 'BRL', 'BRL')).not.toBe(YEARLY);
     });
   });
 
@@ -142,25 +142,31 @@ describe('provider-expense details helpers', () => {
 
   describe('serializeProviderExpenseState', () => {
     it('serializes snake_case with the amount in the currency exponent', () => {
-      expect(serializeProviderExpenseState(YEARLY, 'BRL', TODAY)).toEqual({
+      expect(serializeProviderExpenseState(YEARLY, 'BRL')).toEqual({
         for_accountant: false,
         provider_tax_id: '12.345.678/0001-90',
         expected_amount: '200.00',
         charge_frequency: 'yearly',
         due_day: 10,
         due_month: 3,
+        bills_from: '2026-01-01',
+        show_in_calendar: true,
+        paying_account: null,
       });
-      expect(serializeProviderExpenseState({ ...YEARLY, expectedAmount: 200n }, 'JPY', TODAY)).toMatchObject({ expected_amount: '200' });
+      expect(serializeProviderExpenseState({ ...YEARLY, expectedAmount: 200n }, 'JPY')).toMatchObject({ expected_amount: '200' });
     });
 
     it('returns unset fields as null', () => {
-      expect(serializeProviderExpenseState(defaultProviderExpenseState(), 'BRL', TODAY)).toEqual({
+      expect(serializeProviderExpenseState(defaultProviderExpenseState(), 'BRL')).toEqual({
         for_accountant: true,
         provider_tax_id: null,
         expected_amount: null,
         charge_frequency: 'monthly',
         due_day: null,
         due_month: null,
+        bills_from: null,
+        show_in_calendar: true,
+        paying_account: null,
       });
     });
   });

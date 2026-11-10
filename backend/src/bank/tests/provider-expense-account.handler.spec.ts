@@ -274,6 +274,9 @@ describe('ProviderExpenseAccountHandler', () => {
         charge_frequency: 'yearly',
         due_day: 10,
         due_month: 3,
+        bills_from: null,
+        show_in_calendar: true,
+        paying_account: null,
       });
       expect(handler.serialize(stored({ expectedAmount: 200n }), buildAccount({ currency: 'JPY' })))
         .toMatchObject({ expected_amount: '200' });
@@ -287,6 +290,9 @@ describe('ProviderExpenseAccountHandler', () => {
         charge_frequency: 'monthly',
         due_day: null,
         due_month: null,
+        bills_from: null,
+        show_in_calendar: true,
+        paying_account: null,
       });
     });
   });

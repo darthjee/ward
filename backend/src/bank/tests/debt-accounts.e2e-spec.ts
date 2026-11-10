@@ -32,6 +32,9 @@ const DEFAULT_DEBT = {
   due_day: null,
   due_month: null,
   instalment_count: null,
+  bills_from: null,
+  show_in_calendar: true,
+  paying_account: null,
 };
 
 const FULL_DEBT = {
@@ -42,7 +45,11 @@ const FULL_DEBT = {
   due_day: 10,
   due_month: 3,
   instalment_count: 48,
+  bills_from: '2026-01-01',
+  show_in_calendar: true,
 };
+
+const FULL_DEBT_RESPONSE = { ...FULL_DEBT, paying_account: null };
 
 const CONTEXTS: Array<[string, number | null]> = [['Personal', null], ['organization', ALICE_ORG]];
 
@@ -97,7 +104,7 @@ describe('debt accounts (e2e)', () => {
       it('creates a debt with a full debt object', async () => {
         const created = await createDebt(orgId, { debt: FULL_DEBT, opening_balance: '-10000.00' });
 
-        expect(created.debt).toEqual(FULL_DEBT);
+        expect(created.debt).toEqual(FULL_DEBT_RESPONSE);
         expect(created.opening_balance).toBe('-10000.00');
         expect(detailsOf(created.id)?.instalmentAmount).toBe(50000n);
       });
@@ -131,8 +138,8 @@ describe('debt accounts (e2e)', () => {
         ];
         const list = await send(app, 'get', `${prefix}/accounts.json?type=debt`, ALICE).expect(200);
 
-        responses.forEach((response) => expect(response.body.debt).toEqual(FULL_DEBT));
-        expect(list.body.find((row: { id: number }) => row.id === created.id).debt).toEqual(FULL_DEBT);
+        responses.forEach((response) => expect(response.body.debt).toEqual(FULL_DEBT_RESPONSE));
+        expect(list.body.find((row: { id: number }) => row.id === created.id).debt).toEqual(FULL_DEBT_RESPONSE);
         expect(ownerKeysIn([created, list.body, ...responses.map((response) => response.body)])).toEqual([]);
       });
 
@@ -223,10 +230,10 @@ describe('debt accounts (e2e)', () => {
         const created = await createDebt(orgId, { debt: FULL_DEBT });
 
         const merged = await patch(orgId, created.id, { debt: { due_day: 20 } }).expect(200);
-        expect(merged.body.debt).toEqual({ ...FULL_DEBT, due_day: 20 });
+        expect(merged.body.debt).toEqual({ ...FULL_DEBT_RESPONSE, due_day: 20 });
 
         const cleared = await patch(orgId, created.id, { debt: { instalment_amount: null, instalment_count: null } }).expect(200);
-        expect(cleared.body.debt).toEqual({ ...FULL_DEBT, due_day: 20, instalment_amount: null, instalment_count: null });
+        expect(cleared.body.debt).toEqual({ ...FULL_DEBT_RESPONSE, due_day: 20, instalment_amount: null, instalment_count: null });
       });
 
       it('checks the paired rules on the merged state', async () => {
@@ -311,7 +318,7 @@ describe('debt accounts (e2e)', () => {
         await send(app, 'post', `${prefix}/accounts/${created.id}/archive.json`, ALICE).expect(200);
 
         const renamed = await patch(orgId, created.id, { name: uniqueName('Old loan') }).expect(200);
-        expect(renamed.body.debt).toEqual(FULL_DEBT);
+        expect(renamed.body.debt).toEqual(FULL_DEBT_RESPONSE);
 
         // `interest_period: null` alone breaks the merged rate/period rule: still 409, not 400.
         for (const debt of [{ due_day: 5 }, { interest_period: null }, { instalment_frequency: 'yearly' }]) {
