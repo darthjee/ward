@@ -1,8 +1,9 @@
 # Routes — Bank
 
-Routes of the lazy `bank` module (`backend/src/bank/`), served by four thin resident
-controllers: `AccountsController`, `TransactionsController`, `SettingsController` and
-`AccountantController`. Each is
+Routes of the lazy `bank` module (`backend/src/bank/`), served by seven thin resident
+controllers: `AccountsController`, `TransactionsController`, `SettingsController`,
+`AccountantController`, `CalendarController`, `BillsController` and
+`BillPaymentsController`. Each is
 declared with `@OwnerScopedController('bank')`, so every route is mounted under **both** base
 paths (the external `/api` prefix is added by the proxy):
 
@@ -11,9 +12,12 @@ paths (the external `/api` prefix is added by the proxy):
 
 The controllers parse the ids, load the lazy `BankModule` on the first bank request
 (`BankModuleLoader` → `LazyModuleLoaderService#loadOnFirstRequest()`) and delegate to its
-`AccountService` / `TransactionService` / `AccountantService`. `settings.json` reads the resident `BANK_CONFIG` and
-does not load the module. The specs (`docs/agents/specs/banking/accounts/regular.md`,
-`debt.md`, `transactions.md`) are the source of truth for the behaviour.
+`AccountService` / `TransactionService` / `AccountantService` / `CalendarService` /
+`BillService` / `BillPaymentService` / `BillHistoryService` (the debt and provider handlers
+resolve the default paying account through `PayingAccountResolver`). `settings.json` reads the
+resident `BANK_CONFIG` and does not load the module. The specs
+(`docs/agents/specs/banking/accounts/regular.md`, `debt.md`, `transactions.md`,
+`docs/agents/specs/banking/bills.md`) are the source of truth for the behaviour.
 
 ## Shared rules
 
@@ -120,6 +124,16 @@ spec is `docs/agents/specs/banking/accounts/debt.md`.
 - **`409 ACCOUNT_ARCHIVED`** — any `debt` field on an archived debt (a field failing the
   format checks above is still a `400`, rejected by the validation pipe first).
 
+- **Schedule fields** (bills, see `docs/agents/specs/banking/bills.md`) — the object also
+  accepts `bills_from` (`YYYY-MM-DD` or `null`), `show_in_calendar` (boolean, not nullable,
+  default `true`) and `paying_account_id` (positive integer or `null`), and returns
+  `bills_from`, `show_in_calendar` and `paying_account: { id, name } | null` (never the raw
+  id). Setting `due_day` for the first time while `bills_from` is `null` and not sent sets
+  `bills_from` to UTC today; clearing `due_day` keeps it. A `paying_account_id` that is
+  unknown, another owner's, in the other context, not `regular` or archived → `422
+  ACCOUNT_NOT_FOUND` (one generic body); a visible account of another currency → `422
+  CURRENCY_MISMATCH`. A currency-changing account PATCH re-checks the stored default.
+
 ### Investment object
 
 `type: investment` accounts carry a nested `investment` object, stored 1:1 in
@@ -188,6 +202,15 @@ transaction routes unchanged.
 - **`409 ACCOUNT_ARCHIVED`** — any `provider_expense` field on an archived provider-expense
   account (a field failing the format checks above is still a `400`, rejected by the
   validation pipe first).
+- **Schedule fields** (bills, see `docs/agents/specs/banking/bills.md`) — the object also
+  accepts `bills_from` (`YYYY-MM-DD` or `null`), `show_in_calendar` (boolean, not nullable,
+  default `true`) and `paying_account_id` (positive integer or `null`), and returns
+  `bills_from`, `show_in_calendar` and `paying_account: { id, name } | null` (never the raw
+  id). Setting `due_day` for the first time while `bills_from` is `null` and not sent sets
+  `bills_from` to UTC today; clearing `due_day` keeps it. A `paying_account_id` that is
+  unknown, another owner's, in the other context, not `regular` or archived → `422
+  ACCOUNT_NOT_FOUND` (one generic body); a visible account of another currency → `422
+  CURRENCY_MISMATCH`. A currency-changing account PATCH re-checks the stored default.
 - The accountant hand-off (`sent_to_accountant_at`, preview, mark sent / unsent) is described
   in [Accountant hand-off](#accountant-hand-off).
 
@@ -310,6 +333,117 @@ those five fields (no owner fields, no `account_number`, no balance).
 
   `mark-sent` is idempotent: an already-sent charge keeps (and reports) its original
   timestamp. `mark-unsent` reports `null` for every id; an already-unsent charge is a no-op.
+
+## Bills and calendar
+
+Served by `CalendarController`, `BillsController` and `BillPaymentsController`, delegating to
+the lazy `CalendarService`, `BillService`, `BillPaymentService` and `BillHistoryService`; the
+spec is `docs/agents/specs/banking/bills.md`. Occurrences are computed in memory per request
+(pure `occurrence-generator.ts`: monthly / yearly, `bills_from` start, clamp to the month's last
+day, Saturday / Sunday → Monday); nothing is generated ahead of time. Tables:
+`bank_bills` (one-off bills) and `bank_bill_payments`.
+
+| Method | Route | Body | Success | Errors | Cache class |
+|---|---|---|---|---|---|
+| GET | `<base>/calendar.json?from=&to=` | — | `200 { occurrences, totals }` | `400 VALIDATION_FAILED` (missing / invalid / repeated date, `from > to`, `to − from` over 366 days) | `user-scoped` |
+| GET | `<base>/calendar/overdue.json` | — | `200 { occurrences, totals }`, oldest first | `404` non-member `:orgId` | `user-scoped` |
+| GET | `<base>/bills.json?provider_account_id=&page=` | — | `200 { bills, pagination }` | `400` invalid `page` / malformed filter | `user-scoped` |
+| POST | `<base>/bills.json` | bill body | `201` bill | `400`; `422 ACCOUNT_NOT_FOUND` / `CURRENCY_MISMATCH` | `never` |
+| GET | `<base>/bills/:id.json` | — | `200` bill | `404` (also when the provider is archived) | `user-scoped` |
+| PATCH | `<base>/bills/:id.json` | bill body, all optional | `200` bill | `400`; `404`; `422`; `409 BILL_PAID` (provider change on a paid bill) | `never` |
+| DELETE | `<base>/bills/:id.json` | — | `204` (an unpaid / skipped bill goes with its payment row) | `404`; `409 BILL_PAID` | `never` |
+| POST | `<base>/accounts/:accountId/occurrences/:dueDate/payment.json` | payment body | `201` occurrence | `404`; `400`; `422`; `409 OCCURRENCE_ALREADY_PAID` | `never` |
+| DELETE | `<base>/accounts/:accountId/occurrences/:dueDate/payment.json` | — | `204` | `404`; `409 ACCOUNT_ARCHIVED` | `never` |
+| POST | `<base>/bills/:id/payment.json` | payment body | `201` occurrence (`kind: bill`) | `404`; `400`; `422`; `409 OCCURRENCE_ALREADY_PAID` | `never` |
+| DELETE | `<base>/bills/:id/payment.json` | — | `204` | `404`; `409 ACCOUNT_ARCHIVED` | `never` |
+| GET | `<base>/accounts/:accountId/bill-payments.json?page=` | — | `200 { payments, pagination }` | `400` invalid `page`; `404` (also for regular / investment accounts) | `user-scoped` |
+
+### Calendar envelope and totals
+
+```json
+{
+  "occurrences": [
+    {
+      "kind": "provider", "source_account": { "id": 12, "name": "Vivo Fibra", "type": "provider_expense" },
+      "bill": null, "nominal_date": "2026-11-08", "effective_date": "2026-11-09",
+      "expected_amount": "149.90", "currency": "BRL", "status": "open", "payment": null,
+      "default_paying_account": { "id": 3, "name": "Nubank" }
+    }
+  ],
+  "totals": [ { "currency": "BRL", "expected": "149.90", "paid": "0.00", "open": "149.90" } ]
+}
+```
+
+- `kind` is `debt`, `provider` or `bill`; `status` is `open`, `overdue`, `paid` or `skipped`;
+  `payment` is `{ id, status, paid_on, amount, paying_account: { id, name } | null }` or `null`.
+- `calendar.json` lists the occurrences whose **effective** date is in `[from, to]`, sorted by
+  `effective_date`, then `kind`, source account id and bill id. `overdue.json` lists every
+  open occurrence with an effective date before UTC today, oldest first.
+- **Totals** — one entry per currency (sorted by code), never summed across currencies; an
+  empty range answers `totals: []`. `calendar.json`: `{ currency, expected, paid, open }`
+  (occurrences without an expected amount count toward neither `expected` nor `open`; skipped
+  ones toward neither `paid` nor `open`). `overdue.json`: `{ currency, open }`.
+- A schedule exists only when `due_day` and `bills_from` are set, `show_in_calendar` is `true`
+  and the account is not archived; one-off bills of archived providers are hidden too.
+
+### Bills
+
+Bill body (`@StrictBody()`): `provider_account_id` (a `provider_expense` account), `paying_account_id`
+(a `regular`, non-archived account of the provider's currency; `null` allowed on PATCH),
+`due_date` (any date, no weekend shift), `amount` (> 0, provider's currency), `description`
+(trimmed, at most 255), `notes` (at most 2000, nullable). All required on create except
+`notes`. A bad account id in the body → `422 ACCOUNT_NOT_FOUND` (archived providers
+included); a currency mismatch → `422 CURRENCY_MISMATCH`.
+
+Bill response: `{ id, provider_account: { id, name }, paying_account: { id, name } | null,
+due_date, amount, currency, description, notes, payment | null, created_at, updated_at }`.
+
+- **List** — newest `due_date` first, then `id`; ledger `pagination` block (50 per page). The
+  optional `provider_account_id` filter answers an empty list for an unknown, foreign or
+  non-provider id (never `404`).
+- **PATCH with a payment** — a provider change on a `paid` bill → `409 BILL_PAID`; otherwise
+  the payment row follows the bill (source account and due date) in the same DB transaction. A
+  provider change re-checks the paying account's currency and rescales the amount (`400` when
+  it cannot be represented).
+
+### Pay, skip and undo
+
+Payment body (`@StrictBody()`): `status` (`paid` | `skipped`); for `paid` also `paid_on`
+(at most UTC today + 1 day), `amount` (> 0), `paying_account_id` and `record_charge`
+(providers and one-offs only, default `true`). Any extra field on a skip, or `record_charge` on
+a debt → `400`. Check order: path `404`, body `400`, paying account `422`, then `409`.
+
+- `:dueDate` is the **nominal** date (`YYYY-MM-DD`). A date that is not an occurrence
+  (off-schedule, before `bills_from`, hidden or archived account) or a non-debt / non-provider
+  account → `404`.
+- **`paid`** writes the `bank_bill_payments` row plus a payment (+) on the source account, a
+  withdrawal (−) on the paying account and, with `record_charge`, an unsent charge (−) on the
+  provider (it feeds the accountant hand-off), all dated `paid_on`, described
+  `"<bill description | account name> — <nominal date>"` (label truncated so the total stays
+  ≤ 255), in **one DB transaction**. **`skipped`** writes only the row.
+- **Undo** — `204`; deletes the linked transactions that still exist (a charge already sent to
+  the accountant included) and the row, in one DB transaction. No payment → `404`. A `paid`
+  payment whose source or paying account is archived → `409 ACCOUNT_ARCHIVED`; a skip on an
+  archived source, or a one-off whose provider is archived → `404`. Undo looks the row up with
+  no schedule check, so off-schedule payments can be undone.
+
+### Bill history
+
+`bill-payments.json` lists the payment rows of a debt / provider account, newest `due_date`
+first, then `id`, with the ledger `pagination` block:
+
+```json
+{
+  "payments": [ { "id": 4, "status": "paid", "paid_on": "2026-11-09", "amount": "149.90",
+                  "paying_account": { "id": 3, "name": "Nubank" }, "due_date": "2026-11-08",
+                  "bill": null, "off_schedule": false } ],
+  "pagination": { "page": 1, "per_page": 50, "total_pages": 1, "total_count": 1 }
+}
+```
+
+`off_schedule` is `true` when `due_date` is not a nominal occurrence of the account's current
+schedule pattern (`due_day`, `due_month`, frequency, `bills_from`; archived and
+`show_in_calendar` are ignored). An archived account's history stays readable.
 
 ## Settings
 

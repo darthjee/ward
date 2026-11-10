@@ -1,6 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { In, type EntityManager } from 'typeorm';
 import type { AccountTypeContext, AccountTypeHandler } from './account-type-handler.js';
+import type { WithPayingAccount } from './schedule-fields.js';
+import { withPayingAccounts } from '../account-refs.js';
 import {
   assertProviderExpensePairs,
   defaultProviderExpenseState,
@@ -14,6 +16,7 @@ import {
 import type { ProviderExpenseDetailsDto } from '../dto/provider-expense-details.dto.js';
 import type { Account } from '../entities/account.entity.js';
 import { ProviderExpenseDetails } from '../entities/provider-expense-details.entity.js';
+import { todayUtc } from '../ledger-date.js';
 
 /**
  * Handler of `provider_expense` accounts (see
@@ -65,7 +68,8 @@ export class ProviderExpenseAccountHandler implements AccountTypeHandler {
   }
 
   /**
-   * Loads the details rows in one query (no N+1).
+   * Loads the details rows in one query, plus one for their default paying
+   * accounts' names (no N+1).
    * @param {number[]} accountIds - The provider-expense accounts.
    * @param {EntityManager} manager - The entity manager.
    * @returns {Promise<Map<number, unknown>>} The rows keyed by account id.
@@ -77,7 +81,7 @@ export class ProviderExpenseAccountHandler implements AccountTypeHandler {
 
     const rows = await manager.getRepository(ProviderExpenseDetails).find({ where: { accountId: In(accountIds) } });
 
-    return new Map(rows.map((row) => [row.accountId, row]));
+    return new Map((await withPayingAccounts(rows, manager)).map((row) => [row.accountId, row]));
   }
 
   /**
@@ -99,11 +103,13 @@ export class ProviderExpenseAccountHandler implements AccountTypeHandler {
    * @returns {ProviderExpenseResponse} The nested `provider_expense` object.
    */
   serialize(details: unknown, account: Account): ProviderExpenseResponse {
-    return serializeProviderExpenseState(providerExpenseStateOf(details as ProviderExpenseState | undefined), account.currency);
+    const loaded = details as (ProviderExpenseState & WithPayingAccount) | undefined;
+
+    return serializeProviderExpenseState(providerExpenseStateOf(loaded), account.currency, loaded?.payingAccount ?? null);
   }
 
   #merge(base: ProviderExpenseState, nested: unknown, currency: string): ProviderExpenseState {
-    const merged = nested === undefined ? base : mergeProviderExpenseState(base, nested as ProviderExpenseDetailsDto, currency);
+    const merged = nested === undefined ? base : mergeProviderExpenseState(base, nested as ProviderExpenseDetailsDto, currency, todayUtc(new Date()));
     assertProviderExpensePairs(merged);
 
     return merged;

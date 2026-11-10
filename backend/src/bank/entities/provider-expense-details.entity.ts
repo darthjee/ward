@@ -41,6 +41,18 @@ export class ProviderExpenseDetails {
   @Column({ name: 'due_month', type: 'tinyint', nullable: true })
     dueMonth!: number | null;
 
+  /** `YYYY-MM-DD`; the first bill occurrence is the first due date on or after it (see `bills.md`). */
+  @Column({ name: 'bills_from', type: 'date', nullable: true })
+    billsFrom!: string | null;
+
+  /** When `false`, the account never produces bill occurrences. */
+  @Column({ name: 'show_in_calendar', type: 'boolean', default: true })
+    showInCalendar!: boolean;
+
+  /** Default paying account of its bills (a real FK, `ON DELETE SET NULL`). */
+  @Column({ name: 'paying_account_id', type: 'int', nullable: true })
+    payingAccountId!: number | null;
+
   @CreateDateColumn({ name: 'created_at' })
     createdAt!: Date;
 

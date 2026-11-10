@@ -5,6 +5,7 @@ import { AccountBalancesQuery } from './account-balances.query.js';
 import { accountArchived, accountHasTransactions, currencyLocked, mapNameClash } from './account-conflicts.js';
 import { accountOwnerWhere, copyEditableFields, nestedObject, ownerColumns, presentFields } from './account-fields.js';
 import { serializeAccount, type AccountResponse } from './account-response.js';
+import { AccountScheduleValidator } from './account-schedule.validator.js';
 import type { OwnerContext } from '../core/owner-context.js';
 import { ownerNotFound } from '../core/parse-id.js';
 import type { AccountTypeHandler } from './account-types/account-type-handler.js';
@@ -44,23 +45,27 @@ export class AccountService {
   private readonly registry: AccountTypeRegistry;
   private readonly balances: AccountBalancesQuery;
   private readonly config: BankConfig;
+  private readonly schedule: AccountScheduleValidator;
 
   /**
    * @param {Repository<Account>} accountRepository - The account repository.
    * @param {AccountTypeRegistry} registry - The account type handlers.
    * @param {AccountBalancesQuery} balances - Balance reads.
    * @param {BankConfig} config - The boot-validated bank config.
+   * @param {AccountScheduleValidator} schedule - The owner-aware schedule-field check.
    */
   constructor(
     @InjectRepository(Account) accountRepository: Repository<Account>,
       registry: AccountTypeRegistry,
       balances: AccountBalancesQuery,
     @Inject(BANK_CONFIG) config: BankConfig,
+      schedule: AccountScheduleValidator,
   ) {
     this.accountRepository = accountRepository;
     this.registry = registry;
     this.balances = balances;
     this.config = config;
+    this.schedule = schedule;
   }
 
   /**
@@ -114,6 +119,7 @@ export class AccountService {
    * @param {CreateAccountDto} dto - The validated body.
    * @returns {Promise<AccountResponse>} The new account (`account_number` masked).
    * @throws {BadRequestException} For a type without a handler or an invalid amount.
+   * @throws {UnprocessableEntityException} 422 on an invalid default paying account.
    * @throws {ConflictException} 409 on an active-name clash.
    */
   async create(owner: OwnerContext, dto: CreateAccountDto): Promise<AccountResponse> {
@@ -121,7 +127,9 @@ export class AccountService {
     this.registry.assertNoForeignNested(dto, handler.type);
 
     const currency = dto.currency ?? this.config.defaultCurrency;
-    const prepared = handler.validateCreate(nestedObject(dto, handler.type), { currency });
+    const nested = nestedObject(dto, handler.type);
+    const prepared = handler.validateCreate(nested, { currency });
+    await this.schedule.validate(owner, { nested, prepared, currency, currencyChanged: false });
     const account = this.accountRepository.create({
       ...ownerColumns(owner),
       type: handler.type,
@@ -143,7 +151,7 @@ export class AccountService {
    * Edits an account. On an archived account only `name` is accepted (checked
    * before any nested validation); the currency is locked once the account
    * has transactions. A type's nested object (e.g. `debt`) is merged onto the
-   * stored details.
+   * stored details (stored amounts rescaled when the currency changes).
    * @param {OwnerContext} owner - The resolved owner.
    * @param {number} id - The account id.
    * @param {UpdateAccountDto} dto - The validated body.
@@ -163,13 +171,11 @@ export class AccountService {
     const previousCurrency = account.currency;
     await this.#applyCurrency(account, dto);
 
-    // PATCH validates the type's nested object merged onto the stored details,
-    // with stored amounts rescaled when the currency changes.
     const stored = (await this.registry.loadDetails([account], this.accountRepository.manager)).get(account.id);
-    const prepared = handler.validateUpdate(nestedObject(dto, handler.type), stored, {
-      currency: account.currency,
-      previousCurrency,
-    });
+    const nested = nestedObject(dto, handler.type);
+    const { currency } = account;
+    const prepared = handler.validateUpdate(nested, stored, { currency, previousCurrency });
+    await this.schedule.validate(owner, { nested, prepared, currency, currencyChanged: currency !== previousCurrency });
 
     copyEditableFields(account, dto);
 

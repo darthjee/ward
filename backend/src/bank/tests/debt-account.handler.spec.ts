@@ -5,6 +5,7 @@ import { defaultDebtState, type DebtState } from '../account-types/debt-details.
 import { normaliseRate } from '../account-types/rate.js';
 import type { DebtDetailsDto } from '../dto/debt-details.dto.js';
 import { DebtDetails } from '../entities/debt-details.entity.js';
+import { todayUtc } from '../ledger-date.js';
 
 const BRL = { currency: 'BRL' };
 
@@ -50,6 +51,9 @@ describe('DebtAccountHandler', () => {
         dueDay: null,
         dueMonth: null,
         instalmentCount: null,
+        billsFrom: null,
+        showInCalendar: true,
+        payingAccountId: null,
       });
     });
 
@@ -70,6 +74,9 @@ describe('DebtAccountHandler', () => {
         dueDay: 31,
         dueMonth: 12,
         instalmentCount: 1,
+        billsFrom: todayUtc(new Date()),
+        showInCalendar: true,
+        payingAccountId: null,
       });
     });
 
@@ -117,11 +124,18 @@ describe('DebtAccountHandler', () => {
         dueDay: 10,
         dueMonth: 3,
         instalmentCount: 12,
+        billsFrom: null,
+        showInCalendar: true,
+        payingAccountId: null,
       });
     });
 
     it('falls back to the defaults when there is no stored row', () => {
-      expect(handler.validateUpdate(debt({ due_day: 5 }), undefined, BRL)).toEqual({ ...defaultDebtState(), dueDay: 5 });
+      expect(handler.validateUpdate(debt({ due_day: 5 }), undefined, BRL)).toEqual({
+        ...defaultDebtState(),
+        dueDay: 5,
+        billsFrom: todayUtc(new Date()),
+      });
     });
 
     it('merges partially: omitted fields are unchanged', () => {
@@ -270,6 +284,9 @@ describe('DebtAccountHandler', () => {
         due_day: 10,
         due_month: 3,
         instalment_count: 12,
+        bills_from: null,
+        show_in_calendar: true,
+        paying_account: null,
       });
       expect(handler.serialize(stored({ instalmentAmount: 500n }), buildAccount({ currency: 'JPY' })))
         .toMatchObject({ instalment_amount: '500' });
@@ -284,6 +301,9 @@ describe('DebtAccountHandler', () => {
         due_day: null,
         due_month: null,
         instalment_count: null,
+        bills_from: null,
+        show_in_calendar: true,
+        paying_account: null,
       });
     });
   });

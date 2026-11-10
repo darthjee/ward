@@ -12,6 +12,8 @@ import { ORGANIZATION_MEMBERSHIP_LOOKUP, type OrganizationMembershipLookup } fro
 import { OwnerContextGuard } from '../../../core/owner-context.guard.js';
 import { BankRoutesModule } from '../../bank-routes.module.js';
 import { Account } from '../../entities/account.entity.js';
+import { BillPayment } from '../../entities/bill-payment.entity.js';
+import { Bill } from '../../entities/bill.entity.js';
 import { DebtDetails } from '../../entities/debt-details.entity.js';
 import { InvestmentDetails } from '../../entities/investment-details.entity.js';
 import { ProviderExpenseDetails } from '../../entities/provider-expense-details.entity.js';
@@ -66,6 +68,8 @@ function fakeDataSource(repos: InMemoryBankRepos) {
   const repositoryFor = (entity: unknown): unknown => {
     if (entity === Account) return { ...repos.accounts, manager };
     if (entity === Transaction) return { ...repos.transactions, manager };
+    if (entity === Bill) return { ...repos.bills, manager };
+    if (entity === BillPayment) return { ...repos.billPayments, manager };
     if (entity === DebtDetails) return repos.debtDetails;
     if (entity === InvestmentDetails) return repos.investmentDetails;
     if (entity === ProviderExpenseDetails) return repos.providerExpenseDetails;
@@ -115,6 +119,27 @@ export async function buildBankTestApp(config: Record<string, string> = {}): Pro
   await app.init();
 
   return { app, repos };
+}
+
+type TransactionFn = <R>(work: (manager: unknown) => Promise<R>) => Promise<R>;
+
+/**
+ * Runs `interleave` right before the next DB transaction opens — i.e. after
+ * the service's pre-checks — standing in for a concurrent request that slips
+ * in between the pre-check and the write.
+ * @param {INestApplication} app - The app.
+ * @param {() => unknown} interleave - The concurrent change.
+ * @returns {void}
+ */
+export function beforeNextTransaction(app: INestApplication, interleave: () => unknown): void {
+  const { manager } = app.get<{ manager: { transaction: TransactionFn } }>(getDataSourceToken());
+  const original = manager.transaction;
+
+  manager.transaction = async (work) => {
+    manager.transaction = original;
+    await interleave();
+    return original(work);
+  };
 }
 
 type Method = 'get' | 'post' | 'patch' | 'delete';

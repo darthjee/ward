@@ -32,6 +32,9 @@ const DEFAULT_PROVIDER_EXPENSE = {
   charge_frequency: 'monthly',
   due_day: null,
   due_month: null,
+  bills_from: null,
+  show_in_calendar: true,
+  paying_account: null,
 };
 
 const FULL_PROVIDER_EXPENSE = {
@@ -41,7 +44,11 @@ const FULL_PROVIDER_EXPENSE = {
   charge_frequency: 'yearly',
   due_day: 10,
   due_month: 3,
+  bills_from: '2026-01-01',
+  show_in_calendar: true,
 };
+
+const FULL_PROVIDER_EXPENSE_RESPONSE = { ...FULL_PROVIDER_EXPENSE, paying_account: null };
 
 const MONTHLY_PROVIDER_EXPENSE = { ...FULL_PROVIDER_EXPENSE, charge_frequency: 'monthly', due_month: null };
 
@@ -121,7 +128,7 @@ describe('provider-expense accounts (e2e)', () => {
       it('creates a provider account with a full object', async () => {
         const created = await createProvider(orgId, { provider_expense: FULL_PROVIDER_EXPENSE, notes: 'Monthly fee' });
 
-        expect(created.provider_expense).toEqual(FULL_PROVIDER_EXPENSE);
+        expect(created.provider_expense).toEqual(FULL_PROVIDER_EXPENSE_RESPONSE);
         expect(created.notes).toBe('Monthly fee');
         expect(detailsOf(created.id)).toMatchObject({ forAccountant: false, expectedAmount: 20000n, dueMonth: 3 });
       });
@@ -159,8 +166,8 @@ describe('provider-expense accounts (e2e)', () => {
         ];
         const list = await send(app, 'get', `${prefix}/accounts.json?type=provider_expense`, ALICE).expect(200);
 
-        responses.forEach((response) => expect(response.body.provider_expense).toEqual(FULL_PROVIDER_EXPENSE));
-        expect(list.body.find((row: { id: number }) => row.id === created.id).provider_expense).toEqual(FULL_PROVIDER_EXPENSE);
+        responses.forEach((response) => expect(response.body.provider_expense).toEqual(FULL_PROVIDER_EXPENSE_RESPONSE));
+        expect(list.body.find((row: { id: number }) => row.id === created.id).provider_expense).toEqual(FULL_PROVIDER_EXPENSE_RESPONSE);
         expect(ownerKeysIn([created, list.body, ...responses.map((response) => response.body)])).toEqual([]);
         expect(created).not.toHaveProperty('debt');
         expect(created).not.toHaveProperty('investment');
@@ -266,13 +273,13 @@ describe('provider-expense accounts (e2e)', () => {
         const created = await createProvider(orgId, { provider_expense: FULL_PROVIDER_EXPENSE });
 
         const merged = await patch(orgId, created.id, { provider_expense: { due_day: 20, for_accountant: true } }).expect(200);
-        expect(merged.body.provider_expense).toEqual({ ...FULL_PROVIDER_EXPENSE, due_day: 20, for_accountant: true });
+        expect(merged.body.provider_expense).toEqual({ ...FULL_PROVIDER_EXPENSE_RESPONSE, due_day: 20, for_accountant: true });
 
         const cleared = await patch(orgId, created.id, {
           provider_expense: { provider_tax_id: null, expected_amount: null, due_day: null },
         }).expect(200);
         expect(cleared.body.provider_expense).toEqual({
-          ...FULL_PROVIDER_EXPENSE,
+          ...FULL_PROVIDER_EXPENSE_RESPONSE,
           for_accountant: true,
           provider_tax_id: null,
           expected_amount: null,
@@ -289,7 +296,7 @@ describe('provider-expense accounts (e2e)', () => {
           expect(response.body.provider_expense).toMatchObject(expected);
         } else {
           const detail = await send(app, 'get', accountPath(orgId, created.id), ALICE).expect(200);
-          expect(detail.body.provider_expense).toEqual(stored);
+          expect(detail.body.provider_expense).toEqual({ ...stored, paying_account: null });
         }
       });
 
@@ -363,7 +370,7 @@ describe('provider-expense accounts (e2e)', () => {
         await send(app, 'post', `${prefix}/accounts/${created.id}/archive.json`, ALICE).expect(200);
 
         const renamed = await patch(orgId, created.id, { name: uniqueName('Old accountant') }).expect(200);
-        expect(renamed.body.provider_expense).toEqual(FULL_PROVIDER_EXPENSE);
+        expect(renamed.body.provider_expense).toEqual(FULL_PROVIDER_EXPENSE_RESPONSE);
 
         for (const body of [
           { provider_expense: { due_day: 5 } },

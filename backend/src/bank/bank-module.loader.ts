@@ -1,6 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import type { AccountService } from './account.service.js';
 import type { AccountantService } from './accountant.service.js';
+import type { BillHistoryService } from './bill-history.service.js';
+import type { BillPaymentService } from './bill-payment.service.js';
+import type { BillService } from './bill.service.js';
+import type { CalendarService } from './calendar.service.js';
 import type { TransactionService } from './transaction.service.js';
 import { LazyModuleLoaderService } from '../core/lazy-module-loader.service.js';
 
@@ -10,6 +14,10 @@ import { LazyModuleLoaderService } from '../core/lazy-module-loader.service.js';
 export interface BankServices {
   accounts: AccountService;
   accountant: AccountantService;
+  billHistory: BillHistoryService;
+  billPayments: BillPaymentService;
+  bills: BillService;
+  calendar: CalendarService;
   transactions: TransactionService;
 }
 
@@ -42,6 +50,10 @@ export class BankModuleLoader {
     return {
       accounts: moduleRef.get(bank.AccountService),
       accountant: moduleRef.get(bank.AccountantService),
+      billHistory: moduleRef.get(bank.BillHistoryService),
+      billPayments: moduleRef.get(bank.BillPaymentService),
+      bills: moduleRef.get(bank.BillService),
+      calendar: moduleRef.get(bank.CalendarService),
       transactions: moduleRef.get(bank.TransactionService),
     };
   }

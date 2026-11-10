@@ -1,5 +1,15 @@
 import { BadRequestException } from '@nestjs/common';
 import { convertAmountInput, parseAmountInput } from '../amount-input.js';
+import {
+  applyBillsFromLifecycle,
+  defaultScheduleState,
+  SCHEDULE_COPIED_FIELDS,
+  scheduleStateOf,
+  serializeScheduleFields,
+  type ScheduleResponse,
+  type ScheduleState,
+} from './schedule-fields.js';
+import type { AccountRef } from '../account-refs.js';
 import { formatAmount } from '../currency.js';
 import type { ProviderExpenseDetailsDto } from '../dto/provider-expense-details.dto.js';
 import type { ProviderChargeFrequency, ProviderExpenseDetails } from '../entities/provider-expense-details.entity.js';
@@ -12,7 +22,7 @@ import type { ProviderChargeFrequency, ProviderExpenseDetails } from '../entitie
 export type ProviderExpenseState = Pick<
   ProviderExpenseDetails,
   'forAccountant' | 'providerTaxId' | 'expectedAmount' | 'dueDay' | 'chargeFrequency' | 'dueMonth'
->;
+> & ScheduleState;
 
 /**
  * The nested `provider_expense` response object (snake_case). A type alias
@@ -26,7 +36,7 @@ export type ProviderExpenseResponse = {
   charge_frequency: ProviderChargeFrequency;
   due_day: number | null;
   due_month: number | null;
-};
+} & ScheduleResponse;
 
 /** The body field named in `expected_amount` errors. */
 export const EXPECTED_AMOUNT_FIELD = 'provider_expense.expected_amount';
@@ -38,6 +48,7 @@ const COPIED_FIELDS = [
   ['due_day', 'dueDay'],
   ['charge_frequency', 'chargeFrequency'],
   ['due_month', 'dueMonth'],
+  ...SCHEDULE_COPIED_FIELDS,
 ] as const;
 
 /**
@@ -53,6 +64,7 @@ export function defaultProviderExpenseState(): ProviderExpenseState {
     dueDay: null,
     chargeFrequency: 'monthly',
     dueMonth: null,
+    ...defaultScheduleState(),
   };
 }
 
@@ -69,7 +81,7 @@ export function providerExpenseStateOf(details: ProviderExpenseState | undefined
 
   const { forAccountant, providerTaxId, expectedAmount, dueDay, chargeFrequency, dueMonth } = details;
 
-  return { forAccountant, providerTaxId, expectedAmount, dueDay, chargeFrequency, dueMonth };
+  return { forAccountant, providerTaxId, expectedAmount, dueDay, chargeFrequency, dueMonth, ...scheduleStateOf(details) };
 }
 
 /**
@@ -112,9 +124,12 @@ export function rescaleProviderExpenseState(state: ProviderExpenseState, from: s
  * Merges the sent `provider_expense` fields onto `base` (`null` clears a
  * field, an absent one is unchanged). A merged `monthly` frequency clears
  * `due_month`, unless the request sends a non-null `due_month` (→ 400).
+ * Setting `due_day` for the first time sets an unset, unsent `bills_from` to
+ * `today`.
  * @param {ProviderExpenseState} base - The stored (or default) details.
  * @param {ProviderExpenseDetailsDto} dto - The validated nested body.
  * @param {string} currency - The account's (final) currency.
+ * @param {string} today - Today (UTC), `YYYY-MM-DD`.
  * @returns {ProviderExpenseState} The merged details.
  * @throws {BadRequestException} When `expected_amount` is invalid, or
  *   `due_month` is sent with a `monthly` frequency.
@@ -123,6 +138,7 @@ export function mergeProviderExpenseState(
   base: ProviderExpenseState,
   dto: ProviderExpenseDetailsDto,
   currency: string,
+  today: string,
 ): ProviderExpenseState {
   const merged: ProviderExpenseState = { ...base };
 
@@ -144,6 +160,8 @@ export function mergeProviderExpenseState(
     merged.dueMonth = null;
   }
 
+  applyBillsFromLifecycle(base, merged, dto, today);
+
   return merged;
 }
 
@@ -162,9 +180,14 @@ export function assertProviderExpensePairs(state: ProviderExpenseState): void {
 /**
  * @param {ProviderExpenseState} state - The details.
  * @param {string} currency - The account currency.
+ * @param {AccountRef | null} [payingAccount] - The default paying account's ref, if loaded.
  * @returns {ProviderExpenseResponse} The nested `provider_expense` response object.
  */
-export function serializeProviderExpenseState(state: ProviderExpenseState, currency: string): ProviderExpenseResponse {
+export function serializeProviderExpenseState(
+  state: ProviderExpenseState,
+  currency: string,
+  payingAccount: AccountRef | null = null,
+): ProviderExpenseResponse {
   return {
     for_accountant: state.forAccountant,
     provider_tax_id: state.providerTaxId,
@@ -172,5 +195,6 @@ export function serializeProviderExpenseState(state: ProviderExpenseState, curre
     charge_frequency: state.chargeFrequency,
     due_day: state.dueDay,
     due_month: state.dueMonth,
+    ...serializeScheduleFields(state, payingAccount),
   };
 }

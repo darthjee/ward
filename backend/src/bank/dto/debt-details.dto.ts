@@ -1,5 +1,5 @@
-import { IsIn, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
-import { IsInterestRate, IsOptionalNonNull, MAX_INT_COLUMN, RATE_PERIODS } from './field-validators.js';
+import { IsBoolean, IsIn, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
+import { IsCalendarDate, IsInterestRate, IsOptionalNonNull, MAX_INT_COLUMN, RATE_PERIODS } from './field-validators.js';
 
 /** The periods a debt's interest rate and instalment frequency accept. */
 export const DEBT_PERIODS = RATE_PERIODS;
@@ -47,4 +47,18 @@ export class DebtDetailsDto {
   @Min(1)
   @Max(MAX_INT_COLUMN)
     instalment_count?: number | null;
+
+  @IsOptional()
+  @IsCalendarDate()
+    bills_from?: string | null;
+
+  @IsOptionalNonNull()
+  @IsBoolean()
+    show_in_calendar?: boolean;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(MAX_INT_COLUMN)
+    paying_account_id?: number | null;
 }

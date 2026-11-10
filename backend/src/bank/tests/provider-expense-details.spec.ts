@@ -20,7 +20,12 @@ const YEARLY: ProviderExpenseState = {
   dueDay: 10,
   chargeFrequency: 'yearly',
   dueMonth: 3,
+  billsFrom: '2026-01-01',
+  showInCalendar: true,
+  payingAccountId: null,
 };
+
+const TODAY = '2026-11-10';
 
 const dto = (fields: Partial<ProviderExpenseDetailsDto>): ProviderExpenseDetailsDto => fields as ProviderExpenseDetailsDto;
 
@@ -34,6 +39,9 @@ describe('provider-expense details helpers', () => {
         dueDay: null,
         chargeFrequency: 'monthly',
         dueMonth: null,
+        billsFrom: null,
+        showInCalendar: true,
+        payingAccountId: null,
       });
     });
   });
@@ -93,7 +101,7 @@ describe('provider-expense details helpers', () => {
 
   describe('mergeProviderExpenseState', () => {
     it('copies sent fields and keeps omitted ones', () => {
-      expect(mergeProviderExpenseState(YEARLY, dto({ due_day: 5, for_accountant: true }), 'BRL')).toEqual({
+      expect(mergeProviderExpenseState(YEARLY, dto({ due_day: 5, for_accountant: true }), 'BRL', TODAY)).toEqual({
         ...YEARLY,
         dueDay: 5,
         forAccountant: true,
@@ -101,24 +109,24 @@ describe('provider-expense details helpers', () => {
     });
 
     it('clears nullable fields sent as null', () => {
-      expect(mergeProviderExpenseState(YEARLY, dto({ provider_tax_id: null, expected_amount: null, due_day: null }), 'BRL'))
+      expect(mergeProviderExpenseState(YEARLY, dto({ provider_tax_id: null, expected_amount: null, due_day: null }), 'BRL', TODAY))
         .toMatchObject({ providerTaxId: null, expectedAmount: null, dueDay: null });
     });
 
     it('parses expected_amount against the given currency', () => {
-      expect(mergeProviderExpenseState(YEARLY, dto({ expected_amount: '99.9' }), 'BRL')).toMatchObject({ expectedAmount: 9990n });
-      expect(() => mergeProviderExpenseState(YEARLY, dto({ expected_amount: '99.9' }), 'JPY')).toThrow(BadRequestException);
+      expect(mergeProviderExpenseState(YEARLY, dto({ expected_amount: '99.9' }), 'BRL', TODAY)).toMatchObject({ expectedAmount: 9990n });
+      expect(() => mergeProviderExpenseState(YEARLY, dto({ expected_amount: '99.9' }), 'JPY', TODAY)).toThrow(BadRequestException);
     });
 
     it('clears due_month on a merged monthly frequency', () => {
-      expect(mergeProviderExpenseState(YEARLY, dto({ charge_frequency: 'monthly' }), 'BRL')).toMatchObject({
+      expect(mergeProviderExpenseState(YEARLY, dto({ charge_frequency: 'monthly' }), 'BRL', TODAY)).toMatchObject({
         chargeFrequency: 'monthly',
         dueMonth: null,
       });
     });
 
     it('rejects a sent non-null due_month on a merged monthly frequency', () => {
-      expect(() => mergeProviderExpenseState(defaultProviderExpenseState(), dto({ due_month: 5 }), 'BRL')).toThrow(
+      expect(() => mergeProviderExpenseState(defaultProviderExpenseState(), dto({ due_month: 5 }), 'BRL', TODAY)).toThrow(
         BadRequestException,
       );
     });
@@ -141,6 +149,9 @@ describe('provider-expense details helpers', () => {
         charge_frequency: 'yearly',
         due_day: 10,
         due_month: 3,
+        bills_from: '2026-01-01',
+        show_in_calendar: true,
+        paying_account: null,
       });
       expect(serializeProviderExpenseState({ ...YEARLY, expectedAmount: 200n }, 'JPY')).toMatchObject({ expected_amount: '200' });
     });
@@ -153,6 +164,9 @@ describe('provider-expense details helpers', () => {
         charge_frequency: 'monthly',
         due_day: null,
         due_month: null,
+        bills_from: null,
+        show_in_calendar: true,
+        paying_account: null,
       });
     });
   });

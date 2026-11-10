@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AccountBalancesQuery } from './account-balances.query.js';
+import { AccountScheduleValidator } from './account-schedule.validator.js';
 import { ACCOUNT_TYPE_HANDLERS, type AccountTypeHandler } from './account-types/account-type-handler.js';
 import { AccountTypeRegistry } from './account-types/account-type.registry.js';
 import { DebtAccountHandler } from './account-types/debt-account.handler.js';
@@ -11,18 +12,32 @@ import { AccountService } from './account.service.js';
 import { AccountantChargesQuery } from './accountant-charges.query.js';
 import { AccountantService } from './accountant.service.js';
 import { BankConfigModule } from './bank-config.module.js';
+import { BillHistoryService } from './bill-history.service.js';
+import { BillPaymentService } from './bill-payment.service.js';
+import { BillPaymentWriter } from './bill-payment.writer.js';
+import { BillSourceResolver } from './bill-source.resolver.js';
+import { BillService } from './bill.service.js';
+import { CalendarQuery } from './calendar.query.js';
+import { CalendarService } from './calendar.service.js';
 import { Account } from './entities/account.entity.js';
+import { BillPayment } from './entities/bill-payment.entity.js';
+import { Bill } from './entities/bill.entity.js';
 import { DebtDetails } from './entities/debt-details.entity.js';
 import { InvestmentDetails } from './entities/investment-details.entity.js';
 import { ProviderExpenseDetails } from './entities/provider-expense-details.entity.js';
 import { Transaction } from './entities/transaction.entity.js';
 import { LedgerQuery } from './ledger.query.js';
+import { PayingAccountResolver } from './paying-account.resolver.js';
 import { TransactionService } from './transaction.service.js';
 
 // Re-exported so the resident `BankModuleLoader` reaches the service classes
 // only through its dynamic `import()` of this file.
 export { AccountService } from './account.service.js';
 export { AccountantService } from './accountant.service.js';
+export { BillHistoryService } from './bill-history.service.js';
+export { BillPaymentService } from './bill-payment.service.js';
+export { BillService } from './bill.service.js';
+export { CalendarService } from './calendar.service.js';
 export { TransactionService } from './transaction.service.js';
 
 /**
@@ -38,7 +53,15 @@ export { TransactionService } from './transaction.service.js';
  * and to the `ACCOUNT_TYPE_HANDLERS` factory's `inject` list.
  */
 @Module({
-  imports: [TypeOrmModule.forFeature([Account, DebtDetails, InvestmentDetails, ProviderExpenseDetails, Transaction]), BankConfigModule],
+  imports: [TypeOrmModule.forFeature([
+    Account,
+    Bill,
+    BillPayment,
+    DebtDetails,
+    InvestmentDetails,
+    ProviderExpenseDetails,
+    Transaction,
+  ]), BankConfigModule],
   providers: [
     RegularAccountHandler,
     DebtAccountHandler,
@@ -51,13 +74,30 @@ export { TransactionService } from './transaction.service.js';
     },
     AccountTypeRegistry,
     AccountBalancesQuery,
+    PayingAccountResolver,
+    AccountScheduleValidator,
     AccountService,
     AccountantChargesQuery,
     AccountantService,
+    BillHistoryService,
+    BillPaymentService,
+    BillPaymentWriter,
+    BillService,
+    BillSourceResolver,
+    CalendarQuery,
+    CalendarService,
     LedgerQuery,
     TransactionService,
   ],
-  exports: [AccountService, AccountantService, TransactionService],
+  exports: [
+    AccountService,
+    AccountantService,
+    BillHistoryService,
+    BillPaymentService,
+    BillService,
+    CalendarService,
+    TransactionService,
+  ],
 })
 // NestJS module classes are intentionally empty; all behavior lives in @Module().
 // eslint-disable-next-line @typescript-eslint/no-extraneous-class

@@ -1,6 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { In, type EntityManager } from 'typeorm';
 import type { AccountTypeContext, AccountTypeHandler } from './account-type-handler.js';
+import type { WithPayingAccount } from './schedule-fields.js';
+import { withPayingAccounts } from '../account-refs.js';
 import {
   assertDebtPairs,
   debtStateOf,
@@ -14,6 +16,7 @@ import {
 import type { DebtDetailsDto } from '../dto/debt-details.dto.js';
 import type { Account } from '../entities/account.entity.js';
 import { DebtDetails } from '../entities/debt-details.entity.js';
+import { todayUtc } from '../ledger-date.js';
 
 /**
  * Handler of `debt` accounts (see `docs/agents/specs/banking/accounts/debt.md`):
@@ -63,7 +66,8 @@ export class DebtAccountHandler implements AccountTypeHandler {
   }
 
   /**
-   * Loads the details rows in one query (no N+1).
+   * Loads the details rows in one query, plus one for their default paying
+   * accounts' names (no N+1).
    * @param {number[]} accountIds - The debt accounts.
    * @param {EntityManager} manager - The entity manager.
    * @returns {Promise<Map<number, unknown>>} The rows keyed by account id.
@@ -75,7 +79,7 @@ export class DebtAccountHandler implements AccountTypeHandler {
 
     const rows = await manager.getRepository(DebtDetails).find({ where: { accountId: In(accountIds) } });
 
-    return new Map(rows.map((row) => [row.accountId, row]));
+    return new Map((await withPayingAccounts(rows, manager)).map((row) => [row.accountId, row]));
   }
 
   /**
@@ -97,11 +101,13 @@ export class DebtAccountHandler implements AccountTypeHandler {
    * @returns {DebtResponse} The nested `debt` object.
    */
   serialize(details: unknown, account: Account): DebtResponse {
-    return serializeDebtState(debtStateOf(details as DebtState | undefined), account.currency);
+    const loaded = details as (DebtState & WithPayingAccount) | undefined;
+
+    return serializeDebtState(debtStateOf(loaded), account.currency, loaded?.payingAccount ?? null);
   }
 
   #merge(base: DebtState, nested: unknown, currency: string): DebtState {
-    const merged = nested === undefined ? base : mergeDebtState(base, nested as DebtDetailsDto, currency);
+    const merged = nested === undefined ? base : mergeDebtState(base, nested as DebtDetailsDto, currency, todayUtc(new Date()));
     assertDebtPairs(merged);
 
     return merged;

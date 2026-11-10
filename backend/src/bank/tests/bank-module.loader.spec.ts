@@ -2,16 +2,28 @@ import { AccountService } from '../account.service.js';
 import { AccountantService } from '../accountant.service.js';
 import { BankModuleLoader } from '../bank-module.loader.js';
 import { BankModule } from '../bank.module.js';
+import { BillHistoryService } from '../bill-history.service.js';
+import { BillPaymentService } from '../bill-payment.service.js';
+import { BillService } from '../bill.service.js';
+import { CalendarService } from '../calendar.service.js';
 import { TransactionService } from '../transaction.service.js';
 
 describe('BankModuleLoader', () => {
   it('loads BankModule through the lazy loader and resolves its services', async () => {
     const accounts = { name: 'accounts' };
     const accountant = { name: 'accountant' };
+    const billHistory = { name: 'billHistory' };
+    const billPayments = { name: 'billPayments' };
+    const bills = { name: 'bills' };
+    const calendar = { name: 'calendar' };
     const transactions = { name: 'transactions' };
     const byToken = new Map<unknown, object>([
       [AccountService, accounts],
       [AccountantService, accountant],
+      [BillHistoryService, billHistory],
+      [BillPaymentService, billPayments],
+      [BillService, bills],
+      [CalendarService, calendar],
       [TransactionService, transactions],
     ]);
     const moduleRef = { get: jest.fn((token: unknown) => byToken.get(token)) };
@@ -26,6 +38,10 @@ describe('BankModuleLoader', () => {
     expect(moduleRef.get).toHaveBeenCalledWith(AccountService);
     expect(moduleRef.get).toHaveBeenCalledWith(AccountantService);
     expect(moduleRef.get).toHaveBeenCalledWith(TransactionService);
-    expect(services).toEqual({ accounts, accountant, transactions });
+    expect(moduleRef.get).toHaveBeenCalledWith(CalendarService);
+    expect(moduleRef.get).toHaveBeenCalledWith(BillService);
+    expect(moduleRef.get).toHaveBeenCalledWith(BillPaymentService);
+    expect(moduleRef.get).toHaveBeenCalledWith(BillHistoryService);
+    expect(services).toEqual({ accounts, accountant, billHistory, billPayments, bills, calendar, transactions });
   });
 });
