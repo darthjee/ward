@@ -50,6 +50,13 @@ describe('ScheduleFieldsHelper', () => {
     expect(page.containsElement('option', 'Main')).toBeFalse();
   });
 
+  it('escapes the paying account names', () => {
+    const page = output({}, { payingAccounts: [{ id: 1, name: '<script>x</script>', currency: 'BRL', type: 'regular' }] });
+
+    expect(page.containsTag('script')).toBeFalse();
+    expect(page.contains('&lt;script&gt;x&lt;/script&gt;')).toBeTrue();
+  });
+
   it('shows the Bills from error', () => {
     expect(output({}, { fieldErrors: { bills_from: 'Enter a valid date' } }).contains('Enter a valid date')).toBeTrue();
   });

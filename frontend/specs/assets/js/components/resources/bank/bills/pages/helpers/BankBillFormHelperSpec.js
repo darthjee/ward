@@ -132,5 +132,8 @@ describe('BankBillFormHelper', () => {
     expect(page.containsTag('img')).toBeFalse();
     expect(page.contains('<b>')).toBeFalse();
     expect(page.contains('&lt;b&gt;n&lt;/b&gt;')).toBeTrue();
+    expect(page.contains('&lt;script&gt;p&lt;/script&gt;')).toBeTrue();
+    expect(page.contains('&lt;img src=x&gt;')).toBeTrue();
+    expect(page.contains('&quot;&gt;&lt;script&gt;d&lt;/script&gt;')).toBeTrue();
   });
 });

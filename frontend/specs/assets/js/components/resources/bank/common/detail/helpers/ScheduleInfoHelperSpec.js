@@ -22,8 +22,9 @@ describe('ScheduleInfoHelper', () => {
   });
 
   it('escapes the paying account name', () => {
-    const page = renderedOutput(ScheduleInfoHelper.render({ paying_account: { id: 1, name: '<b>x</b>' } }));
+    const page = renderedOutput(ScheduleInfoHelper.render({ paying_account: { id: 1, name: '<script>x</script>' } }));
 
-    expect(page.containsTag('b')).toBeFalse();
+    expect(page.containsTag('script')).toBeFalse();
+    expect(page.contains('&lt;script&gt;x&lt;/script&gt;')).toBeTrue();
   });
 });
