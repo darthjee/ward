@@ -51,11 +51,14 @@ frontend/assets/js/
         accounts/pages/        #   BankAccountList, BankAccountDetail (+ ledger),
                                #   BankAccountNew, BankAccountEdit (+ controllers/, helpers/,
                                #   hooks/)
+        debts/, investments/,  #   one folder per submenu, same shape; every bank page is
+        providers/, bills/     #   described in docs/agents/modules/bank/ui.md
       admin/pages/             # AdminUsers.jsx (search, status filter, approve/deny via
                                #   users/ApproveUserButton.jsx, users/DenyUserButton.jsx),
                                #   AdminUserEdit.jsx
   client/                      # AccountsClient, AdminClient, ApiClient, ApiError,
-                                #   OrganizationsClient, BankClient (context-aware),
+                                #   OrganizationsClient, BankClient, AccountantClient,
+                                #   BillsClient (the bank clients are context-aware),
                                 #   AuthSession, AuthEvents, AuthStatus, LoginModalEvents,
                                 #   pickDefined.js (drops undefined keys from request bodies)
   utils/
@@ -197,9 +200,10 @@ The frontend side of [User approval](../modules/auth/user-approval.md):
 
 ## Owner context (organizations)
 
-The frontend side of [Organizations](../specs/auth/organizations.md) (#47). Every
+The frontend side of [Organizations](../modules/auth/organizations.md) (#47). Every
 user-or-organization-owned module (starting with `bank`, #49) registers its routes once and
-works in both contexts.
+works in both contexts. This section covers only the cross-cutting mechanics; the bank pages
+themselves are described in [Bank — UI](../modules/bank/ui.md).
 
 - **UI paths**: Personal `#/<module>/...`, organization `#/orgs/:orgId/<module>/...`.
 - **Router** (`utils/routing/`): `routes.js` holds three tables — `ROUTES_PERSONAL`
@@ -234,7 +238,10 @@ works in both contexts.
   whose stripped path matches a prefix (on a segment boundary) lands on that section's list in
   the new context (`switchTargetFor(hash)`); anything else lands on `landingFor`. The query
   string is dropped, and each switcher item's `href` uses the same target. Each module adds its
-  own row (`/bank/accounts` for #49).
+  own rows: `bank` registers `/bank/accounts`, `/bank/debts`, `/bank/investments` and
+  `/bank/providers` (each mapping to its own list; the Providers prefix also covers the
+  accountant hand-off page), and maps `/bank/bills` to the Providers list, since the one-off bill
+  pages have no list of their own.
 - **Hash query** (`utils/routing/hashQuery.js`): `hashQuery` / `withHashQuery` read and write
   the `?...` part of the hash (e.g. the ledger's `?page=`, the list's `?archived=true`).
 - **Pages**: `#/orgs/new`, `#/orgs/:orgId` (overview: name, role, Rename link) and

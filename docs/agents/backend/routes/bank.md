@@ -15,9 +15,10 @@ The controllers parse the ids, load the lazy `BankModule` on the first bank requ
 `AccountService` / `TransactionService` / `AccountantService` / `CalendarService` /
 `BillService` / `BillPaymentService` / `BillHistoryService` (the debt and provider handlers
 resolve the default paying account through `PayingAccountResolver`). `settings.json` reads the
-resident `BANK_CONFIG` and does not load the module. The specs
-(`docs/agents/specs/banking/accounts/regular.md`, `debt.md`, `transactions.md`,
-`docs/agents/specs/banking/bills.md`) are the source of truth for the behaviour.
+resident `BANK_CONFIG` and does not load the module. The rules behind these routes (ownership,
+ledger, currency, account types, the accountant hand-off, bills) are in the
+[Bank module](../../modules/bank.md) and its `modules/bank/` pages; this page is the
+per-endpoint reference.
 
 ## Shared rules
 
@@ -98,7 +99,7 @@ balance's decimal value (`400` when it cannot be represented in the new exponent
 ### Debt object
 
 `type: debt` accounts carry a nested `debt` object, stored 1:1 in `bank_debt_details`; the
-spec is `docs/agents/specs/banking/accounts/debt.md`.
+rules are in [Bank — Debt accounts](../../modules/bank/debt.md).
 
 ```json
 "debt": {
@@ -124,7 +125,7 @@ spec is `docs/agents/specs/banking/accounts/debt.md`.
 - **`409 ACCOUNT_ARCHIVED`** — any `debt` field on an archived debt (a field failing the
   format checks above is still a `400`, rejected by the validation pipe first).
 
-- **Schedule fields** (bills, see `docs/agents/specs/banking/bills.md`) — the object also
+- **Schedule fields** (bills, see [Bank — Bills](../../modules/bank/bills.md#schedule-fields)) — the object also
   accepts `bills_from` (`YYYY-MM-DD` or `null`), `show_in_calendar` (boolean, not nullable,
   default `true`) and `paying_account_id` (positive integer or `null`), and returns
   `bills_from`, `show_in_calendar` and `paying_account: { id, name } | null` (never the raw
@@ -137,7 +138,8 @@ spec is `docs/agents/specs/banking/accounts/debt.md`.
 ### Investment object
 
 `type: investment` accounts carry a nested `investment` object, stored 1:1 in
-`bank_investment_details`; the spec is `docs/agents/specs/banking/accounts/investment.md`.
+`bank_investment_details`; the rules are in
+[Bank — Investment accounts](../../modules/bank/investment.md).
 
 ```json
 "investment": {
@@ -167,8 +169,8 @@ spec is `docs/agents/specs/banking/accounts/debt.md`.
 ### Provider-expense object
 
 `type: provider_expense` accounts carry a nested `provider_expense` object, stored 1:1 in
-`bank_provider_expense_details`; the spec is
-`docs/agents/specs/banking/accounts/provider-expense.md`. Charges and payments use the generic
+`bank_provider_expense_details`; the rules are in
+[Bank — Provider-expense accounts](../../modules/bank/provider-expense.md). Charges and payments use the generic
 transaction routes unchanged.
 
 ```json
@@ -202,7 +204,7 @@ transaction routes unchanged.
 - **`409 ACCOUNT_ARCHIVED`** — any `provider_expense` field on an archived provider-expense
   account (a field failing the format checks above is still a `400`, rejected by the
   validation pipe first).
-- **Schedule fields** (bills, see `docs/agents/specs/banking/bills.md`) — the object also
+- **Schedule fields** (bills, see [Bank — Bills](../../modules/bank/bills.md#schedule-fields)) — the object also
   accepts `bills_from` (`YYYY-MM-DD` or `null`), `show_in_calendar` (boolean, not nullable,
   default `true`) and `paying_account_id` (positive integer or `null`), and returns
   `bills_from`, `show_in_calendar` and `paying_account: { id, name } | null` (never the raw
@@ -268,9 +270,8 @@ The project's first paginated route; the `pagination` block is the convention fo
 
 ## Accountant hand-off
 
-Served by `AccountantController`, delegating to the lazy `AccountantService`; the spec is
-`docs/agents/specs/banking/accounts/provider-expense.md` (*Business expenses for the
-accountant*). There is no CSV route: the CSV is built client-side from the preview.
+Served by `AccountantController`, delegating to the lazy `AccountantService`; the rules are in
+[Bank — Provider-expense accounts → Accountant hand-off](../../modules/bank/provider-expense.md#accountant-hand-off). There is no CSV route: the CSV is built client-side from the preview.
 
 | Method | Route | Body | Success | Errors | Cache class |
 |---|---|---|---|---|---|
@@ -338,7 +339,7 @@ those five fields (no owner fields, no `account_number`, no balance).
 
 Served by `CalendarController`, `BillsController` and `BillPaymentsController`, delegating to
 the lazy `CalendarService`, `BillService`, `BillPaymentService` and `BillHistoryService`; the
-spec is `docs/agents/specs/banking/bills.md`. Occurrences are computed in memory per request
+rules are in [Bank — Bills](../../modules/bank/bills.md). Occurrences are computed in memory per request
 (pure `occurrence-generator.ts`: monthly / yearly, `bills_from` start, clamp to the month's last
 day, Saturday / Sunday → Monday); nothing is generated ahead of time. Tables:
 `bank_bills` (one-off bills) and `bank_bill_payments`.
@@ -350,8 +351,8 @@ day, Saturday / Sunday → Monday); nothing is generated ahead of time. Tables:
 | GET | `<base>/bills.json?provider_account_id=&page=` | — | `200 { bills, pagination }` | `400` invalid `page` / malformed filter | `user-scoped` |
 | POST | `<base>/bills.json` | bill body | `201` bill | `400`; `422 ACCOUNT_NOT_FOUND` / `CURRENCY_MISMATCH` | `never` |
 | GET | `<base>/bills/:id.json` | — | `200` bill | `404` (also when the provider is archived) | `user-scoped` |
-| PATCH | `<base>/bills/:id.json` | bill body, all optional | `200` bill | `400`; `404`; `422`; `409 BILL_PAID` (provider change on a paid bill) | `never` |
-| DELETE | `<base>/bills/:id.json` | — | `204` (an unpaid / skipped bill goes with its payment row) | `404`; `409 BILL_PAID` | `never` |
+| PATCH | `<base>/bills/:id.json` | bill body, all optional | `200` bill | `400`; `404` (also when the provider is archived); `422`; `409 BILL_PAID` (provider change on a paid bill) | `never` |
+| DELETE | `<base>/bills/:id.json` | — | `204` (an unpaid / skipped bill goes with its payment row) | `404` (also when the provider is archived); `409 BILL_PAID` | `never` |
 | POST | `<base>/accounts/:accountId/occurrences/:dueDate/payment.json` | payment body | `201` occurrence | `404`; `400`; `422`; `409 OCCURRENCE_ALREADY_PAID` | `never` |
 | DELETE | `<base>/accounts/:accountId/occurrences/:dueDate/payment.json` | — | `204` | `404`; `409 ACCOUNT_ARCHIVED` | `never` |
 | POST | `<base>/bills/:id/payment.json` | payment body | `201` occurrence (`kind: bill`) | `404`; `400`; `422`; `409 OCCURRENCE_ALREADY_PAID` | `never` |

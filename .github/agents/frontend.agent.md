@@ -38,8 +38,9 @@ hash-based `Router`/`Route`/`HashRouteResolver` (`utils/routing/`), a full `clie
 and Jasmine specs mirroring all of it under `frontend/specs/`. Domain modules (`bank`,
 `protocol`, `car-performance`, `links`, …) each get a `client/<Name>Client.js` and pages under
 `components/resources/<area>/pages/` as their backend module lands — see
-`docs/agents/product.md`. Don't invent API shapes speculatively; build against what `backend`
-actually exposes.
+`docs/agents/product.md`. The `bank` pages (menu, per-type submenus, bills, accountant
+hand-off, Calendar) are documented in `docs/agents/modules/bank/ui.md`. Don't invent API shapes
+speculatively; build against what `backend` actually exposes.
 
 ## Commands
 

@@ -13,10 +13,20 @@ For a short abstract of each doc's content, see [summary.md](summary.md) instead
 - [Modules](modules/)
   - [Auth](modules/auth.md)
   - [User approval](modules/auth/user-approval.md)
+  - [Organizations](modules/auth/organizations.md)
   - [Mail](modules/mail.md)
+  - [Bank](modules/bank.md)
+    - [Accounts](modules/bank/accounts.md)
+    - [Transactions](modules/bank/transactions.md)
+    - [Debt accounts](modules/bank/debt.md)
+    - [Investment accounts](modules/bank/investment.md)
+    - [Provider-expense accounts](modules/bank/provider-expense.md)
+    - [Bills](modules/bank/bills.md)
+    - [UI](modules/bank/ui.md)
 - [Routes](backend/routes.md)
   - [Auth routes](backend/routes/auth.md)
   - [Admin routes](backend/routes/admin.md)
+  - [Bank routes](backend/routes/bank.md)
 
 ## Conventions
 

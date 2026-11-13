@@ -20,7 +20,8 @@ full file before loading it. For a bare link-only table of contents instead, see
   events (and the lazy-listener caveat), database ownership, what a module page must contain,
   and the "Adding a new module" checklist. Read it before creating or extending a module.
 - **[Modules](modules/)** — Per-backend-module documentation (routes, entities, events), one
-  file per module (`modules/auth.md` and `modules/mail.md` today). Read the module's page before
+  file per module (`modules/auth.md`, `modules/mail.md` and `modules/bank.md`, with per-concern
+  sub-pages under `modules/auth/` and `modules/bank/`). Read the module's page before
   extending or consuming it.
   - **[Auth](modules/auth.md)** — Ward's always-on login module: `/auth/*.json` routes, the
     `auth_` tables, the JWT/refresh-token flow and session-lookup gate, the admin tool routes, and
@@ -28,22 +29,33 @@ full file before loading it. For a bare link-only table of contents instead, see
   - **[User approval](modules/auth/user-approval.md)** — Account statuses (`pending` /
     `approved` / `denied`), the optional `WARD_USER_APPROVAL_REQUIRED` flag, admin
     approve/deny, per-endpoint behavior by status and lifecycle edge cases.
+  - **[Organizations](modules/auth/organizations.md)** — `auth_organizations` /
+    `auth_organization_memberships`, roles (stored, not enforced), the active context in the
+    URL, the user-or-organization data-ownership rule, `OwnerContextGuard` /
+    `@OwnerScopedController()` and the `data-access` checks for user-or-organization-owned
+    modules.
   - **[Mail](modules/mail.md)** — Always-on, general-purpose transactional email sender. No HTTP
     surface; consumed via the exported `MailService`. `WARD_EMAIL_*` config read once at boot;
     disabled by default (log-and-skip). Templated sends via `sendEmailTemplate`, backed by
     filesystem templates under `mail/templates/` read once at boot. First consumer: the auth
     module's password-recovery email.
+  - **[Bank](modules/bank.md)** — The lazy `bank` module: entities, account types, the bank
+    ownership contract, cache classes and module shape, with one page per concern under
+    `modules/bank/` (accounts, transactions and currency, debt, investment, provider expense and
+    the accountant hand-off, bills and recurrence, UI). Each page ends with its deferred epics
+    and its differences from the original spec.
 - **[Routes](backend/routes.md)** — Per-endpoint backend route reference, one file per domain
-  under `backend/routes/` ([auth.md](backend/routes/auth.md) and
-  [admin.md](backend/routes/admin.md)), complementing the entity/event-focused `modules/` pages.
+  under `backend/routes/` ([auth.md](backend/routes/auth.md), with the organization routes,
+  [admin.md](backend/routes/admin.md) and [bank.md](backend/routes/bank.md)), complementing the entity/event-focused `modules/` pages.
 
 ## Conventions
 
 - **[Contributing](contributing.md)** — Commit guidelines (atomic, no unrelated changes,
   separate refactors) and PR standards (descriptive summary, description files when needed).
-- **[Product Definitions](product.md)** — What Ward is, its module list (Auth/Mail implemented;
-  `bank`, `protocol`, `car-performance`, `links` planned), cross-cutting decisions
-  (login/session, user approval, admin tooling, mail, config, per-user data ownership) and what
+- **[Product Definitions](product.md)** — What Ward is, its module list (Auth/Mail/Bank implemented;
+  `protocol`, `car-performance`, `links` planned), cross-cutting decisions
+  (login/session, user approval, admin tooling, mail, config, user-or-organization data
+  ownership) and what
   is still open per planned module. Read it before planning any issue that introduces new
   entities.
 - **[Issue Enhancement](issue-enhancement.md)** — Checklist of concerns (`/enhance-issue` uses

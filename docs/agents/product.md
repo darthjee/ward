@@ -22,7 +22,7 @@ added one at a time, so Ward grows as new needs show up.
 |---|---|---|---|
 | [Auth](modules/auth.md) | Always-on | Accounts, login, sessions, device authorization, user approval, admin user tooling | Implemented |
 | [Mail](modules/mail.md) | Always-on (service-only) | Transactional email (e.g. password recovery) | Implemented |
-| `bank` | Lazy | Bank accounts, business expenses to send to the accountant, bills to pay | Planned |
+| [Bank](modules/bank.md) | Lazy | Bank accounts, business expenses to send to the accountant, bills to pay | Implemented (Calendar views pending [#77](https://github.com/darthjee/ward/issues/77)) |
 | `protocol` | Lazy | Protocol numbers of requests made to companies (support tickets, complaints, service calls) | Planned |
 | `car-performance` | Lazy | Fuel consumption and cost per car | Planned |
 | `links` | Lazy | Links saved to check later | Planned |
@@ -55,24 +55,48 @@ More modules will follow. Each one gets its own page under `modules/` once speci
   `WARD_USER_APPROVAL_REQUIRED` (new registrations start `pending` when exactly
   `true`), `NODE_ENV`/`DEBUG`.
 
-- **Domain data ownership**: every domain record (a bank account, a protocol, a car, a link,
-  …) belongs to exactly one user, stored as a logical `userId` reference to Auth. A user only
-  ever reads or changes their own records. Admin tooling covers **accounts only** — it does not
-  grant access to other users' domain data. A module that needs sharing must decide and document
-  it explicitly.
+- **Domain data ownership**: every domain record belongs to exactly one user **or**
+  organization, stored as logical references to Auth (no cross-module FK). Each module declares
+  one kind:
+  - **user-owned** (the default; the planned `protocol`, `car-performance`, `links`) — each
+    record belongs to one user through a logical `userId`, and only that user reads or changes
+    it;
+  - **user-or-organization-owned** (`bank`) — each owner-root record has exactly one owner,
+    either a user (Personal) or an [organization](modules/auth/organizations.md), stored as two
+    nullable logical references with a DB check that exactly one is set; child records inherit
+    the owner. Personal records are visible to their owner only; organization records to every
+    member of that organization.
+
+  Organizations are optional (none is created at registration), their roles are stored but not
+  enforced, and the active context lives in the URL. Admin tooling covers **accounts only** — it
+  grants no access to anyone's personal data nor to any organization's data. See
+  [Organizations → Data ownership](modules/auth/organizations.md#data-ownership). A module that
+  needs any other kind of sharing must decide and document it explicitly.
+
+## Implemented domain modules
+
+### `bank`
+
+Tracks bank accounts, business expenses handed to the accountant, and bills to pay. Decided by
+Epic [#26](https://github.com/darthjee/ward/issues/26) and documented in
+[Bank](modules/bank.md):
+
+- one `Account` entity with four types (`regular`, `debt`, `investment`, `provider_expense`),
+  each with a ledger whose balance is computed from an opening anchor and the transactions;
+- one currency per account, amounts in integer minor units, totals grouped per currency and
+  never summed;
+- business expenses are the charges of `forAccountant` provider-expense accounts, handed off as
+  a client-side CSV and marked as sent;
+- bills are derived from debt / provider-expense schedules, plus one-off bills; paying one
+  writes ledger transactions in one DB transaction;
+- user-or-organization-owned (see Domain data ownership above).
+
+The concerns it deferred are open GitHub epics, linked from each `modules/bank/` page.
 
 ## Planned modules — what is known and what is open
 
 Only the purpose of each planned module is decided. Entities, fields, routes and rules are
 decided in each module's own issue and recorded in `modules/<name>.md`.
-
-### `bank`
-
-- **Known**: tracks bank accounts, business expenditures (to be collected and sent to the
-  accountant) and bills to be paid.
-- **Open**: entities (accounts, transactions/expenses, bills, categories?), how expenses are
-  handed to the accountant (export format, period), bill due dates/recurrence and whether paying
-  a bill creates an expense, currency handling.
 
 ### `protocol`
 
@@ -99,12 +123,19 @@ decided in each module's own issue and recorded in `modules/<name>.md`.
   of new pending registrations.
 - **Pagination of the admin user listing** (`POST /admin/users/search.json` is unpaginated).
 - **Cross-module features** (e.g. a bill in `bank` creating a reminder) — wait until the
-  modules involved exist.
+  modules involved exist. Bill reminders and a cross-module calendar are tracked as epics
+  [#99](https://github.com/darthjee/ward/issues/99) and
+  [#98](https://github.com/darthjee/ward/issues/98).
+- **Bank and organization follow-ups** — every concern deferred by the bank and organization
+  specs is an open epic (#81–#104), linked from the page of [Bank](modules/bank.md) or
+  [Organizations](modules/auth/organizations.md) that mentions it.
 
 ## What's still open
 
 - Everything listed as "Open" under each planned module above.
-- Roles beyond regular user/admin (none planned so far).
+- Roles beyond regular user/admin (none planned so far). Organization roles (`owner` / `admin`
+  / `user`) are stored but not enforced until the permission-system epic
+  ([#81](https://github.com/darthjee/ward/issues/81)).
 
 ## When a module is specified
 

@@ -101,7 +101,8 @@ Test files are exempt and may run setup code freely.
   following the standard module structure (`<name>.module.ts`, `.controller.ts`, `.service.ts`,
   `dto/`, `entities/`, `events/`, `tests/`) — see
   [Architecture — Modular Pattern](architecture/modular-pattern.md). When adding a module,
-  follow that page's "Adding a new module" checklist.
+  follow that page's "Adding a new module" checklist, and keep the module's page under
+  `docs/agents/modules/` (for example [Bank](modules/bank.md)) in sync with what is built.
 - **Method order:** within a class, public methods should be declared before private
   (`#`-prefixed) methods (enforced by `eslint-plugin-sort-class-members`).
 - **File naming:** `kebab-case.ts` matching the exported class's purpose (e.g.

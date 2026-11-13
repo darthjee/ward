@@ -4,12 +4,12 @@ Per-endpoint reference for backend routes, one file per domain, complementing th
 entity/event-focused `docs/agents/modules/` pages.
 
 - [Auth](routes/auth.md) — `/auth/*.json`: login, register, refresh, logoff, status, recovery,
-  device authorization
+  device authorization; plus the organization routes (`/orgs.json`, `/orgs/:orgId.json`)
 - [Admin](routes/admin.md) — `/admin/users/*.json`: user search, edit, approve, deny, recovery
   tools
 - [Bank](routes/bank.md) — `/bank/*.json` and `/orgs/:orgId/bank/*.json`: accounts
   (regular, debt, investment and provider-expense), transactions and the paginated ledger,
   the accountant hand-off, bills and the calendar (one-off bills, pay / skip / undo, bill
-  history), settings
+  history), settings. Complete: every bank route is listed there.
 
 Future backend modules add their own entry here as they land.
