@@ -78,10 +78,61 @@ for the `public` `Cache-Control: max-age`. Change both together.
 
 ## Invalidation
 
-Tent's `CacheCleanupMiddleware` (`clear => ['collection','entity']`) runs on any
-POST/PATCH/PUT/DELETE that reaches the backend rule, and clears the matching collection and
-entity cache directories for that path. There is no cross-path invalidation map and no manual
-purge endpoint.
+Invalidation is **declared by the backend and carried out by the proxy**, through the
+`X-Cache-Invalidate` response header.
+
+**Backend: declaration.** Every write route (any method other than GET/HEAD) declares which
+cached GET paths it changes. The decorators live in `backend/src/core/cache-invalidation.decorator.ts`:
+
+| Decorator | Emits | Used by |
+|---|---|---|
+| `InvalidatesOwner()` | The owner's prefix: `/bank` for a personal write, `/orgs/<organizationId>/bank` for an organization write (id taken from `request.ownerContext`) | Applied by default through `OwnerScopedController` |
+| `InvalidatesPaths(build)` | The paths returned by `build(request)` | Organization writes: `POST /orgs.json` gives `/orgs.json`; `PATCH /orgs/:orgId.json` gives `/orgs.json, /orgs/<orgId>.json` (`backend/src/auth/organization-invalidation.ts`) |
+| `NoCacheInvalidation()` | Nothing | Auth, authorization-request and admin controllers |
+
+The global `CacheInvalidationInterceptor` (`backend/src/core/cache-invalidation.interceptor.ts`)
+sets the header in an rxjs `tap` **after** the handler returns, so a thrown exception (4xx/5xx)
+never carries it. It drops any unsafe path (see below). A write never emits the other owner's
+prefix, and the backend must **never** emit `/orgs` or `/`: the clear is recursive, so that
+would wipe every organization's tree.
+
+**Enforcement:** `cache-policy.coverage.spec.ts` fails when a write route declares no
+invalidation, when an owner-scoped route does not resolve to the owner default, or when a
+`paths` declaration emits `/` or `/orgs`.
+
+**Header format.** A comma-separated list of absolute paths, e.g.
+`X-Cache-Invalidate: /orgs.json, /orgs/3.json`. Each path starts with `/`, is not `/` itself,
+and contains no query, fragment, scheme, backslash, NUL, percent-encoding, or empty/`.`/`..`
+segment. Invalid entries are ignored; the others are still honoured.
+
+**Proxy: clearing.** Ward's `CacheInvalidationMiddleware`
+(`proxy/extension/lib/middlewares/`) runs on the backend rule. When the response is 2xx and the
+method is not GET/HEAD, it recursively clears each listed path subtree in the cache folder:
+every entry whose path equals the given path or lies under it as a path-segment prefix, for
+every query variant, caller and method. `/bank` clears `{cache}/bank/**`, but not
+`{cache}/bank.json/**`; `/orgs/3/bank` never touches `/orgs/4/...`. Targets are confined to the
+cache folder and symlinks are never followed. The middleware **always** strips the header,
+whatever the status or method, so it is neither stored in the cache nor sent to the client.
+
+**Granularity and accepted costs.**
+
+- Invalidation is per owner subtree, not per entity. One personal bank write clears every
+  user's `/bank` entries. This is accepted: the clear is cheap, and the next reads repopulate it.
+- Race windows are accepted. A GET that misses while a write is in flight, or a
+  `BackgroundRefresher` refresh scheduled by `CacheStalenessMiddleware`, can store a value from
+  before the write. That heals within about 10 s plus one read.
+
+**Out-of-band writers.** Anything that changes data without going through a backend write route
+(manual SQL, scripts, migrations that rewrite data) does not emit the header. Such a writer must
+either purge the cache folder itself or only touch data that is never cached. No purge endpoint
+is built for now.
+
+Tent's own `CacheCleanupMiddleware` was **removed** from the backend rule. It only cleared the
+written path's own collection/entity, so it could not express cross-path effects.
+
+Today every bank and organization GET is `user-scoped` and never cached, so the observable effect
+is limited to `public` GETs. The contract is in place for the per-user cache (see
+[Future](#future)).
 
 ## Navi warm-up
 
