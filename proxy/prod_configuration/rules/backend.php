@@ -10,6 +10,14 @@
  * sets X-Skip-Cache for user-scoped/never classes and for any method
  * other than GET/HEAD.
  *
+ * Invalidation is header-driven: a successful write declares the cached
+ * paths it changes through X-Cache-Invalidate, and
+ * CacheInvalidationMiddleware recursively clears those subtrees in
+ * $cacheFolder after a 2xx non-GET/HEAD response. It always strips the
+ * header, and is registered under prependMiddlewares so its
+ * processResponse runs before the handler's FileCacheMiddleware could
+ * store the header; additional_excluded_headers is a second layer.
+ *
  * CacheStalenessMiddleware's maxAgeSeconds must stay in sync with the
  * backend's PUBLIC_MAX_AGE_SECONDS (backend/src/core/cache-class.ts);
  * change both together.
@@ -27,19 +35,22 @@ Configuration::buildRule([
     'handler' => [
         'type' => 'default_proxy',
         'host' => $backendHost,
-        'skip_cache_header' => 'X-Skip-Cache'
+        'cache' => $cacheFolder,
+        'skip_cache_header' => 'X-Skip-Cache',
+        'additional_excluded_headers' => ['X-Cache-Invalidate']
     ],
     'matchers' => [
         ['uri' => '.json', 'type' => 'ends_with']
     ],
+    'prependMiddlewares' => [
+        [
+            'class'    => 'Tent\\Middlewares\\CacheInvalidationMiddleware',
+            'location' => $cacheFolder
+        ]
+    ],
     'middlewares' => [
         [
             'class' => 'Tent\\Middlewares\\SetClientIpMiddleware'
-        ],
-        [
-            'class'    => 'Tent\\Middlewares\\CacheCleanupMiddleware',
-            'location' => $cacheFolder,
-            'clear'    => ['collection', 'entity']
         ],
         [
             'class' => 'Tent\\Middlewares\\CacheStalenessMiddleware',
