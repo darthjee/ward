@@ -6,6 +6,10 @@ Ward's lightweight per-user login (username/password — see
 `docs/agents/product.md`). Ported from the pre-migration Express `Authenticator`/`Registrar`/
 `UserSerializer` (`backend/lib/accounts/`, `backend/lib/serializers/`, now removed).
 
+Sub-pages: [User approval](auth/user-approval.md) (optional admin approval of registrations)
+and [Organizations](auth/organizations.md) (organizations, memberships, the owner-context guard
+used by user-or-organization-owned modules such as `bank`).
+
 ## Routes
 
 See [Auth routes](../backend/routes/auth.md) for the full per-endpoint reference (request/response
@@ -81,6 +85,23 @@ these POST routes carry no query string, an uncapped response could otherwise be
 the first login/register/refresh and served verbatim (credentials/session token included) to a
 different caller. See [API Caching](../architecture/caching.md) for the general strategy.
 
+### Organization routes (`OrganizationController`)
+
+JWT-protected (no `@Public()`), served by `auth/organization.controller.ts` and delegating to
+`OrganizationService`. Bodies come only through `@StrictBody()` and accept only `name`. Every
+miss (unknown, malformed or non-member `:orgId`, a non-member global admin included) answers
+the uniform 404. See [Organizations](auth/organizations.md) for the rules and
+[Auth routes](../backend/routes/auth.md#organization-routes) for the per-endpoint detail.
+
+| Route | Body | Response | Cache class |
+|---|---|---|---|
+| `GET /orgs.json` | — | the caller's organizations, ordered by id | `user-scoped` |
+| `POST /orgs.json` | `{ name }` | the created organization; the caller is its `owner` | `never` |
+| `GET /orgs/:orgId.json` | — | the organization; 404 unless the caller is a member | `user-scoped` |
+| `PATCH /orgs/:orgId.json` | `{ name }` | the renamed organization (any member) | `never` |
+
+Each organization is `{ id, name, role, created_at, updated_at }`, `role` being the caller's.
+
 ## CSRF protection
 
 Every mutating route above (`POST`/`PATCH`/`DELETE`), `@Public()` or not, is covered by the
@@ -123,6 +144,11 @@ table, the accepted residual risks and the rules future changes must keep.
   `20261018120013-auth-drop-sessions.ts`; the refresh-token chain replaces it.
 - `auth_authorization_requests` (`entities/authorization-request.entity.ts`) — see
   "Device-authorization flow" below for the full contract.
+- `auth_organizations` (`entities/organization.entity.ts`) — `id`, `name`, timestamps. See
+  [Organizations](auth/organizations.md#entities).
+- `auth_organization_memberships` (`entities/organization-membership.entity.ts`) —
+  `organization_id`, `user_id` (real FKs, `ON DELETE RESTRICT`), `role`, timestamps; unique
+  `(organization_id, user_id)`. See [Organizations](auth/organizations.md#entities).
 
 A dev/manual-testing demo user (`demo`/`ward-demo`) is seeded by
 `database/migrations/20260824120004-auth-seed-demo-user.ts`, gated on `process.env.STAGE !==
