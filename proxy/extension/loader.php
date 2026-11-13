@@ -17,3 +17,4 @@ require_once __DIR__ . '/lib/cache/AccessTokenCookie.php';
 require_once __DIR__ . '/lib/cache/AccessTokenRequestHasher.php';
 require_once __DIR__ . '/lib/cache/CacheSubtreeClearer.php';
 require_once __DIR__ . '/lib/middlewares/CacheInvalidationMiddleware.php';
+require_once __DIR__ . '/lib/middlewares/ExpiredTokenCacheBypassMiddleware.php';
