@@ -97,6 +97,7 @@ describe('bill payments (e2e)', () => {
         const response = await pay(orgId, loan.id, '2026-01-10', paid(checking.id)).expect(201);
 
         expect(response.headers['cache-control']).toBe('no-store');
+        expect(response.headers['x-cache-invalidate']).toBe(base(orgId));
         expect(response.body).toEqual({
           kind: 'debt',
           source_account: { id: loan.id, name: loan.name, type: 'debt' },
@@ -201,6 +202,7 @@ describe('bill payments (e2e)', () => {
         const response = await pay(orgId, loan.id, '2026-01-10', { status: 'skipped' }).expect(409);
 
         expect(response.body.error.code).toBe('OCCURRENCE_ALREADY_PAID');
+        expect(response.headers['x-cache-invalidate']).toBeUndefined();
         expect(ledgerOf(loan.id)).toHaveLength(1);
         const bill = await createBill(orgId, (await provider(orgId)).id, checking.id);
         await send(app, 'post', billPaymentPath(orgId, bill.id), ALICE, { status: 'skipped' }).expect(201);
@@ -224,7 +226,9 @@ describe('bill payments (e2e)', () => {
           [archived.id, '2026-01-10'],
           [unscheduled.id, '2026-01-10'],
         ] as const) {
-          expect((await pay(orgId, id, date, { status: 'skipped' }).expect(404)).body).toEqual(NOT_FOUND_BODY);
+          const response = await pay(orgId, id, date, { status: 'skipped' }).expect(404);
+          expect(response.body).toEqual(NOT_FOUND_BODY);
+          expect(response.headers['x-cache-invalidate']).toBeUndefined();
         }
       });
 
@@ -339,6 +343,7 @@ describe('bill payments (e2e)', () => {
         const response = await undo(orgId, fee.id, '2026-01-05').expect(204);
 
         expect(response.headers['cache-control']).toBe('no-store');
+        expect(response.headers['x-cache-invalidate']).toBe(base(orgId));
         expect(repos.transactions.rows.filter((row) => row.accountId === fee.id).map(({ id }) => id)).toEqual([unrelated]);
         expect(repos.billPayments.rows.some((row) => row.sourceAccountId === fee.id)).toBe(false);
         expect(await calendarRow(orgId, fee.id)).toMatchObject({ status: 'overdue', payment: null });
@@ -571,9 +576,20 @@ describe('bill payments (e2e)', () => {
       for (const response of responses) {
         expect(response.status).toBe(404);
         expect(response.body).toEqual(NOT_FOUND_BODY);
+        expect(response.headers['x-cache-invalidate']).toBeUndefined();
       }
       const ownedDebts = Object.values(owned).map(({ debt: id }) => id);
       expect(repos.billPayments.rows.some((row) => ownedDebts.includes(row.sourceAccountId))).toBe(false);
+    });
+
+    it('invalidates only the acting organization\'s bank prefix', async () => {
+      const response = await send(app, 'post', occurrencePath(ALICE_ORG, owned.aliceOrg.debt, '2026-01-10'), ALICE, { status: 'skipped' })
+        .expect(201);
+      const header = response.headers['x-cache-invalidate'];
+
+      expect(header).toBe(`/orgs/${ALICE_ORG}/bank`);
+      expect(header).not.toContain(`/orgs/${BOB_ORG}`);
+      expect(header.split(', ')).not.toContain('/bank');
     });
 
     it('answers the uniform 404 for a non-numeric id and a regular account', async () => {

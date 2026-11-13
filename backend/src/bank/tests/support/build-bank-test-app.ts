@@ -5,6 +5,7 @@ import { getDataSourceToken } from '@nestjs/typeorm';
 import type { Request } from 'express';
 import request from 'supertest';
 import { createInMemoryBankRepos, type InMemoryBankRepos } from './in-memory-bank-repos.js';
+import { CacheInvalidationInterceptor } from '../../../core/cache-invalidation.interceptor.js';
 import { CachePolicyInterceptor } from '../../../core/cache-policy.interceptor.js';
 import { HttpExceptionFilter } from '../../../core/http-exception.filter.js';
 import { LoggingModule } from '../../../core/logging.module.js';
@@ -26,7 +27,7 @@ import { Transaction } from '../../entities/transaction.entity.js';
 // `BankModule` (`forFeature`) resolve to the same fakes. Identities come from a stub user guard
 // (`x-test-user`, `x-test-admin`) standing in for `JwtGuard`, and memberships from a fake
 // `ORGANIZATION_MEMBERSHIP_LOOKUP`; the real `OwnerContextGuard`, `CachePolicyInterceptor`,
-// `HttpExceptionFilter` and global `ValidationPipe` are wired as in `AppModule` / `main.ts`.
+// `CacheInvalidationInterceptor`, `HttpExceptionFilter` and global `ValidationPipe` are wired as in `AppModule` / `main.ts`.
 //
 // Users: 7 (member of organization 3), 8 (member of organization 4), 9 (global admin, member of
 // nothing). Spec files swap the SQL query classes for in-memory ones with `jest.mock`.
@@ -109,6 +110,7 @@ export async function buildBankTestApp(config: Record<string, string> = {}): Pro
       { provide: APP_GUARD, useClass: StubUserGuard },
       { provide: APP_GUARD, useClass: OwnerContextGuard },
       { provide: APP_INTERCEPTOR, useClass: CachePolicyInterceptor },
+      { provide: APP_INTERCEPTOR, useClass: CacheInvalidationInterceptor },
       { provide: APP_FILTER, useClass: HttpExceptionFilter },
     ],
   })

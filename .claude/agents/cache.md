@@ -57,6 +57,12 @@ health) that the architect then acts on.
   `CacheClass.Public`. `user-scoped`/`never` routes, and any non-GET/HEAD route, must end up
   with `X-Skip-Cache: true` — flag any route that sets or strips the header by hand instead of
   going through the `CachePolicyInterceptor`.
+- **Backend invalidation**: every non-GET/HEAD route declares its cache invalidation: the
+  owner-scoped default (`InvalidatesOwner()`, applied by `OwnerScopedController`), explicit
+  paths (`InvalidatesPaths(build)`), or none (`NoCacheInvalidation()`). Flag any write route
+  without a declaration, and any decorator that can emit `/orgs` or `/` (the proxy clear is
+  recursive, so either would wipe far more than intended). See the "Invalidation" section of
+  `docs/agents/architecture/caching.md`.
 - **Proxy**: `proxy/*/rules/backend.php` already sets `'skip_cache_header' => 'X-Skip-Cache'` on
   the whole `*.json` rule — verify no new rule bypasses this convention by using a different
   handler type without the same skip-cache wiring.

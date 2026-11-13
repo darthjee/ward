@@ -224,12 +224,14 @@ describe('bank account routes (e2e)', () => {
 
     it('never clashes with an archived name, but unarchiving onto an active name answers 409', async () => {
       const old = await createAccount(app, ALICE, null, { name: 'Recycled' });
-      await send(app, 'post', `/bank/accounts/${old.id}/archive.json`, ALICE).expect(200);
+      const archived = await send(app, 'post', `/bank/accounts/${old.id}/archive.json`, ALICE).expect(200);
       await createAccount(app, ALICE, null, { name: 'RECYCLED' });
 
       const response = await send(app, 'post', `/bank/accounts/${old.id}/unarchive.json`, ALICE).expect(409);
 
+      expect(archived.headers['x-cache-invalidate']).toBe('/bank');
       expect(response.body.error.code).toBe('ACCOUNT_NAME_TAKEN');
+      expect(response.headers['x-cache-invalidate']).toBeUndefined();
     });
 
     it('answers 409 on a rename clash', async () => {

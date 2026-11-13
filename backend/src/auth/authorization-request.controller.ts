@@ -8,6 +8,7 @@ import { CreateAuthorizationRequestDto } from './dto/create-authorization-reques
 import { PollAuthorizationRequestDto } from './dto/poll-authorization-request.dto.js';
 import type { AccessTokenPayload } from '../core/access-token-payload.js';
 import { CacheClass } from '../core/cache-class.js';
+import { NoCacheInvalidation } from '../core/cache-invalidation.decorator.js';
 import { CachePolicy } from '../core/cache-policy.decorator.js';
 import { DEFAULT_TRUSTED_PROXY_HOPS, extractClientRequestInfo } from '../core/client-request.js';
 import { CurrentUser } from '../core/current-user.decorator.js';
@@ -27,6 +28,7 @@ import { Public } from '../core/public.decorator.js';
  */
 @Controller('auth')
 @CachePolicy(CacheClass.Never)
+@NoCacheInvalidation()
 export class AuthorizationRequestController {
   private readonly authorizationRequestService: AuthorizationRequestService;
   private readonly configService: ConfigService;

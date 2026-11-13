@@ -1,9 +1,11 @@
 import { Controller, Get, Param, Patch, Post } from '@nestjs/common';
 import { OrganizationNameDto } from './dto/organization-name.dto.js';
+import { organizationCreateInvalidation, organizationRenameInvalidation } from './organization-invalidation.js';
 import { OrganizationResponse, serializeOrganization } from './organization-response.js';
 import { OrganizationService } from './organization.service.js';
 import type { AccessTokenPayload } from '../core/access-token-payload.js';
 import { CacheClass } from '../core/cache-class.js';
+import { InvalidatesPaths } from '../core/cache-invalidation.decorator.js';
 import { CachePolicy } from '../core/cache-policy.decorator.js';
 import { CurrentUser } from '../core/current-user.decorator.js';
 import { ownerNotFound, parseOrgId } from '../core/parse-org-id.js';
@@ -18,7 +20,8 @@ import { StrictBody } from '../core/strict-validation.pipe.js';
  * non-member — including a non-member global admin) answers the uniform 404.
  * Bodies come only through `@StrictBody()`, so unknown fields (`role`,
  * `organizationId`) answer 400. Cache class: `never` at the controller level,
- * narrowed to `user-scoped` on the GETs. Names are never logged.
+ * narrowed to `user-scoped` on the GETs. Writes declare the paths they invalidate
+ * (`/orgs.json`, plus `/orgs/<id>.json` on rename — never `/orgs`). Names are never logged.
  */
 @Controller()
 @CachePolicy(CacheClass.Never)
@@ -52,6 +55,7 @@ export class OrganizationController {
    * @returns {Promise<OrganizationResponse>} The created organization, with role `owner`.
    */
   @Post('orgs.json')
+  @InvalidatesPaths(organizationCreateInvalidation)
   async create(
     @CurrentUser() caller: AccessTokenPayload,
       @StrictBody() dto: OrganizationNameDto,
@@ -93,6 +97,7 @@ export class OrganizationController {
    * @returns {Promise<OrganizationResponse>} The renamed organization, with the caller's role.
    */
   @Patch('orgs/:orgId.json')
+  @InvalidatesPaths(organizationRenameInvalidation)
   async rename(
     @CurrentUser() caller: AccessTokenPayload,
       @Param('orgId') rawOrgId: string,

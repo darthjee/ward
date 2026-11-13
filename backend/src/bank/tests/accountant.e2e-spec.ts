@@ -237,6 +237,7 @@ describe('accountant hand-off (e2e)', () => {
 
         const response = await mark(orgId, 'sent', { transaction_ids: [b, a, b] }).expect(200);
 
+        expect(response.headers['x-cache-invalidate']).toBe(base(orgId));
         expect(response.body).toEqual({
           charges: [
             { id: b, sent_to_accountant_at: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/) },

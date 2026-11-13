@@ -15,6 +15,7 @@ import {
 import { createInMemoryRepo } from './in-memory-repo.js';
 import { InMemorySessionLookup } from './in-memory-session-lookup.js';
 import { AdminGuard } from '../../../core/admin.guard.js';
+import { CacheInvalidationInterceptor } from '../../../core/cache-invalidation.interceptor.js';
 import { CachePolicyInterceptor } from '../../../core/cache-policy.interceptor.js';
 import { HttpExceptionFilter } from '../../../core/http-exception.filter.js';
 import { JwtGuard } from '../../../core/jwt.guard.js';
@@ -57,6 +58,8 @@ export interface BuildAuthTestAppResult {
 // the `APP_GUARD`/`JwtGuard` provider, and the
 // `APP_INTERCEPTOR`/`CachePolicyInterceptor` provider (so `@CachePolicy()`-annotated
 // routes still get `X-Skip-Cache`/`Cache-Control` set, as under the real `AppModule`),
+// the `APP_INTERCEPTOR`/`CacheInvalidationInterceptor` provider (so writes emit
+// `X-Cache-Invalidate`, as under the real `AppModule`),
 // and the `APP_FILTER`/`HttpExceptionFilter` provider (so error responses use
 // the standard error body, as under the real `AppModule`);
 // overrides the `User`, `RefreshToken`, `PasswordResetToken`,
@@ -113,6 +116,7 @@ export async function buildAuthTestApp({
       ...(adminGuard ? [{ provide: APP_GUARD, useClass: AdminGuard }] : []),
       ...(ownerContextGuard ? [{ provide: APP_GUARD, useClass: OwnerContextGuard }] : []),
       { provide: APP_INTERCEPTOR, useClass: CachePolicyInterceptor },
+      { provide: APP_INTERCEPTOR, useClass: CacheInvalidationInterceptor },
       { provide: APP_FILTER, useClass: HttpExceptionFilter },
     ],
   })

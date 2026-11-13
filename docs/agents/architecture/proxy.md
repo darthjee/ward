@@ -13,7 +13,7 @@ this page only covers how Ward configures it.
 
 1. `rules/frontend.php` — dev: proxies to Vite (HMR); prod: serves static `dist/` output
 2. `rules/backend.php` — routes every `*.json`-suffixed URL to the NestJS backend, with cache
-   middlewares (`SetClientIpMiddleware`, `CacheCleanupMiddleware`, `CacheStalenessMiddleware`)
+   middlewares (`CacheInvalidationMiddleware`, `SetClientIpMiddleware`, `CacheStalenessMiddleware`)
 3. `rules/redirects.php` — catch-all: `GET /path → /#/path` (302) — **must stay last**
 
 There is no `rules/admin.php` — Ward has no admin UI (see `docs/agents/product.md`).
@@ -39,6 +39,11 @@ differ in where hosts/paths come from:
   static-serving prod frontend rule).
 - `SetClientIpMiddleware` — overwrites `X-Forwarded-For` with Tent's own view of the client IP,
   so the backend can trust it.
+- `CacheInvalidationMiddleware` — reads the backend's `X-Cache-Invalidate` response header and,
+  on a 2xx non-GET/HEAD response, recursively clears the listed path subtrees in the cache
+  folder. It always strips the header. See [API Caching](./caching.md#invalidation).
+- `CacheSubtreeClearer` (`lib/cache/`) — the helper behind it. It validates each path, confines
+  it to the cache folder (`realpath`), refuses symlinks, and deletes the subtree.
 - `TestHeaderMiddleware` — sample middleware demonstrating the extension pattern.
 - `DomainHash` — derives a per-domain cache folder name (used internally by Tent's own caching).
 
@@ -64,8 +69,12 @@ The same rule also carries the freshness and invalidation middlewares:
 
 - `CacheStalenessMiddleware` (`maxAgeSeconds => 10`) serves entries older than 10s while
   refreshing them in the background. The backend's `PUBLIC_MAX_AGE_SECONDS` mirrors this value.
-- `CacheCleanupMiddleware` (`clear => ['collection','entity']`) clears the matching collection
-  and entity cache entries on any POST/PATCH/PUT/DELETE.
+- `CacheInvalidationMiddleware` (`location => $cacheFolder`) clears the subtrees listed in the
+  backend's `X-Cache-Invalidate` header after a successful write. It is registered under
+  `prependMiddlewares`, so its response step runs before the handler's `FileCacheMiddleware` could
+  store the header. The handler also lists the header in `additional_excluded_headers` as a
+  second layer, and sets `'cache' => $cacheFolder` explicitly so both use the same folder. It
+  replaces Tent's `CacheCleanupMiddleware`, which only cleared the written path itself.
 
 The full strategy — classes, header table, freshness, invalidation, and Navi — lives in
 [API Caching](./caching.md). Don't restate it here.
