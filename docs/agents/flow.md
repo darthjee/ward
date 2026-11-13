@@ -34,7 +34,10 @@ URL is the frontend.
    `access_token` cookie and active session, `AdminGuard` where marked). For a lazy module, the
    controller loads the module on its first request through `LazyModuleLoaderService`; later
    requests reuse it. The module's service reads/writes **only its own tables**, scoped to the
-   current user, and may emit `<entity>.<action>` events for other modules.
+   current user, and may emit `<entity>.<action>` events for other modules. A successful write
+   also declares the cached paths it changes in an `X-Cache-Invalidate` header. Tent clears
+   those paths before answering, and never passes the header on. See
+   [API Caching](architecture/caching.md#invalidation).
 
 5. **Session renewal.** When the access token expires, `ApiClient` refreshes it with the
    rotating refresh token and retries; if that fails, the login modal opens again.

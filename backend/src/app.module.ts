@@ -7,6 +7,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuthModule } from './auth/auth.module.js';
 import { BankRoutesModule } from './bank/bank-routes.module.js';
 import { AdminGuard } from './core/admin.guard.js';
+import { CacheInvalidationInterceptor } from './core/cache-invalidation.interceptor.js';
 import { CachePolicyInterceptor } from './core/cache-policy.interceptor.js';
 import { CacheTokenService } from './core/cache-token.service.js';
 import { HttpExceptionFilter } from './core/http-exception.filter.js';
@@ -136,6 +137,10 @@ export function buildJwtSignOptions(configService: ConfigService): { expiresIn: 
     {
       provide: APP_INTERCEPTOR,
       useClass: CachePolicyInterceptor,
+    },
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: CacheInvalidationInterceptor,
     },
     {
       provide: APP_FILTER,

@@ -104,6 +104,12 @@ describe('OrganizationController (e2e) — reading and renaming', () => {
       expect(response.headers['cache-control']).toBe('no-store');
     });
 
+    it('invalidates the organization list and the renamed organization, never /orgs', async () => {
+      const response = await renameOrganization(ctx.current.app, cookie, 1, { name: 'Household' }).expect(200);
+
+      expect(response.headers['x-cache-invalidate']).toBe('/orgs.json, /orgs/1.json');
+    });
+
     it.each([
       ['no name', {}],
       ['an empty name', { name: '' }],

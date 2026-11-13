@@ -86,6 +86,12 @@ describe('OrganizationController (e2e) — POST /orgs.json', () => {
       expect(response.headers['x-skip-cache']).toBe('true');
       expect(response.headers['cache-control']).toBe('no-store');
     });
+
+    it('invalidates only the organization list', async () => {
+      const response = await createOrganization(ctx.current.app, cookie, { name: 'Family' }).expect(201);
+
+      expect(response.headers['x-cache-invalidate']).toBe('/orgs.json');
+    });
   });
 
   describe('with an invalid body', () => {

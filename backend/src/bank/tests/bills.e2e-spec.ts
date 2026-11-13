@@ -172,6 +172,16 @@ describe('one-off bills (e2e)', () => {
 
         expect(withoutTimestamp(await post(orgId, { ...body, paying_account_id: usd.id }).expect(422))).toEqual(CURRENCY_MISMATCH);
       });
+
+      it('invalidates the owner\'s bank prefix on create, and nothing on a rejected create', async () => {
+        const { body } = await setup(orgId);
+
+        const created = await post(orgId, body).expect(201);
+        const rejected = await post(orgId, { ...body, provider_account_id: 999999 }).expect(422);
+
+        expect(created.headers['x-cache-invalidate']).toBe(base(orgId));
+        expect(rejected.headers['x-cache-invalidate']).toBeUndefined();
+      });
     });
 
     describe('list', () => {

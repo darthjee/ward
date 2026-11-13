@@ -59,6 +59,7 @@ describe('bank transaction routes (e2e)', () => {
         date: '2026-01-10', amount: '-1234.56', description: '  Rent  ', notes: 'January',
       }).expect(201);
 
+      expect(created.headers['x-cache-invalidate']).toBe(prefix);
       expect(created.body).toEqual({
         id: expect.any(Number),
         date: '2026-01-10',
@@ -287,6 +288,8 @@ describe('bank transaction routes (e2e)', () => {
 
       expect(get.headers['x-skip-cache']).toBe('true');
       expect(get.headers['cache-control']).toBe('private, no-store');
+      expect(get.headers['x-cache-invalidate']).toBeUndefined();
+      expect(post.headers['x-cache-invalidate']).toBe(`/orgs/${ALICE_ORG}/bank`);
       expect(post.headers['x-skip-cache']).toBe('true');
       expect(post.headers['cache-control']).toBe('no-store');
     });

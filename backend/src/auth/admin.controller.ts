@@ -6,6 +6,7 @@ import { User } from './entities/user.entity.js';
 import type { AccessTokenPayload } from '../core/access-token-payload.js';
 import { AdminOnly } from '../core/admin-only.decorator.js';
 import { CacheClass } from '../core/cache-class.js';
+import { NoCacheInvalidation } from '../core/cache-invalidation.decorator.js';
 import { CachePolicy } from '../core/cache-policy.decorator.js';
 import { CurrentUser } from '../core/current-user.decorator.js';
 
@@ -21,6 +22,7 @@ import { CurrentUser } from '../core/current-user.decorator.js';
 @Controller('admin')
 @AdminOnly()
 @CachePolicy(CacheClass.Never)
+@NoCacheInvalidation()
 export class AdminController {
   private readonly adminService: AdminService;
 
