@@ -82,6 +82,14 @@ Tent's `CacheStalenessMiddleware` (`maxAgeSeconds => 10`) treats entries older t
 as stale. A stale entry is **still served**, and a background refresh against the backend is
 scheduled (stale-while-revalidate). There is no hard expiry.
 
+**Caveat:** `CacheStalenessMiddleware` sits in the rule's `middlewares`, after the handler's
+`FileCacheMiddleware`. That middleware sets the response on every hit, which stops the request
+middlewares, so the staleness check and the background refresh never run today: entries are
+served until a write clears them, the token rotates, or the cache folder is reset. Do not move
+it ahead of the cache until Tent's refresher honours `require_cache_header` and
+`skip_cache_header` (see [Background refresh](#background-refresh)), and re-run a security
+review first.
+
 The backend's `PUBLIC_MAX_AGE_SECONDS` (`backend/src/core/cache-class.ts`) mirrors this value
 for the `public` `Cache-Control: max-age`. Change both together.
 
@@ -177,9 +185,12 @@ with no token are left alone.
 
 After logout or revocation, only someone who still holds the token can get hits, for at most
 its remaining life (15 minutes or less by default). Logout also clears the cookie in the
-browser. The backend never reads `X-Skip-Cache` from requests, and must not start to.
+browser. Raising `WARD_ACCESS_TOKEN_TTL_MS` widens this window directly. The backend never reads `X-Skip-Cache` from requests, and must not start to.
 
 ### Background refresh
+
+Today the refresher never fires (see the caveat under [Freshness](#freshness)). The analysis
+below applies once it does.
 
 Tent's `BackgroundRefresher` (scheduled by `CacheStalenessMiddleware` on a stale hit) replays
 the triggering request with that caller's own headers and writes under the same memoized key, so
@@ -191,6 +202,18 @@ Known gap: the refresher ignores `require_cache_header` and `skip_cache_header`.
 entry keeps being refreshed if its route later changes to `never`, until the cache folder is
 reset (deploy). It can never create an entry that was not opted in. This is accepted; it should
 be raised upstream on Tent.
+
+### On-disk retention
+
+Every token rotation creates a new set of per-caller files. Entries keyed by an expired token are
+unreachable, but they stay on disk until a write clears that path or the cache folder is reset on
+deploy. Disk use grows with users × paths × rotations between deploys. This is accepted for now;
+add time-based eviction (files older than the maximum token TTL) before adding `public` routes,
+since the proxy does not check token signatures and forged tokens could otherwise create
+unlimited entries on a `public` route.
+
+The hasher and `ExpiredTokenCacheBypassMiddleware` each read the `access_token` cookie by
+default; their cookie names must always match.
 
 ### Query parameters
 
