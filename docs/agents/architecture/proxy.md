@@ -57,13 +57,37 @@ Proxy PHP follows **PSR-12**. The root `phpcs.xml` enforces it for `proxy/extens
 `proxy/extension/tests`, `proxy/dev_configuration` and `proxy/prod_configuration`. Codacy reads
 the same ruleset, and you can check locally with `docker-compose run --rm proxy_lint`.
 
-## Cache bypass (`X-Skip-Cache`)
+## Cache opt-in, per-caller key and bypass
 
-The backend rule is an **opt-out** cache: Tent shared-caches every 2xx `*.json` response,
-keyed by path and query string only (not by HTTP method or caller), unless the response carries
-the header named by `'skip_cache_header' => 'X-Skip-Cache'`. The backend decides this per route
-through its cache classes (`public`, `user-scoped`, `never`), declared with `@CachePolicy()`;
-`user-scoped`, `never`, and any non-GET/HEAD response send `X-Skip-Cache`.
+The backend rule is an **opt-in** cache. A 2xx `*.json` response is stored only when it carries
+the header named by `'require_cache_header' => 'X-Cache-Allow'`; a response carrying
+`'skip_cache_header' => 'X-Skip-Cache'` bypasses the cache entirely, and that header always
+wins. The backend decides this per route through its cache classes (`public`, `user-scoped`,
+`never`), declared with `@CachePolicy()`: `public` and `user-scoped` GET/HEAD responses send
+`X-Cache-Allow`; `never` and any non-GET/HEAD response send `X-Skip-Cache`.
+
+### Request hasher
+
+`'request_hasher' => ['class' => 'Tent\\Cache\\AccessTokenRequestHasher']` replaces Tent's
+query-only key. `AccessTokenRequestHasher` (`lib/cache/`) reads the `access_token` cookie and
+returns `sha256(token + '|' + query)`, or the plain query hash when there is no token. The raw
+token never appears in a key or path.
+
+`filter_query_params` stays unset: it must never drop a parameter that defines scope.
+
+### Expired-token bypass
+
+`ExpiredTokenCacheBypassMiddleware` (`lib/middlewares/`) decodes the access token's JWT payload
+(no signature check, no secret) and, when `exp` has passed or is unreadable, sets
+`X-Skip-Cache` on the request so it is neither served from the cache nor stored. It is
+registered under the rule's `prependMiddlewares` because it must run **before** the handler's
+`FileCacheMiddleware`; anything in the rule's `middlewares` runs after the cache.
+
+### Excluded headers
+
+The handler and `CacheStalenessMiddleware` both list `Authorization` in
+`additional_excluded_headers`, so credentials are never stored (`Set-Cookie` is excluded by
+Tent's defaults).
 
 The same rule also carries the freshness and invalidation middlewares:
 

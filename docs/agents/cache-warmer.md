@@ -16,24 +16,15 @@ if it's genuinely public and unauthenticated (e.g. a possible future public stat
 a GET route declared `@CachePolicy(CacheClass.Public)`. `user-scoped` and `never` routes are
 never warmed. See [API Caching](architecture/caching.md) for the cache classes.
 
-## Per-user cache (upcoming)
+## Per-user cache
 
-Today, the rule for any user-scoped endpoint (see
-[Flow](flow.md#per-user-cache-upcoming)) is: declare it `@CachePolicy(CacheClass.UserScoped)`, which sets the `X-Skip-Cache` header so
-it bypasses Tent's shared HTTP cache entirely (see [API Caching](architecture/caching.md) and
-`.claude/agents/cache.md`'s cache-class review). That's a
-correctness requirement, not a performance story — user-scoped responses currently get no
-caching at all.
+User-scoped endpoints are declared `@CachePolicy(CacheClass.UserScoped)`. Their GET responses
+send `X-Cache-Allow` and are cached by Tent **per caller**, keyed by
+`sha256(access_token + '|' + query)` (see [API Caching](architecture/caching.md#per-user-cache)
+and [Flow](flow.md#per-user-cache)). `never` endpoints and writes send `X-Skip-Cache`.
 
-A **per-user cache** capability is in active development on Tent itself, meant to let
-user-scoped responses be cached safely (keyed per user, not shared across users the way Navi's
-warm-up is). It is not available yet. Once it lands:
-
-- Update this section with the actual mechanism (cache key shape, invalidation, how a route
-  opts in) once it's implemented.
-- Update `.claude/agents/cache.md` and `.claude/agents/proxy.md` to describe when a route should
-  use it instead of `X-Skip-Cache`.
-- Update `docs/agents/flow.md`'s repo-selection step accordingly.
+Navi still **never** warms user-scoped data: warming with a real session would write that
+session's data to disk. Only `public` GET endpoints belong in Navi's resources.
 
 ## Configuration
 

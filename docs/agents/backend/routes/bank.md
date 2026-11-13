@@ -33,8 +33,8 @@ per-endpoint reference.
   personal account, another organization's account, the wrong context (an organization account
   on a personal route, or the reverse), a transaction of another account, a non-member `:orgId`,
   and a global admin who is not a member (no admin bypass).
-- **Caching** — `GET` routes are `user-scoped` (`X-Skip-Cache: true`,
-  `Cache-Control: private, no-store`); writes are `never` (`X-Skip-Cache: true`,
+- **Caching** — `GET` routes are `user-scoped` (`X-Cache-Allow: true`,
+  `Cache-Control: private, no-store`; cached per caller by the proxy); writes are `never` (`X-Skip-Cache: true`,
   `Cache-Control: no-store`). None goes into Navi's warm-up.
 - **Amounts** are decimal strings in the account currency's exponent (BRL/USD 2, JPY 0,
   BHD 3; e.g. `"-1234.56"`, `"500"`), stored as `BIGINT` minor units. More decimals than the

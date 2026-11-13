@@ -32,7 +32,7 @@ explore, or plan what belongs to a specialist yourself.
 | `backend` | `backend/` — NestJS modules/controllers/services, TypeORM entities/migrations, Jest specs, ESLint |
 | `infra` | `docker-compose.yml`, `dockerfiles/`, `.circleci/config.yml`, `scripts/`, `Makefile` |
 | `proxy` | `proxy/` — PHP Tent proxy configuration, custom middleware, and tests |
-| `cache` | `navi/navi_config.yaml`, `navi/resources/*.yml`, cache-warmer docs — Navi warm-up route maintenance + `X-Skip-Cache` review |
+| `cache` | `navi/navi_config.yaml`, `navi/resources/*.yml`, cache-warmer docs — Navi warm-up route maintenance + cache-header (`X-Cache-Allow` / `X-Skip-Cache`) review |
 
 ## How to coordinate
 
@@ -87,7 +87,7 @@ findings are resolved before merging the PR.
 Invoke the `cache` agent after `backend`, `frontend`, or `proxy` finishes whenever an issue
 involves a new or changed API endpoint. Given Ward's multi-tenant model, expect most
 endpoints to be excluded from Navi's warm-up entirely — `cache` will confirm that, and flag any
-endpoint that should carry `X-Skip-Cache` but doesn't.
+endpoint whose cache header (`X-Cache-Allow` / `X-Skip-Cache`) doesn't match its class.
 
 ## Documentation (`docs/agents/`)
 

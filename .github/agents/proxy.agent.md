@@ -72,12 +72,18 @@ Each rule file calls `Configuration::buildRule([...])` with:
 
 **Matcher types:** `exact`, `begins_with`, `ends_with`, `regex`.
 
-### Cache bypass (`X-Skip-Cache`)
+### Cache opt-in and bypass (`X-Cache-Allow` / `X-Skip-Cache`)
 
-The backend rule sets `'skip_cache_header' => 'X-Skip-Cache'`. Any response that carries this
-header bypasses the Tent cache entirely. Caching is opt-out: every other 2xx `*.json` response
-is shared-cached, keyed by path and query string only (not method or caller). The backend sets
-the header per route through its `@CachePolicy()` cache classes. Keep
+Caching on the backend rule is opt-in: `'require_cache_header' => 'X-Cache-Allow'` means only
+2xx `*.json` responses carrying `X-Cache-Allow` are stored, and
+`'skip_cache_header' => 'X-Skip-Cache'` always wins. The key is per caller:
+`AccessTokenRequestHasher` hashes the `access_token` cookie with the query (plain query hash
+when there is no token). `ExpiredTokenCacheBypassMiddleware`, in the rule's
+`prependMiddlewares` so it runs before the cache, marks requests with an expired or `exp`-less
+token as `X-Skip-Cache`. `Authorization` is listed in `additional_excluded_headers` on the
+handler and `CacheStalenessMiddleware`. Never set `filter_query_params` in a way that drops a
+scope-defining parameter. The backend sets the response headers per route through its
+`@CachePolicy()` cache classes. Keep
 `CacheStalenessMiddleware`'s `maxAgeSeconds` in sync with the backend's
 `PUBLIC_MAX_AGE_SECONDS`. The full strategy is in `docs/agents/architecture/caching.md`.
 

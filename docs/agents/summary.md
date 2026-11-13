@@ -75,10 +75,11 @@ full file before loading it. For a bare link-only table of contents instead, see
 ## API caching
 
 - **[API Caching](architecture/caching.md)** — Single source of truth for API caching: Tent
-  shared-caches every 2xx `*.json` response unless it carries `X-Skip-Cache`; every route
-  declares a `public`/`user-scoped`/`never` class with `@CachePolicy()` (enforced by a spec),
-  which drives `X-Skip-Cache` and `Cache-Control`; 10s stale-while-revalidate; writes clear the
-  collection/entity entries; only `public` GET endpoints may be warmed by Navi.
+  caches a 2xx `*.json` response only when it carries `X-Cache-Allow` (`X-Skip-Cache` always
+  wins), keyed per caller by the hashed `access_token` cookie; expired tokens bypass the cache;
+  every route declares a `public`/`user-scoped`/`never` class with `@CachePolicy()` (enforced by
+  a spec), which drives `X-Cache-Allow`, `X-Skip-Cache` and `Cache-Control`; 10s
+  stale-while-revalidate; writes clear the owner subtrees listed in `X-Cache-Invalidate`; only `public` GET endpoints may be warmed by Navi.
 
 ## External tooling
 
@@ -87,8 +88,8 @@ full file before loading it. For a bare link-only table of contents instead, see
   CLI/library). Read the linked guide before making changes involving that tool.
 - **[Cache Warmer](cache-warmer.md)** — How Ward uses Navi to warm the Tent proxy cache after
   each production release; used by the `cache` agent. Given Ward's multi-tenant model, most
-  endpoints are excluded from warming by default. Also documents the per-user cache Tent is
-  developing, expected to eventually replace `X-Skip-Cache` for user-scoped reads.
+  endpoints are excluded from warming by default. User-scoped reads are cached per caller by
+  the proxy, but are never warmed.
 
 ## Specs, Plans & Issues
 
