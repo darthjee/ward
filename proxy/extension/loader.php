@@ -14,5 +14,6 @@ require_once __DIR__ . '/lib/middlewares/CacheControlMiddleware.php';
 require_once __DIR__ . '/lib/middlewares/SetClientIpMiddleware.php';
 require_once __DIR__ . '/lib/cache/DomainHash.php';
 require_once __DIR__ . '/lib/cache/AccessTokenCookie.php';
+require_once __DIR__ . '/lib/cache/AccessTokenRequestHasher.php';
 require_once __DIR__ . '/lib/cache/CacheSubtreeClearer.php';
 require_once __DIR__ . '/lib/middlewares/CacheInvalidationMiddleware.php';
