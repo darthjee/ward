@@ -2,6 +2,7 @@ import AccountDetailHelper from '../../../common/detail/helpers/AccountDetailHel
 import AccountHeaderHelper from '../../../common/detail/helpers/AccountHeaderHelper.jsx';
 import ProviderInfoHelper from './ProviderInfoHelper.jsx';
 import ProviderShortcuts from '../../common/ProviderShortcuts.jsx';
+import AddBillLink from '../../common/AddBillLink.jsx';
 import SentMark from '../../common/SentMark.jsx';
 import BillHistory from '../../../common/bills/BillHistory.jsx';
 import { PROVIDERS_BASE } from '../../../common/sections.js';
@@ -22,14 +23,19 @@ function renderHeader(header, handlers) {
 }
 
 /**
- * Render the Add charge / Add payment shortcuts.
+ * Render the Add charge / Add payment shortcuts and the Add bill link.
  *
  * @param {object} account - The provider account.
  * @param {{onStartNew: Function}} handlers - Page handlers.
+ * @param {{context: object}} state - Page state.
  * @returns {React.ReactElement} The shortcuts.
  */
-function renderShortcuts(account, handlers) {
-  return <ProviderShortcuts account={account} onStartNew={handlers.onStartNew} />;
+function renderShortcuts(account, handlers, state) {
+  return (
+    <ProviderShortcuts account={account} onStartNew={handlers.onStartNew}>
+      <AddBillLink account={account} context={state.context} />
+    </ProviderShortcuts>
+  );
 }
 
 /**
@@ -71,7 +77,8 @@ function renderAfterLedger(account, handlers, state) {
 const BankProviderDetailHelper = {
   /**
    * Render the provider detail page: the shared detail page under the Providers section, with
-   * the provider header (info block), the Add charge / Add payment shortcuts above the ledger
+   * the provider header (info block), the Add charge / Add payment shortcuts and the Add bill
+   * link above the ledger
    * and each sent charge's mark with **Mark as unsent** (also on an archived provider), and the
    * Bill history after the ledger.
    *

@@ -122,9 +122,17 @@ describe('BankProviderDetailHelper', () => {
     expect(page.containsInOrder('Mark as unsent', 'Mark as unsent')).toBeFalse();
   });
 
+  it('links Add bill to the new bill page with the provider pre-selected', () => {
+    expect(output().containsInOrder('Ledger', 'Add charge', 'Add payment', 'href="#/bank/bills/new?provider=4"', 'Add bill'))
+      .toBeTrue();
+    expect(output({ context: { kind: 'organization', orgId: 5 } }).containsAttribute('href', '#/orgs/5/bank/bills/new?provider=4'))
+      .toBeTrue();
+  });
+
   it('keeps Mark as unsent on an archived provider, without shortcuts, inline form, Edit or Delete', () => {
     const page = output({}, { archived_at: '2026-04-01T00:00:00.000Z' });
 
+    expect(page.contains('Add bill')).toBeFalse();
     expect(page.containsInOrder('Charge Feb', 'Mark as unsent')).toBeTrue();
     expect(page.contains('Add charge')).toBeFalse();
     expect(page.contains('New transaction')).toBeFalse();

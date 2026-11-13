@@ -21,6 +21,10 @@ describe('sectionTarget', () => {
     it('registers the bank providers section', () => {
       expect(SECTIONS_CONTEXT).toContain(['/bank/providers', '/bank/providers']);
     });
+
+    it('lands the one-off bill pages on the providers list', () => {
+      expect(SECTIONS_CONTEXT).toContain(['/bank/bills', '/bank/providers']);
+    });
   });
 
   describe('sectionListPathFor', () => {
@@ -127,6 +131,11 @@ describe('sectionTarget', () => {
       expect(switchTargetFor('#/orgs/5/bank/providers/3/edit')(PERSONAL)).toBe('#/bank/providers');
       expect(switchTargetFor('#/bank/providers/accountant')(ORG_5)).toBe('#/orgs/5/bank/providers');
       expect(switchTargetFor('#/orgs/5/bank/providers/accountant')(PERSONAL)).toBe('#/bank/providers');
+    });
+
+    it('lands on the providers list from a bill page, in both directions', () => {
+      expect(switchTargetFor('#/bank/bills/new?provider=3')(ORG_5)).toBe('#/orgs/5/bank/providers');
+      expect(switchTargetFor('#/orgs/5/bank/bills/9/edit')(PERSONAL)).toBe('#/bank/providers');
     });
 
     it('lands on the landing page outside a section', () => {
