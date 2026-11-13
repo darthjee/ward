@@ -91,6 +91,7 @@ describe('OrganizationController (e2e) — uniform 404', () => {
       const response = await renameOrganization(ctx.current.app, outsider, 1, { name: 'Hijacked' }).expect(404);
 
       expect(withoutTimestamp(response)).toEqual(UNIFORM_404);
+      expect(response.headers['x-cache-invalidate']).toBeUndefined();
       expect(ctx.current.organizationRepo.rows[0].name).toBe('Family');
     });
 
@@ -100,6 +101,7 @@ describe('OrganizationController (e2e) — uniform 404', () => {
       const response = await renameOrganization(ctx.current.app, outsider, 1, { name: 'Hijacked' }).expect(404);
 
       expect(withoutTimestamp(response)).toEqual(UNIFORM_404);
+      expect(response.headers['x-cache-invalidate']).toBeUndefined();
       expect(ctx.current.organizationRepo.rows[0].name).toBe('Family');
     });
 

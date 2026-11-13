@@ -11,6 +11,7 @@ describe('AuthController (e2e)', () => {
 
       expect(response.headers['x-skip-cache']).toBe('true');
       expect(response.headers['cache-control']).toBe('no-store');
+      expect(response.headers['x-cache-invalidate']).toBeUndefined();
     });
 
     it('is set on the register response', async () => {
@@ -22,6 +23,7 @@ describe('AuthController (e2e)', () => {
 
       expect(response.headers['x-skip-cache']).toBe('true');
       expect(response.headers['cache-control']).toBe('no-store');
+      expect(response.headers['x-cache-invalidate']).toBeUndefined();
     });
 
     it('is set on the refresh response', async () => {
