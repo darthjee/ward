@@ -29,6 +29,17 @@ describe('classifyError', () => {
     expect(classifyError(new ApiError(400, 'Bad', 'BAD_REQUEST', [])).messages).toEqual(['Bad']);
   });
 
+  it('classifies a 422 as validation with its message alone', () => {
+    expect(classifyError(new ApiError(422, 'currency mismatch', 'CURRENCY_MISMATCH'))).toEqual({
+      kind: 'validation', code: 'CURRENCY_MISMATCH', message: 'currency mismatch', messages: ['currency mismatch'],
+    });
+  });
+
+  it('ignores the details of a 422', () => {
+    expect(classifyError(new ApiError(422, 'account not found', 'ACCOUNT_NOT_FOUND', ['x'])).messages)
+      .toEqual(['account not found']);
+  });
+
   it('classifies a 5xx as transient', () => {
     expect(classifyError(new ApiError(503, 'Unavailable')).kind).toBe('transient');
   });
