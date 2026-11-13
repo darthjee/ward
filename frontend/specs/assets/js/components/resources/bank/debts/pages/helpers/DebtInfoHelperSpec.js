@@ -78,6 +78,31 @@ describe('DebtInfoHelper', () => {
       .toBeTrue();
   });
 
+  it('renders the schedule values after the debt info', () => {
+    const page = output({
+      debt: {
+        ...DEBT.debt, bills_from: '2026-02-01', show_in_calendar: true, paying_account: { id: 9, name: 'Main' },
+      },
+    });
+
+    expect(page.containsInOrder(
+      'Instalment count', 'Bills from', '2026-02-01', 'Show in Calendar', 'Yes', 'Default paying account', 'Main',
+    )).toBeTrue();
+  });
+
+  it('shows "—" for blank schedule values and No when hidden from the Calendar', () => {
+    const page = output({ debt: { ...DEBT.debt, bills_from: null, show_in_calendar: false, paying_account: null } });
+
+    expect(page.containsInOrder('Bills from', '—', 'Show in Calendar', 'No', 'Default paying account', '—')).toBeTrue();
+  });
+
+  it('escapes the default paying account name', () => {
+    const page = output({ debt: { ...DEBT.debt, paying_account: { id: 9, name: '<script>alert(1)</script>' } } });
+
+    expect(page.containsTag('script')).toBeFalse();
+    expect(page.contains('&lt;script&gt;')).toBeTrue();
+  });
+
   it('copes with a missing debt object', () => {
     expect(output({ debt: undefined }).contains('Interest rate')).toBeTrue();
   });
