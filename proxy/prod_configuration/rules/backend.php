@@ -61,6 +61,10 @@ Configuration::buildRule([
         'cache' => $cacheFolder,
         'skip_cache_header' => 'X-Skip-Cache',
         'require_cache_header' => 'X-Cache-Allow',
+        // AccessTokenRequestHasher and ExpiredTokenCacheBypassMiddleware both
+        // read the `access_token` cookie by default; their cookie names must
+        // always match, otherwise the expiry check would look at a different
+        // cookie than the one the cache key is built from.
         'request_hasher' => [
             'class' => 'Tent\\Cache\\AccessTokenRequestHasher'
         ],
@@ -77,6 +81,10 @@ Configuration::buildRule([
             'class'    => 'Tent\\Middlewares\\CacheInvalidationMiddleware',
             'location' => $cacheFolder
         ],
+        // Reads the `access_token` cookie by default; its cookie name must
+        // always match AccessTokenRequestHasher's (see request_hasher above),
+        // otherwise the expiry check would look at a different cookie than
+        // the cache key.
         [
             'class' => 'Tent\\Middlewares\\ExpiredTokenCacheBypassMiddleware'
         ]
@@ -85,6 +93,15 @@ Configuration::buildRule([
         [
             'class' => 'Tent\\Middlewares\\SetClientIpMiddleware'
         ],
+        // CacheStalenessMiddleware runs after the handler's
+        // FileCacheMiddleware, which sets the response on every cache hit and
+        // stops the remaining request middlewares. Its processRequest
+        // therefore never runs today: maxAgeSeconds is not enforced and
+        // BackgroundRefresher never fires. Do NOT move it before the handler
+        // (e.g. into prependMiddlewares) until Tent's refresher honours
+        // require_cache_header/skip_cache_header: the refresher stores any
+        // 2xx, so per-user entries could be refreshed/stored without opting
+        // in. Re-review security before making that change.
         [
             'class' => 'Tent\\Middlewares\\CacheStalenessMiddleware',
             'location' => $cacheFolder,
