@@ -44,6 +44,12 @@ differ in where hosts/paths come from:
   folder. It always strips the header. See [API Caching](./caching.md#invalidation).
 - `CacheSubtreeClearer` (`lib/cache/`) — the helper behind it. It validates each path, confines
   it to the cache folder (`realpath`), refuses symlinks, and deletes the subtree.
+- `AccessTokenCookie` (`lib/cache/`) — reads the `access_token` cookie and decodes its JWT `exp`
+  (no signature check). Shared by the two classes below.
+- `AccessTokenRequestHasher` (`lib/cache/`) — the per-caller cache key. See
+  [Request hasher](#request-hasher).
+- `ExpiredTokenCacheBypassMiddleware` — marks expired-token requests `X-Skip-Cache`. See
+  [Expired-token bypass](#expired-token-bypass).
 - `TestHeaderMiddleware` — sample middleware demonstrating the extension pattern.
 - `DomainHash` — derives a per-domain cache folder name (used internally by Tent's own caching).
 
