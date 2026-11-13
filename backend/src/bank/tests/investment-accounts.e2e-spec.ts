@@ -487,12 +487,13 @@ describe('investment accounts (e2e)', () => {
   });
 
   describe('caching', () => {
-    it('sends X-Skip-Cache and the user-scoped Cache-Control on GETs', async () => {
+    it('sends X-Cache-Allow and the user-scoped Cache-Control on GETs', async () => {
       const created = await createInvestment(null);
 
       for (const path of ['/bank/accounts.json?type=investment', `/bank/accounts/${created.id}.json`]) {
         const response = await send(app, 'get', path, ALICE).expect(200);
-        expect(response.headers['x-skip-cache']).toBe('true');
+        expect(response.headers['x-cache-allow']).toBe('true');
+        expect(response.headers['x-skip-cache']).toBeUndefined();
         expect(response.headers['cache-control']).toBe('private, no-store');
       }
     });

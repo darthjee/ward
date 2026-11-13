@@ -100,7 +100,8 @@ describe('one-off bills (e2e)', () => {
         const shown = await send(app, 'get', billPath(orgId, bill.id), ALICE).expect(200);
         expect(shown.body).toEqual(bill);
         expect(ownerKeysIn([bill, shown.body])).toEqual([]);
-        expect(shown.headers['x-skip-cache']).toBe('true');
+        expect(shown.headers['x-cache-allow']).toBe('true');
+        expect(shown.headers['x-skip-cache']).toBeUndefined();
       });
 
       it('accepts a past due date and amounts in the provider currency', async () => {
@@ -196,7 +197,8 @@ describe('one-off bills (e2e)', () => {
 
         expect(response.body.bills.map((row: Body) => row.id)).toEqual([second.id, first.id, older.id]);
         expect(response.body.pagination).toEqual({ page: 1, per_page: 50, total_pages: 1, total_count: 3 });
-        expect(response.headers['x-skip-cache']).toBe('true');
+        expect(response.headers['x-cache-allow']).toBe('true');
+        expect(response.headers['x-skip-cache']).toBeUndefined();
         expect(ownerKeysIn(response.body)).toEqual([]);
       });
 

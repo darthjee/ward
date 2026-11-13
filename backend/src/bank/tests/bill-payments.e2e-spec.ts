@@ -488,7 +488,8 @@ describe('bill payments (e2e)', () => {
           ['2026-01-05', 'skipped', null, false],
         ]);
         expect(response.body.pagination).toEqual({ page: 1, per_page: 50, total_pages: 1, total_count: 3 });
-        expect(response.headers['x-skip-cache']).toBe('true');
+        expect(response.headers['x-cache-allow']).toBe('true');
+        expect(response.headers['x-skip-cache']).toBeUndefined();
         expect(response.headers['cache-control']).toBe('private, no-store');
         expect(ownerKeysIn(response.body)).toEqual([]);
       });

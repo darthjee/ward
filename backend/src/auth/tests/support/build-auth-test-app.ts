@@ -57,7 +57,7 @@ export interface BuildAuthTestAppResult {
 // as in `AppModule`, so CSRF rejections answer `403` before authentication),
 // the `APP_GUARD`/`JwtGuard` provider, and the
 // `APP_INTERCEPTOR`/`CachePolicyInterceptor` provider (so `@CachePolicy()`-annotated
-// routes still get `X-Skip-Cache`/`Cache-Control` set, as under the real `AppModule`),
+// routes still get `X-Cache-Allow`/`X-Skip-Cache`/`Cache-Control` set, as under the real `AppModule`),
 // the `APP_INTERCEPTOR`/`CacheInvalidationInterceptor` provider (so writes emit
 // `X-Cache-Invalidate`, as under the real `AppModule`),
 // and the `APP_FILTER`/`HttpExceptionFilter` provider (so error responses use

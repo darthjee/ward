@@ -17,7 +17,7 @@ const DEFAULT_ACCESS_TOKEN_TTL_MS = 15 * 60 * 1000;
  * password-login/refresh/register routes (`AuthController`) and the
  * device-authorization "logged" poll response
  * (`AuthorizationRequestController`), so the two response bodies cannot
- * drift apart. Cache headers (`X-Skip-Cache`/`Cache-Control`) come from the owning
+ * drift apart. Cache headers (`X-Skip-Cache`/`Cache-Control`, never `X-Cache-Allow`) come from the owning
  * controllers' `@CachePolicy(CacheClass.Never)` via the global `CachePolicyInterceptor`.
  * @param {AuthResult} result - The freshly issued session (user + access/refresh tokens).
  * @param {Response} res - Used to set the access-token cookie.
