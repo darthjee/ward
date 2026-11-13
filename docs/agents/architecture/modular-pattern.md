@@ -79,7 +79,7 @@ in the module's page under `docs/agents/modules/`.
 |---|---|---|---|
 | `auth` | Always-on | `auth_` | Accounts, login, sessions, device authorization, user approval |
 | `mail` | Always-on (service-only) | — (no tables) | Transactional email |
-| `bank` | Lazy | `bank_` | Bank accounts, business expenses for the accountant, bills to pay |
+| [`bank`](../modules/bank.md) | Lazy | `bank_` | Bank accounts, business expenses for the accountant, bills to pay (implemented) |
 | `protocol` | Lazy | `protocol_` | Protocol numbers of requests made to companies |
 | `car-performance` | Lazy | `car_performance_` | Fuel consumption and cost per car |
 | `links` | Lazy | `links_` | Links saved to check later |

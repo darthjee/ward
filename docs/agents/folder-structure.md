@@ -4,7 +4,7 @@
 
 | Path | Purpose |
 |---|---|
-| `backend/` | Node.js/NestJS app, TypeScript + TypeORM/MySQL. The Auth and Mail modules exist; each domain module (`bank`, `protocol`, `car-performance`, `links`, …) gets its own folder under `src/` — see `docs/agents/product.md` |
+| `backend/` | Node.js/NestJS app, TypeScript + TypeORM/MySQL. The Auth, Mail and Bank modules exist; each domain module (`bank`, `protocol`, `car-performance`, `links`, …) gets its own folder under `src/` — see `docs/agents/product.md` |
 | `frontend/` | React 19 + Vite app — the login modal, device-authorization flow, hash routing, and `client/` HTTP layer already exist; each domain module adds its own `client/<Name>Client.js` and pages under `components/resources/<area>/pages/` |
 | `proxy/` | PHP Tent proxy config (`dev_configuration/`, `prod_configuration/`, `extension/`), plus `extension.exclude` (patterns left out when `upload_extension` deploys `extension/`) |
 | `dockerfiles/` | `base/` (one shared Dockerfile for all four `*-base` images) plus one directory per leaf image |
@@ -28,10 +28,11 @@
 |---|---|
 | `src/main.ts` | Nest app bootstrap (cookie-parser, global `ValidationPipe`, `PORT`) |
 | `src/app.module.ts` | Root module — see `docs/agents/architecture/backend.md` |
-| `src/core/` | Core layer: JWT Guard, `@Public()` decorator, CacheToken service, `LazyModuleLoader` wrapper, `tests/` |
+| `src/core/` | Core layer: JWT Guard, `@Public()` decorator, CacheToken service, `LazyModuleLoader` wrapper, the owner context (`OwnerContextGuard`, `@OwnerScopedController()`, `@CurrentOwner()`, `ownerWhere()` — see `docs/agents/modules/auth/organizations.md`), `@StrictBody()`, `tests/` |
 | `src/database/` | TypeORM `DataSource` config + `migrations/` (`<timestamp>-<module>-<action>.ts`) |
 | `src/health/` | `GET /health.json` controller |
-| `src/auth/` | Auth module — see `docs/agents/modules/auth.md` |
+| `src/auth/` | Auth module, organizations included — see `docs/agents/modules/auth.md` |
+| `src/bank/` | Bank module (lazy): resident controllers and config, lazy `BankModule` services — see `docs/agents/modules/bank.md` |
 | `src/mail/` | Mail module — always-on, no routes/entities; filesystem email templates live under `mail/templates/` — see `docs/agents/modules/mail.md` |
 | `dist/` | Compiled build output (gitignored) |
 | `nest-cli.json`, `tsconfig.json`, `tsconfig.build.json`, `jest.config.mjs`, `jest.integration.config.mjs`, `package.json`, `eslint.config.mjs` | Tooling config |
@@ -82,7 +83,7 @@
 | Subdirectory / File | Description |
 |---|---|
 | `architecture/` | Per-area architecture pages (`proxy.md`, `frontend.md`, `backend.md`, `modular-pattern.md`, `infra.md`) |
-| `modules/` | One page per backend module (tier, entities, events, config, rules), plus `<module>/<topic>.md` sub-pages — `auth.md` (+ `auth/user-approval.md`) and `mail.md` today; each domain module adds its own |
+| `modules/` | One page per backend module (tier, entities, events, config, rules), plus `<module>/<topic>.md` sub-pages — `auth.md` (+ `auth/user-approval.md`, `auth/organizations.md`), `mail.md` and `bank.md` (+ `bank/accounts.md`, `transactions.md`, `debt.md`, `investment.md`, `provider-expense.md`, `bills.md`, `ui.md`) today; each domain module adds its own |
 | `specs/` | Temporary per-feature spec folders (`specs/<feature>/`), listed in and governed by `specs.md`; each is deleted once its feature is folded into the permanent docs |
 | `plans/` | Implementation plans, one directory per issue |
 | `issues/` | Detailed specs for open issues, one file per issue |

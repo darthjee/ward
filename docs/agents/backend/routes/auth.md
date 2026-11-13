@@ -7,7 +7,10 @@ establish, renew or check credentials and must be reachable without an already-v
 token; plus the authenticated `PATCH /auth/account.json`) and
 `AuthorizationRequestController` (`auth/authorization-request.controller.ts`, the five
 device-authorization routes below — `create`/`poll` are `@Public()` for the same reason,
-`mine`/`authorize`/`deny` require the default `JwtGuard`).
+`mine`/`authorize`/`deny` require the default `JwtGuard`). The organization routes
+(`/orgs.json`, `/orgs/:orgId.json`) are served by a third controller with no prefix,
+`OrganizationController` (`auth/organization.controller.ts`), described in
+[Organization routes](#organization-routes).
 
 Business logic lives in `AuthService` (`auth/auth.service.ts`) for the classic routes
 (`status.json` in `SessionStatusService`, recover/reset in `PasswordResetService`), and
@@ -218,6 +221,79 @@ so `ApiClient`'s refresh-and-retry logic is never triggered by a business reject
 
 Same ownership/status rejection shape as `authorize`, but no password is required.
 
+## Organization routes
+
+Served by `OrganizationController`, delegating to `OrganizationService`
+(`auth/organization.service.ts`); the rules are in
+[Organizations](../../modules/auth/organizations.md). Shared behavior:
+
+- **JWT-protected** (no `@Public()`), so the [gate `401`](#gate-401) applies.
+- **Bodies** come only through `@StrictBody()` (`OrganizationNameDto`): `name` only, required;
+  any other field (`role`, `organizationId`, …) → `400 VALIDATION_FAILED`. The name is trimmed,
+  then must be non-empty, at most 255 code points and free of control characters.
+- **`:orgId`** is taken as a raw string and parsed by `parseOrgId()` (`core/parse-org-id.ts`).
+  An unknown, malformed or non-member id, a non-member global admin included, answers the
+  uniform `404` (`{ error: { code: 'NOT_FOUND', message: 'Not Found' }, statusCode: 404,
+  timestamp }`).
+- **Response** — each organization is `{ id, name, role, created_at, updated_at }`, `role`
+  being the caller's role in it. Never member lists or other users' ids.
+- **Cache class** — `never` at controller level, narrowed to `user-scoped` on the two `GET`s;
+  every route sends `X-Skip-Cache: true`. Names are never logged.
+
+### `GET /orgs.json`
+
+| Property | Value |
+| --- | --- |
+| Controller | `OrganizationController` |
+| Auth | JWT |
+| Request body | — |
+| Success response | Array of organizations the caller belongs to, ordered by id (empty for zero organizations) |
+| HTTP status | `200` |
+| Cache class | `user-scoped` |
+
+### `POST /orgs.json`
+
+| Property | Value |
+| --- | --- |
+| Controller | `OrganizationController` |
+| Auth | JWT |
+| Request body | `OrganizationNameDto` — `{ name: string }` |
+| Success response | The created organization, with `role: "owner"` |
+| HTTP status | `201` |
+| Errors | `400 VALIDATION_FAILED` |
+| Cache class | `never` |
+
+Creates the organization and the caller's `owner` membership in one DB transaction. The role is
+never taken from input.
+
+### `GET /orgs/:orgId.json`
+
+| Property | Value |
+| --- | --- |
+| Controller | `OrganizationController` |
+| Auth | JWT |
+| Request body | — |
+| Success response | The organization, with the caller's role |
+| HTTP status | `200` |
+| Errors | `404` (unknown, malformed, non-member) |
+| Cache class | `user-scoped` |
+
+### `PATCH /orgs/:orgId.json`
+
+| Property | Value |
+| --- | --- |
+| Controller | `OrganizationController` |
+| Auth | JWT, any member (roles are not enforced) |
+| Request body | `OrganizationNameDto` — `{ name: string }` |
+| Success response | The renamed organization, with the caller's role |
+| HTTP status | `200` |
+| Errors | `400 VALIDATION_FAILED`; `404` |
+| Cache class | `never` |
+
+The body is validated before `:orgId` and membership, so an invalid body answers `400` even for
+an unknown or foreign organization. The `400` depends only on the body, so it cannot be used to
+enumerate organizations. Concurrent renames: last write wins.
+
 ## Shared behavior
 
 ### Gate `401`
@@ -298,3 +374,9 @@ is, as it must be stored client-side to call `/auth/refresh.json` and
 | `auth/dto/create-authorization-request.dto.ts` | `CreateAuthorizationRequestDto` validation |
 | `auth/dto/poll-authorization-request.dto.ts` | `PollAuthorizationRequestDto` validation |
 | `auth/dto/authorize-authorization-request.dto.ts` | `AuthorizeAuthorizationRequestDto` validation |
+| `auth/organization.controller.ts` | Organization route definitions |
+| `auth/organization.service.ts` | Organizations and memberships; implements `ORGANIZATION_MEMBERSHIP_LOOKUP` |
+| `auth/organization-response.ts` | Organization serializer |
+| `auth/dto/organization-name.dto.ts` | `OrganizationNameDto` validation |
+| `auth/entities/organization.entity.ts` | `Organization` entity (`auth_organizations`) |
+| `auth/entities/organization-membership.entity.ts` | `OrganizationMembership` entity (`auth_organization_memberships`) |

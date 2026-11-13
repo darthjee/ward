@@ -62,9 +62,9 @@ You will be given a list of changed files. Review them.
 
 ## User-or-organization-owned modules
 
-Reference: `docs/agents/specs/auth/organizations.md`, section *`data-access` checks for
-user-or-organization-owned modules* (issue #58 repoints this at the permanent docs once the
-specs are folded in). For these modules — and for the organization routes themselves
+Reference: `docs/agents/modules/auth/organizations.md`, section *`data-access` checks for
+user-or-organization-owned modules*, plus the data-ownership rule in `docs/agents/product.md`
+and the bank ownership contract in `docs/agents/modules/bank.md`. For these modules — and for the organization routes themselves
 (`/orgs.json`, `/orgs/:orgId.json`) — also check that:
 
 1. **Owner filtering** — every query is filtered through the `OwnerContext` resolved by the

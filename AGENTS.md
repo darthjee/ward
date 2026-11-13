@@ -11,7 +11,7 @@ own tables, routes, frontend client and pages, and modules are added one at a ti
 |--------|------|---------|--------|
 | `auth` | Always-on | Accounts and login: username/password, JWT `access_token` cookie + rotating refresh token, device-authorization, admin approval | Implemented |
 | `mail` | Always-on (service-only) | Transactional email | Implemented |
-| `bank` | Lazy | Bank accounts, business expenses to send to the accountant, bills to pay | Planned |
+| `bank` | Lazy | Bank accounts, business expenses to send to the accountant, bills to pay (user-or-organization-owned) — see [Bank](docs/agents/modules/bank.md) | Implemented (Calendar views pending #77) |
 | `protocol` | Lazy | Protocol numbers of requests made to companies | Planned |
 | `car-performance` | Lazy | Fuel consumption and cost per car | Planned |
 | `links` | Lazy | Links saved to check later | Planned |
@@ -31,8 +31,11 @@ request/data flow and [Product Definitions](docs/agents/product.md) for product 
 - Jest + `@swc/jest` + `supertest` + `@nestjs/testing` (tests and coverage)
 - ESLint (linting, flat config, `typescript-eslint`)
 
-Only the Auth and Mail modules exist so far; the domain modules above are planned (see
-[Product Definitions](docs/agents/product.md)). See
+The Auth, Mail and Bank modules exist; the other domain modules above are planned (see
+[Product Definitions](docs/agents/product.md)). Module pages live under
+[`docs/agents/modules/`](docs/agents/modules/): [Auth](docs/agents/modules/auth.md) (with
+[Organizations](docs/agents/modules/auth/organizations.md)), [Mail](docs/agents/modules/mail.md)
+and [Bank](docs/agents/modules/bank.md) (with its `modules/bank/` concern pages). See
 [Backend Architecture](docs/agents/architecture/backend.md) for the module classification
 (Core/Always-on/Lazy) and inter-module communication guidelines. A new module must follow them
 unless its issue or plan explicitly documents why it deviates.
@@ -118,6 +121,7 @@ All project documentation lives under [`docs/agents/`](docs/agents/):
 | [Architecture](docs/agents/architecture.md) | Hub page linking to per-area architecture pages (`proxy`, `frontend`, `infra`, `backend`) plus the cross-cutting modular-pattern page. |
 | [Contributing](docs/agents/contributing.md) | Commit guidelines, PR standards, code organization, and refactoring rules. |
 | [Product Definitions](docs/agents/product.md) | Product decisions for Ward and its modules. Consult before planning any issue that introduces new entities. |
+| [Modules](docs/agents/modules/) | One page per backend module (`auth.md`, `mail.md`, `bank.md`), with sub-pages per concern (`auth/`, `bank/`). Read the module's page before extending or consuming it. |
 | [External Tooling](docs/agents/external.md) | Hub linking full usage guides for external, project-agnostic tools (Tent, Navi, navi-hey-client). |
 | [Deployment](docs/agents/deployment.md) | How a release runs (job graph, images, Render, SSH staging and swap, rollback, security), the release steps, deploy variables and the provisioning checklist. |
 | [Cache Warmer](docs/agents/cache-warmer.md) | Navi setup for warming the proxy cache after release (CI and local); used by the `cache` agent. |

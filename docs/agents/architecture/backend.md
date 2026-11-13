@@ -70,8 +70,8 @@ backend/src/
 Each module owns its tables under a distinct prefix (see [Modular Pattern](./modular-pattern.md)
 for the rule) — Auth and Bank own tables today (Mail has no HTTP surface and no entities, see
 `docs/agents/modules/mail.md`). Column-level detail lives in `docs/agents/modules/auth.md`'s
-"Entities" section and, for `bank`, in `docs/agents/specs/banking/accounts/` until the specs are
-folded, not repeated here.
+"Entities" section (organizations in `docs/agents/modules/auth/organizations.md`) and, for
+`bank`, in `docs/agents/modules/bank.md` and its `modules/bank/` pages, not repeated here.
 
 | Table | Module | Notes |
 |---|---|---|
@@ -79,11 +79,15 @@ folded, not repeated here.
 | `auth_refresh_tokens` | Auth | |
 | `auth_authorization_requests` | Auth | `user_id` is a logical FK (no physical FK, no cross-module JOIN) — `NULL` when the request's username didn't resolve to a real user |
 | `auth_account_edit_lockouts` | Auth | `user_id` is a logical FK (no physical FK, no cross-module JOIN), unique — one row per user, upserted in place |
+| `auth_organizations` | Auth | No owner column: ownership lives in the membership role |
+| `auth_organization_memberships` | Auth | `organization_id` and `user_id` are **real** FKs (to `auth_organizations` and `auth_users`, same module) with `ON DELETE RESTRICT`; unique `(organization_id, user_id)` |
 | `bank_accounts` | Bank | Owner columns `user_id` / `organization_id` are logical FKs to `auth` (no physical FK), both nullable; the `bank_accounts_exactly_one_owner` check requires exactly one of them. The generated `active_name_key` column (`IF(archived_at IS NULL, LOWER(name), NULL)`, collation `utf8mb4_0900_as_cs` so it is case- but not accent-insensitive) backs two unique indexes, `(user_id, active_name_key)` and `(organization_id, active_name_key)`, which are also the owner lookup indexes. The key and the check are added with raw SQL (TypeORM's MySQL driver supports neither), and the column is not mapped on the entity. Amounts are `BIGINT` minor units |
 | `bank_transactions` | Bank | `account_id` is a **real** FK to `bank_accounts` (same module) with `ON DELETE RESTRICT`; index `(account_id, date, id)`. Nullable `sent_to_accountant_at` `DATETIME` (the accountant hand-off mark of provider-expense charges; no index). No owner columns: the owner is inherited through the account |
 | `bank_debt_details` | Bank | 1:1 with `bank_accounts`: `account_id` is both the PK and a **real** FK to `bank_accounts.id` with `ON DELETE CASCADE` (the details row goes with the account). No owner columns: the owner is inherited through the account. `instalment_amount` is `BIGINT` minor units |
 | `bank_investment_details` | Bank | 1:1 with `bank_accounts`: `account_id` is both the PK and a **real** FK to `bank_accounts.id` with `ON DELETE CASCADE` (the details row goes with the account). No owner columns: the owner is inherited through the account. `yield_rate` is `DECIMAL(7,4)`, `maturity_date` a `DATE`, `liquidity_days` an `INT` |
 | `bank_provider_expense_details` | Bank | 1:1 with `bank_accounts`: `account_id` is both the PK and a **real** FK to `bank_accounts.id` with `ON DELETE CASCADE` (the details row goes with the account). No owner columns: the owner is inherited through the account. `expected_amount` is `BIGINT` minor units; `for_accountant` a boolean (default `true`), `charge_frequency` a `VARCHAR(16)` (default `monthly`), `due_day` / `due_month` `TINYINT` |
+| `bank_bills` | Bank | One-off bills. `provider_account_id` is a **real** FK to `bank_accounts` with `ON DELETE CASCADE`, `paying_account_id` one with `ON DELETE SET NULL`; index `(provider_account_id, due_date)`. `amount` is `BIGINT` minor units. No owner columns: the owner is inherited through the provider account |
+| `bank_bill_payments` | Bank | One row per paid or skipped occurrence. Real FKs: `source_account_id` and `bill_id` with `ON DELETE CASCADE`; `paying_account_id` and the three transaction ids with `ON DELETE SET NULL`. Unique `(source_account_id, derived_due_date)` over a virtual generated column, and unique `bill_id`. No owner columns |
 
 ## Build
 
