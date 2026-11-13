@@ -3,18 +3,24 @@
 This page is the single source of truth for how Ward's API responses are cached. Other docs
 (proxy, cache warmer, flow, auth routes) link here rather than restating the rules.
 
-## Default: opt-out shared caching
+## Default: opt-in caching with a per-caller key
 
 Tent's backend rule (`proxy/*_configuration/rules/backend.php`) routes every `*.json` URL to
-the NestJS backend through `default_proxy`. It **shared-caches every 2xx response by default**:
-caching is opt-out, not opt-in.
+the NestJS backend through `default_proxy`. Caching is **opt-in**: the rule sets
+`'require_cache_header' => 'X-Cache-Allow'`, so a 2xx response is stored only when the backend
+sends `X-Cache-Allow`. `'skip_cache_header' => 'X-Skip-Cache'` is still set and always wins: a
+response carrying it bypasses the cache entirely.
 
-The Tent cache key is built from the path and query string only. It **ignores the HTTP method**
-and the caller (cookies, `Authorization`). A cached `GET /me.json` would be served to every
-other caller, and a cached `POST` response could be served for a later `GET` to the same URL.
-The only protection is the `X-Skip-Cache` response header: Tent's rule sets
-`'skip_cache_header' => 'X-Skip-Cache'`, and any response carrying it bypasses the cache
-entirely.
+The cache key is **per caller**. Ward's `AccessTokenRequestHasher`
+(`proxy/extension/lib/cache/`) reads the `access_token` cookie and returns
+`sha256(access_token + '|' + query)`. With no token it returns the plain query hash, so anonymous
+`public` responses stay shared. The raw token is only ever hashed; it never appears in a key or
+path. The key still ignores the HTTP method, which is why the backend treats every non-GET/HEAD
+request as `never` (see [Response headers](#response-headers)).
+
+Credentials are never stored: `additional_excluded_headers => ['Authorization']` is set on both
+the handler and `CacheStalenessMiddleware`; `Set-Cookie` and Tent's other defaults are already
+excluded.
 
 ## Cache classes
 
@@ -36,14 +42,16 @@ How to pick one:
 - Operational endpoints (`health.json`, `ready.json`) are always `never`: they must always reach
   the backend, or a cached health/readiness check could report ok while the backend (or its
   database) is down.
-- `user-scoped` stays uncached until Tent supports a per-user cache (see [Future](#future)).
+- `user-scoped` is cached in the proxy, per caller (see [Per-user cache](#per-user-cache)).
+  Logged-in callers' `public` responses are keyed per caller too.
 - When in doubt, choose `never`.
 
 **Enforcement:** a backend spec walks every registered controller route and fails when a route
 declares no class (`backend/src/core/tests/cache-policy.coverage.spec.ts`).
-A new endpoint cannot silently fall into Tent's opt-out default. The `cache` agent also
-reviews, read-only, that every endpoint declares a class and that `never`/`user-scoped`
-endpoints send `X-Skip-Cache`.
+A route with no class is never cached (no `X-Cache-Allow`), but the spec still fails. The
+`cache` agent also reviews, read-only, that every endpoint declares a class, that
+`public`/`user-scoped` GETs send `X-Cache-Allow`, and that `never` endpoints and writes send
+`X-Skip-Cache`. Neither header is ever set by hand.
 
 ## Response headers
 
@@ -52,20 +60,21 @@ thrown by the handler carry them too. Rejections from global guards (`OriginGuar
 `AdminGuard`) happen before interceptors and carry no cache headers; that is harmless because
 Tent only caches 2xx responses.
 
-| Class | `X-Skip-Cache` | `Cache-Control` |
-|---|---|---|
-| `public` (GET/HEAD) | *(absent)* | `public, max-age=10` |
-| `user-scoped` | `true` | `private, no-store` |
-| `never` | `true` | `no-store` |
-| any class, method other than GET/HEAD | `true` | `no-store` |
-| no class declared | *(absent: Tent's opt-out default)* | *(absent)* |
+| Effective class | `X-Cache-Allow` | `X-Skip-Cache` | `Cache-Control` |
+|---|---|---|---|
+| `public`, GET/HEAD | `true` | *(absent)* | `public, max-age=10` |
+| `user-scoped`, GET/HEAD | `true` | *(absent)* | `private, no-store` |
+| `never` | *(absent)* | `true` | `no-store` |
+| any class, method other than GET/HEAD | *(absent)* | `true` | `no-store` |
+| no class declared | *(absent)* | *(absent)* | *(absent)*: not cached, but the coverage spec fails |
 
 Because Tent's cache key ignores the method, **any method other than GET/HEAD is always treated
 as `never`**, whatever class the route declares. This is enforced in the backend interceptor
 rather than with a method matcher in the proxy rule.
 
-`Cache-Control` is browser-facing guidance; Tent itself decides on `X-Skip-Cache` alone. The
-last row must never ship: the coverage spec fails first.
+`Cache-Control` is browser-facing guidance; Tent itself decides on `X-Cache-Allow` and
+`X-Skip-Cache`. `user-scoped` keeps `private, no-store`, so caching happens in the proxy only,
+never in the browser. The last row must never ship: the coverage spec fails first.
 
 ## Freshness
 
@@ -73,8 +82,21 @@ Tent's `CacheStalenessMiddleware` (`maxAgeSeconds => 10`) treats entries older t
 as stale. A stale entry is **still served**, and a background refresh against the backend is
 scheduled (stale-while-revalidate). There is no hard expiry.
 
+**Caveat:** `CacheStalenessMiddleware` sits in the rule's `middlewares`, after the handler's
+`FileCacheMiddleware`. That middleware sets the response on every hit, which stops the request
+middlewares, so the staleness check and the background refresh never run today: entries are
+served until a write clears them, the token rotates, or the cache folder is reset. Do not move
+it ahead of the cache until Tent's refresher honours `require_cache_header` and
+`skip_cache_header` (see [Background refresh](#background-refresh)), and re-run a security
+review first.
+
 The backend's `PUBLIC_MAX_AGE_SECONDS` (`backend/src/core/cache-class.ts`) mirrors this value
 for the `public` `Cache-Control: max-age`. Change both together.
+
+`maxAgeSeconds` does **not** bound how long a per-caller entry can be served. A cache hit never
+reaches `JwtGuard`, so logout, session revocation, admin demotion and leaving an organization
+are not enforced on hits. The bound is the access token's `exp` claim: see
+[Expired tokens](#expired-tokens).
 
 ## Invalidation
 
@@ -130,19 +152,70 @@ is built for now.
 Tent's own `CacheCleanupMiddleware` was **removed** from the backend rule. It only cleared the
 written path's own collection/entity, so it could not express cross-path effects.
 
-Today every bank and organization GET is `user-scoped` and never cached, so the observable effect
-is limited to `public` GETs. The contract is in place for the per-user cache (see
-[Future](#future)).
+Bank and organization GETs are `user-scoped` and cached per caller, so a write clears every
+caller's entries under the owner subtree.
 
 ## Navi warm-up
 
 Only `public` GET endpoints may be added to Navi's warm-up resources (`navi/resources/*.yml`).
-`user-scoped` and `never` responses are never stored by Tent, so warming them is pointless, and
-warming a user-scoped URL with a real session would be a data leak if it were ever cached.
+`never` responses are never stored by Tent. `user-scoped` responses are cached per caller, but
+are still never warmed: warming them with a real session would write that session's data to
+disk.
 Warm-up runs after tagged releases only. See [cache-warmer.md](../cache-warmer.md).
 
-## Future
+## Per-user cache
 
-User-scoped responses stay uncached until Tent supports a per-user cache (see
-[Flow](../flow.md#per-user-cache-upcoming)). At that point `user-scoped` routes may switch from
-`X-Skip-Cache` to the per-user mechanism, and this page must be updated.
+`user-scoped` GETs (and logged-in callers' `public` GETs) are cached in Tent under the caller's
+`sha256(access_token + '|' + query)` key (see
+[Default](#default-opt-in-caching-with-a-per-caller-key)). Only the holder of that exact token
+can reach the entry. The key changes whenever the access token rotates (15 minutes by default),
+and organization data is cached per member rather than shared; both lower the hit rate, and
+that is accepted. No client-supplied identifying header is trusted, and the proxy never needs
+the JWT secret.
+
+### Expired tokens
+
+Ward's `ExpiredTokenCacheBypassMiddleware` (`proxy/extension/lib/middlewares/`) runs in the
+backend rule's `prependMiddlewares`, i.e. **before** the handler's `FileCacheMiddleware`
+(anything in the rule's `middlewares` runs after the cache). It base64url-decodes the access
+token's payload, without checking the signature (a forged token hashes to a different key
+anyway), and reads `exp`. When the token has expired, or has no readable `exp`, it marks the
+request `X-Skip-Cache`, so the request is neither served from the cache nor stored. Requests
+with no token are left alone.
+
+After logout or revocation, only someone who still holds the token can get hits, for at most
+its remaining life (15 minutes or less by default). Logout also clears the cookie in the
+browser. Raising `WARD_ACCESS_TOKEN_TTL_MS` widens this window directly. The backend never reads `X-Skip-Cache` from requests, and must not start to.
+
+### Background refresh
+
+Today the refresher never fires (see the caveat under [Freshness](#freshness)). The analysis
+below applies once it does.
+
+Tent's `BackgroundRefresher` (scheduled by `CacheStalenessMiddleware` on a stale hit) replays
+the triggering request with that caller's own headers and writes under the same memoized key, so
+it can never store a response under another caller's key. An expired-token request never hits,
+so it never triggers a refresh. If the token expires between the hit and the refresh, `JwtGuard`
+answers 401 and the refresher stores nothing.
+
+Known gap: the refresher ignores `require_cache_header` and `skip_cache_header`. An existing
+entry keeps being refreshed if its route later changes to `never`, until the cache folder is
+reset (deploy). It can never create an entry that was not opted in. This is accepted; it should
+be raised upstream on Tent.
+
+### On-disk retention
+
+Every token rotation creates a new set of per-caller files. Entries keyed by an expired token are
+unreachable, but they stay on disk until a write clears that path or the cache folder is reset on
+deploy. Disk use grows with users × paths × rotations between deploys. This is accepted for now;
+add time-based eviction (files older than the maximum token TTL) before adding `public` routes,
+since the proxy does not check token signatures and forged tokens could otherwise create
+unlimited entries on a `public` route.
+
+The hasher and `ExpiredTokenCacheBypassMiddleware` each read the `access_token` cookie by
+default; their cookie names must always match.
+
+### Query parameters
+
+`filter_query_params` stays unset on the backend rule. It must never drop a parameter that
+defines scope, or two scopes would share one key.

@@ -286,7 +286,8 @@ describe('bank transaction routes (e2e)', () => {
         date: '2026-01-02', amount: '1', description: 'x',
       }).expect(201);
 
-      expect(get.headers['x-skip-cache']).toBe('true');
+      expect(get.headers['x-cache-allow']).toBe('true');
+      expect(get.headers['x-skip-cache']).toBeUndefined();
       expect(get.headers['cache-control']).toBe('private, no-store');
       expect(get.headers['x-cache-invalidate']).toBeUndefined();
       expect(post.headers['x-cache-invalidate']).toBe(`/orgs/${ALICE_ORG}/bank`);

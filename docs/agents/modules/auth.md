@@ -79,8 +79,8 @@ calls `MailService.sendEmailTemplate(...)` directly and synchronously (not the f
 disabled mail transport and a thrown send error, never a `500`.
 
 Every `AuthController` route is `@CachePolicy(CacheClass.Never)` (controller level), so they send
-`X-Skip-Cache: true` and `Cache-Control: no-store` on the response. Tent's `default_proxy` rule
-caches any 2xx `*.json` response keyed only by query string, regardless of HTTP method — since
+`X-Skip-Cache: true` and `Cache-Control: no-store` on the response. Tent's cache key ignores the
+HTTP method, and anonymous requests share the plain query-string key — since
 these POST routes carry no query string, an uncapped response could otherwise be cached after
 the first login/register/refresh and served verbatim (credentials/session token included) to a
 different caller. See [API Caching](../architecture/caching.md) for the general strategy.

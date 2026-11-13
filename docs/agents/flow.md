@@ -44,14 +44,13 @@ URL is the frontend.
 
 Per-module flows (e.g. paying a bill, logging a refuel) live in each module's page.
 
-## Per-user cache (upcoming)
+## Per-user cache
 
-User-scoped read paths must bypass Tent's shared HTTP cache: they are declared
-`@CachePolicy(CacheClass.UserScoped)`, which sends `X-Skip-Cache` (see
-[API Caching](architecture/caching.md) and
-[Cache Warmer](cache-warmer.md#per-user-cache-upcoming)). A per-user cache layer is in active
-development on Tent itself and is expected to take over these read paths once available —
-update this section and `cache-warmer.md` together once that lands.
+User-scoped read paths are declared `@CachePolicy(CacheClass.UserScoped)`, which sends
+`X-Cache-Allow`. Tent caches them per caller, under a key derived from the hashed
+`access_token` cookie, and bypasses the cache for requests carrying an expired token (see
+[API Caching](architecture/caching.md#per-user-cache) and
+[Cache Warmer](cache-warmer.md#per-user-cache)). Navi never warms them.
 
 ## Open questions
 

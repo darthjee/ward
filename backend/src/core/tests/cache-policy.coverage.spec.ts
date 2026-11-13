@@ -12,8 +12,9 @@ import { IS_OWNER_SCOPED_KEY, OwnerScopedController } from '../owner-scoped.deco
 import { StrictBody } from '../strict-validation.pipe.js';
 
 // Enforces `docs/agents/architecture/caching.md`: every route must declare a cache class via
-// `@CachePolicy()`, because under Tent's opt-out default an undeclared `*.json` route would be
-// silently shared-cached. Only static decorator metadata is read — no app bootstrap, no DB.
+// `@CachePolicy()`, because under Tent's opt-in rule (`require_cache_header`) an undeclared
+// `*.json` route is silently *not* cached and gets no browser `Cache-Control` either. Only static
+// decorator metadata is read — no app bootstrap, no DB.
 // It also keeps owner-scoped routes from ever being `public`, and keeps owner-scoped and
 // organization handlers on `@StrictBody()` (a plain `@Body()` would silently strip owner fields
 // instead of answering 400). Every write (non-GET/HEAD) route must also declare its cache

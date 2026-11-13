@@ -45,10 +45,11 @@ describe('bank settings route (e2e)', () => {
     expect(withoutTimestamp(admin)).toEqual(withoutTimestamp(nonMember));
   });
 
-  it('is user-scoped and sends X-Skip-Cache', async () => {
+  it('is user-scoped and sends X-Cache-Allow', async () => {
     const response = await send(app, 'get', '/bank/settings.json', ALICE).expect(200);
 
-    expect(response.headers['x-skip-cache']).toBe('true');
+    expect(response.headers['x-cache-allow']).toBe('true');
+    expect(response.headers['x-skip-cache']).toBeUndefined();
     expect(response.headers['cache-control']).toBe('private, no-store');
   });
 });

@@ -220,10 +220,11 @@ describe('accountant hand-off (e2e)', () => {
         expect(response.body.error).toEqual({ code: 'VALIDATION_FAILED', message: expect.stringContaining('narrow the range') });
       });
 
-      it('sends X-Skip-Cache and the user-scoped Cache-Control', async () => {
+      it('sends X-Cache-Allow and the user-scoped Cache-Control', async () => {
         const response = await preview(orgId, OCTOBER).expect(200);
 
-        expect(response.headers['x-skip-cache']).toBe('true');
+        expect(response.headers['x-cache-allow']).toBe('true');
+        expect(response.headers['x-skip-cache']).toBeUndefined();
         expect(response.headers['cache-control']).toBe('private, no-store');
       });
     });

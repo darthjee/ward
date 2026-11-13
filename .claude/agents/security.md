@@ -55,8 +55,9 @@ You will be given a list of changed files and/or a diff. Review them.
    state-changing routes? (Not yet applicable while there's no session/account logic.)
 
 6. **Insecure proxy rules** — do new Tent rules use overly broad URL patterns? Do they forward
-   the `Authorization` header or non-GET methods unnecessarily? Is any cached route (missing
-   `X-Skip-Cache`) serving user-specific data?
+   the `Authorization` header or non-GET methods unnecessarily? Is any cached route serving
+   user-specific data under a key not derived from the caller's token (see the per-caller
+   `AccessTokenRequestHasher`), or is an expired token still served from the cache?
 
 7. **Input validation** — do new request handlers validate/sanitize params before using them
    (e.g. an identifier passed to an external API)? Are query parameters filtered against an

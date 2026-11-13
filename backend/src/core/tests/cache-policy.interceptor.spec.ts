@@ -3,7 +3,7 @@ import { APP_INTERCEPTOR, Reflector } from '@nestjs/core';
 import { Test } from '@nestjs/testing';
 import { of } from 'rxjs';
 import request from 'supertest';
-import { CacheClass, PUBLIC_MAX_AGE_SECONDS, SKIP_CACHE_HEADER } from '../cache-class.js';
+import { CACHE_ALLOW_HEADER, CacheClass, PUBLIC_MAX_AGE_SECONDS, SKIP_CACHE_HEADER } from '../cache-class.js';
 import { CachePolicy } from '../cache-policy.decorator.js';
 import { CachePolicyInterceptor } from '../cache-policy.interceptor.js';
 
@@ -60,6 +60,11 @@ describe('CachePolicyInterceptor', () => {
       expect(set).not.toHaveBeenCalledWith(SKIP_CACHE_HEADER, expect.anything());
     });
 
+    it.each(['GET', 'HEAD'])('on %s sets X-Cache-Allow', async (method) => {
+      await run(method);
+      expect(set).toHaveBeenCalledWith(CACHE_ALLOW_HEADER, 'true');
+    });
+
     it.each(['GET', 'HEAD'])('on %s sets a public Cache-Control', async (method) => {
       await run(method);
       expect(set).toHaveBeenCalledWith('Cache-Control', `public, max-age=${PUBLIC_MAX_AGE_SECONDS}`);
@@ -79,10 +84,10 @@ describe('CachePolicyInterceptor', () => {
       reflector.getAllAndOverride.mockReturnValue(CacheClass.UserScoped);
     });
 
-    it('on GET sets X-Skip-Cache and a private Cache-Control', async () => {
-      await run('GET');
+    it.each(['GET', 'HEAD'])('on %s sets X-Cache-Allow and a private Cache-Control', async (method) => {
+      await run(method);
       expect(set.mock.calls).toEqual([
-        [SKIP_CACHE_HEADER, 'true'],
+        [CACHE_ALLOW_HEADER, 'true'],
         ['Cache-Control', 'private, no-store'],
       ]);
     });
@@ -159,11 +164,13 @@ describe('CachePolicyInterceptor (wired globally)', () => {
   it('applies the controller-level class to routes without their own', async () => {
     const response = await request(app.getHttpServer()).get('/policy/inherited.json');
     expect(response.headers['x-skip-cache']).toBe('true');
+    expect(response.headers['x-cache-allow']).toBeUndefined();
     expect(response.headers['cache-control']).toBe('no-store');
   });
 
   it('lets a route-level class override the controller-level one', async () => {
     const response = await request(app.getHttpServer()).get('/policy/overridden.json');
+    expect(response.headers['x-cache-allow']).toBe('true');
     expect(response.headers['x-skip-cache']).toBeUndefined();
     expect(response.headers['cache-control']).toBe(`public, max-age=${PUBLIC_MAX_AGE_SECONDS}`);
   });
@@ -171,12 +178,14 @@ describe('CachePolicyInterceptor (wired globally)', () => {
   it('forces non-GET requests to the never headers even on a public route', async () => {
     const response = await request(app.getHttpServer()).post('/policy/overridden.json');
     expect(response.headers['x-skip-cache']).toBe('true');
+    expect(response.headers['x-cache-allow']).toBeUndefined();
     expect(response.headers['cache-control']).toBe('no-store');
   });
 
   it('sets no cache headers when no class is declared', async () => {
     const response = await request(app.getHttpServer()).get('/bare/index.json');
     expect(response.headers['x-skip-cache']).toBeUndefined();
+    expect(response.headers['x-cache-allow']).toBeUndefined();
     expect(response.headers['cache-control']).toBeUndefined();
   });
 });

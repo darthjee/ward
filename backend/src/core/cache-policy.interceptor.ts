@@ -2,7 +2,7 @@ import { CallHandler, ExecutionContext, Injectable, NestInterceptor } from '@nes
 import { Reflector } from '@nestjs/core';
 import type { Request, Response } from 'express';
 import type { Observable } from 'rxjs';
-import { CacheClass, PUBLIC_MAX_AGE_SECONDS, SKIP_CACHE_HEADER } from './cache-class.js';
+import { CACHE_ALLOW_HEADER, CacheClass, PUBLIC_MAX_AGE_SECONDS, SKIP_CACHE_HEADER } from './cache-class.js';
 import { CACHE_CLASS_KEY } from './cache-policy.decorator.js';
 
 const CACHEABLE_METHODS = new Set(['GET', 'HEAD']);
@@ -15,10 +15,12 @@ const CACHE_CONTROL_BY_CLASS: Record<CacheClass, string> = {
 
 /**
  * Global interceptor applying the route's (or controller's) `@CachePolicy()` class as response
- * headers — `X-Skip-Cache` for Tent and `Cache-Control` for browsers — before the handler runs,
- * so error responses carry them too. Any method other than GET/HEAD is forced to the `never`
+ * headers before the handler runs, so error responses carry them too: `X-Cache-Allow` (opt-in
+ * to Tent's per-caller cache) for `public`/`user-scoped`, `X-Skip-Cache` (opt-out) for `never`,
+ * plus `Cache-Control` for browsers. Any method other than GET/HEAD is forced to the `never`
  * headers, since Tent's cache key ignores the HTTP method. Routes without a declared class are
- * left untouched (the cache-class coverage spec keeps that from shipping).
+ * left untouched, so Tent does not cache them (the cache-class coverage spec keeps that from
+ * shipping).
  */
 @Injectable()
 export class CachePolicyInterceptor implements NestInterceptor {
@@ -57,8 +59,10 @@ export class CachePolicyInterceptor implements NestInterceptor {
   }
 
   #applyHeaders(response: Response, cacheClass: CacheClass): void {
-    if (cacheClass !== CacheClass.Public) {
+    if (cacheClass === CacheClass.Never) {
       response.set(SKIP_CACHE_HEADER, 'true');
+    } else {
+      response.set(CACHE_ALLOW_HEADER, 'true');
     }
     response.set('Cache-Control', CACHE_CONTROL_BY_CLASS[cacheClass]);
   }

@@ -291,9 +291,9 @@ logs.
 
 ### Cache
 
-The Tent proxy cache holds public responses only. User-scoped responses carry `X-Skip-Cache`
-and are never cached (see [architecture/caching.md](architecture/caching.md)). The deploy does
-not change that.
+The Tent proxy cache holds `public` responses and per-caller `user-scoped` responses, keyed by
+the hashed access token (see [architecture/caching.md](architecture/caching.md)). Resetting the
+cache folder on deploy is safe: entries repopulate on the next reads.
 
 ### Known gaps
 

@@ -195,7 +195,7 @@ the check cannot be forgotten per route.
 - **Minimal responses** — organization routes return only `id`, `name`, the caller's `role` and
   timestamps; never member lists or other users' ids. Records of user-or-organization-owned
   modules never expose owner fields.
-- **Caching** — `GET` routes are `user-scoped` (`@CachePolicy`, `X-Skip-Cache`); writes are
+- **Caching** — `GET` routes are `user-scoped` (`@CachePolicy`, `X-Cache-Allow`, cached per caller); writes are
   `never`. An organization id in the URL does **not** make a response public. Personal routes
   carry no owner in the URL, so a shared cache would leak one user's data to another: they
   **must** be `user-scoped`, with no exception. See

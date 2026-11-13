@@ -106,10 +106,11 @@ load the lazy `BankModule` on the first bank request and delegate to its service
 
 ## Cache classes
 
-Every bank route is `user-scoped` or `never`, and sends `X-Skip-Cache`:
+Every bank route is `user-scoped` or `never`:
 
-- `GET` routes are `user-scoped` (`Cache-Control: private, no-store`);
-- writes are `never`.
+- `GET` routes are `user-scoped`: they send `X-Cache-Allow` and `Cache-Control: private,
+  no-store`, and the proxy caches them per caller;
+- writes are `never` and send `X-Skip-Cache`.
 
 Personal routes carry no owner in the URL, so a shared cache would leak data between users:
 no bank route may ever be `public`. None goes into Navi's warm-up.

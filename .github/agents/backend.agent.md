@@ -130,7 +130,7 @@ etc. are constructed once (via `ConfigService`) and injected. See
   under the module's `tests/` folder
 - **Cache class**: every new controller or route must declare `@CachePolicy(CacheClass.X)`
   (`public`, `user-scoped`, or `never`) — a coverage spec fails otherwise. Never set
-  `X-Skip-Cache` or `Cache-Control` by hand. See `docs/agents/architecture/caching.md`.
+  `X-Cache-Allow`, `X-Skip-Cache` or `Cache-Control` by hand. See `docs/agents/architecture/caching.md`.
 
 ### JSDoc (required for public code)
 

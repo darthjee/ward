@@ -111,7 +111,8 @@ describe('owner-scoped mechanism without the auth module (e2e)', () => {
 
     expect(response.body).toEqual({ owner: { kind: 'user', userId: 7 }, lazy: true });
     expect(lookup.calls).toEqual([]);
-    expect(response.headers['x-skip-cache']).toBe('true');
+    expect(response.headers['x-cache-allow']).toBe('true');
+    expect(response.headers['x-skip-cache']).toBeUndefined();
   });
 
   it('resolves the organization for a member through the port', async () => {
