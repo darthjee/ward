@@ -57,6 +57,14 @@ describe('bank debt form pages', () => {
       expect(options.cancelHref).toBe('#/orgs/5/bank/debts');
       expect(state.fields.instalment_frequency).toBe('monthly');
       expect(state.idPrefix).toBe('bank-debt-new-');
+      expect(state.fields).toEqual(jasmine.objectContaining({ bills_from: '', show_in_calendar: true, paying_account_id: '' }));
+      expect(state.payingAccounts).toBeNull();
+    });
+
+    it('renders the schedule inputs', () => {
+      const page = renderedOutput(React.createElement(inContext(BankDebtNew)));
+
+      expect(page.containsInOrder('Bills from', 'Show in Calendar', 'Default paying account')).toBeTrue();
     });
 
     it('submits the current fields through the debt controller', async () => {
@@ -91,6 +99,7 @@ describe('bank debt form pages', () => {
       expect(options.cancelHref).toBe('#/orgs/5/bank/debts/7');
       expect(state.fields).toBeNull();
       expect(state.idPrefix).toBe('bank-debt-edit-');
+      expect(state.payingAccounts).toBeNull();
     });
 
     it('does not submit before the debt is loaded, and wires retries', () => {

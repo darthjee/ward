@@ -126,8 +126,8 @@ function bindRowExtra(slot, handlers, state) {
 }
 
 /**
- * Render the loaded page: header, alert, the section's shortcuts, ledger form, table and
- * pagination.
+ * Render the loaded page: header, alert, the section's shortcuts, ledger form, table,
+ * pagination and the section's block after the ledger.
  *
  * @param {object} state - Page state (with `data` loaded).
  * @param {object} handlers - Page handlers.
@@ -167,6 +167,7 @@ function renderLoaded(state, handlers, options) {
         hrefFor={hrefFor}
         onNavigate={handlers.onNavigate}
       />
+      {renderSlot(options.renderAfterLedger, account, handlers, state)}
       {renderConfirm(state.confirmation, state, handlers)}
     </>
   );
@@ -204,12 +205,15 @@ const AccountDetailHelper = {
    *   confirmation: (object|null)}} state - Page state.
    * @param {object} handlers - Page handlers (see `buildDetailHandlers`).
    * @param {{base: string, backLabel: string, renderHeader: Function,
-   *   renderShortcuts: Function, renderRowExtra: Function}} options - The section base path,
+   *   renderShortcuts: Function, renderRowExtra: Function, renderAfterLedger: Function}}
+   *   options - The section base path,
    *   the back link label, the header renderer (called with `{ account, hasTransactions,
    *   actionPending, context }` and the handlers), the optional shortcuts renderer (called
-   *   with the account, the handlers and the page state, which may carry section extras) and
+   *   with the account, the handlers and the page state, which may carry section extras),
    *   the optional per-row renderer (called with the transaction, the handlers and the page
-   *   state; rendered under the description, also on an archived account).
+   *   state; rendered under the description, also on an archived account) and the optional
+   *   block after the ledger (called with the account, the handlers and the page state, e.g.
+   *   the Bill history).
    * @returns {React.ReactElement} The rendered page.
    */
   render(state, handlers, options) {

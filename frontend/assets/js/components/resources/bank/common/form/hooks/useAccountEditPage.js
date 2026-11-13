@@ -37,8 +37,9 @@ export function mergeLoadedAccount(fields, account, locked, fieldsFrom = fieldsF
  * @param {{base: string, fieldsFrom: Function, idPrefix: string}} options - The section base
  *   path, the account → form fields builder and the input id prefix.
  * @returns {{context: object, notFound: boolean, accountId: string, account: (object|null),
- *   state: object, handlers: object}} The owner context, whether to show Not-found, the account
- *   id and loaded account, the form helper state and its handlers.
+ *   setFields: Function, state: object, handlers: object}} The owner context, whether to show
+ *   Not-found, the account id and loaded account, the form fields setter (for
+ *   section-specific handlers), the form helper state and its handlers.
  */
 export default function useAccountEditPage(Controller, { base, fieldsFrom, idPrefix }) {
   const form = useBankAccountForm(null);
@@ -78,6 +79,7 @@ export default function useAccountEditPage(Controller, { base, fieldsFrom, idPre
     notFound: form.notFound,
     accountId,
     account,
+    setFields,
     state: {
       fields: account ? form.fields : null,
       fieldErrors: form.fieldErrors,

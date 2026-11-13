@@ -22,6 +22,7 @@ function output(fields = {}, state = {}) {
     currencyLocked: false,
     archived: false,
     idPrefix: 'debt-',
+    payingAccounts: [{ id: 3, name: 'Main BRL', currency: 'BRL' }, { id: 4, name: 'Main USD', currency: 'USD' }],
     ...state,
   }, HANDLERS, OPTIONS));
 }
@@ -51,6 +52,21 @@ describe('BankDebtFormHelper', () => {
     )).toBeTrue();
   });
 
+  it('renders the schedule inputs after the debt fields, Show in Calendar checked', () => {
+    const page = output();
+
+    expect(page.containsInOrder('Instalment count', 'Bills from', 'Show in Calendar', 'Default paying account', 'Notes'))
+      .toBeTrue();
+    expect(page.containsInOrder('id="debt-show_in_calendar"', 'checked=""')).toBeTrue();
+  });
+
+  it('lists only the paying accounts in the debt currency', () => {
+    const page = output();
+
+    expect(page.containsElement('option', 'Main BRL')).toBeTrue();
+    expect(page.containsElement('option', 'Main USD')).toBeFalse();
+  });
+
   it('shows the interest period only once a rate is entered', () => {
     expect(output().contains('Interest period')).toBeFalse();
     expect(output({ interest_rate: ' ' }).contains('Interest period')).toBeFalse();
@@ -77,6 +93,7 @@ describe('BankDebtFormHelper', () => {
 
     expect(page.contains(ARCHIVED_NOTICE)).toBeTrue();
     expect(page.contains('Interest rate')).toBeFalse();
+    expect(page.contains('Bills from')).toBeFalse();
     expect(page.contains('Creditor')).toBeFalse();
   });
 });

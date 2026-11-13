@@ -25,6 +25,8 @@ import BankProviderNew from '../../../../../assets/js/components/resources/bank/
 import BankProviderEdit from '../../../../../assets/js/components/resources/bank/providers/pages/BankProviderEdit.jsx';
 import BankProviderDetail from '../../../../../assets/js/components/resources/bank/providers/pages/BankProviderDetail.jsx';
 import BankProviderAccountant from '../../../../../assets/js/components/resources/bank/providers/pages/BankProviderAccountant.jsx';
+import BankBillNew from '../../../../../assets/js/components/resources/bank/bills/pages/BankBillNew.jsx';
+import BankBillEdit from '../../../../../assets/js/components/resources/bank/bills/pages/BankBillEdit.jsx';
 import HashRouteResolver from '../../../../../assets/js/utils/routing/HashRouteResolver.js';
 import ModalRedirect from '../../../../../assets/js/components/common/ModalRedirect.jsx';
 import ResetPasswordLanding from '../../../../../assets/js/components/resources/accounts/pages/ResetPasswordLanding.jsx';
@@ -100,6 +102,8 @@ describe('AppHelper', () => {
     ['bank-provider-edit', BankProviderEdit],
     ['bank-provider', BankProviderDetail],
     ['bank-provider-accountant', BankProviderAccountant],
+    ['bank-bill-new', BankBillNew],
+    ['bank-bill-edit', BankBillEdit],
   ].forEach(([key, Page]) => {
     it(`maps the ${key} key to its page`, () => {
       expect(partsOf(key).page.type).toBe(Page);

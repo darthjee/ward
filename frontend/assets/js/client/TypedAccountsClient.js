@@ -4,14 +4,14 @@ import { contextPath } from '../utils/context/ownerContext.js';
 
 const DEBT_FIELDS = [
   'interest_rate', 'interest_period', 'instalment_amount', 'instalment_frequency', 'due_day',
-  'due_month', 'instalment_count',
+  'due_month', 'instalment_count', 'bills_from', 'show_in_calendar', 'paying_account_id',
 ];
 
 const INVESTMENT_FIELDS = ['kind', 'yield_rate', 'yield_period', 'maturity_date', 'liquidity_days'];
 
 const PROVIDER_EXPENSE_FIELDS = [
   'for_accountant', 'provider_tax_id', 'expected_amount', 'charge_frequency', 'due_day',
-  'due_month',
+  'due_month', 'bills_from', 'show_in_calendar', 'paying_account_id',
 ];
 
 /**

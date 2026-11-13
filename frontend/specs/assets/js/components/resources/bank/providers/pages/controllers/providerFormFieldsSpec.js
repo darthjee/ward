@@ -57,6 +57,9 @@ describe('providerFormFields', () => {
         charge_frequency: 'monthly',
         due_day: '',
         due_month: '',
+        bills_from: '',
+        show_in_calendar: true,
+        paying_account_id: '',
       }));
     });
 
@@ -77,6 +80,19 @@ describe('providerFormFields', () => {
         charge_frequency: 'yearly',
         due_day: '10',
         due_month: '3',
+      }));
+    });
+
+    it('loads the schedule fields, the paying account id from its object', () => {
+      const account = {
+        ...STORED,
+        provider_expense: {
+          ...STORED.provider_expense, bills_from: '2026-02-01', show_in_calendar: false, paying_account: { id: 9, name: 'Main' },
+        },
+      };
+
+      expect(providerFieldsFromAccount(account)).toEqual(jasmine.objectContaining({
+        bills_from: '2026-02-01', show_in_calendar: false, paying_account_id: '9',
       }));
     });
 
@@ -103,6 +119,9 @@ describe('providerFormFields', () => {
             charge_frequency: 'monthly',
             due_day: 10,
             due_month: null,
+            bills_from: null,
+            show_in_calendar: true,
+            paying_account_id: null,
           },
         }),
       });
@@ -116,7 +135,19 @@ describe('providerFormFields', () => {
         charge_frequency: 'monthly',
         due_day: null,
         due_month: null,
+        bills_from: null,
+        show_in_calendar: true,
+        paying_account_id: null,
       });
+    });
+
+    it('sends the schedule fields nested in provider_expense', () => {
+      expect(validate({ bills_from: '2026-02-01', show_in_calendar: false, paying_account_id: '9' }).body.provider_expense)
+        .toEqual(jasmine.objectContaining({ bills_from: '2026-02-01', show_in_calendar: false, paying_account_id: 9 }));
+    });
+
+    it('rejects an invalid Bills from date', () => {
+      expect(validate({ bills_from: '01/02/2026' }).errors.bills_from).toBeDefined();
     });
 
     it('rejects a tax id longer than 32 characters', () => {
@@ -184,6 +215,13 @@ describe('providerFormFields', () => {
         bank_name: 'New Ltd',
         provider_expense: { expected_amount: null, charge_frequency: 'monthly', due_month: null },
       });
+    });
+
+    it('sends only the changed schedule fields', () => {
+      const original = validate(providerFieldsFromAccount(STORED)).body;
+      const body = validate({ ...providerFieldsFromAccount(STORED), paying_account_id: '9' }).body;
+
+      expect(changedProviderFields(body, original)).toEqual({ provider_expense: { paying_account_id: 9 } });
     });
 
     it('omits provider_expense when nothing in it changed', () => {

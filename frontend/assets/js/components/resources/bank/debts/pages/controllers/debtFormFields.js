@@ -11,6 +11,11 @@ import {
   rateEntries,
   text,
 } from '../../../common/form/controllers/nestedFields.js';
+import {
+  emptyScheduleFields,
+  scheduleFieldsFromAccount,
+  validateScheduleFields,
+} from '../../../common/form/controllers/scheduleFields.js';
 
 /** The debt-specific form fields (flat in the form, nested as `debt` in the body). */
 export const DEBT_FIELD_NAMES = [
@@ -26,7 +31,7 @@ const RATE_NAMES = { rate: 'interest_rate', period: 'interest_period', periodErr
 
 /**
  * Build the empty debt create form: the common fields (Amount owed `0`) plus empty debt fields,
- * the frequency defaulting to `monthly`.
+ * the frequency defaulting to `monthly`, and the schedule fields (shown in the Calendar).
  *
  * @param {string} [currency] - The default currency (`''` when unknown).
  * @param {string} [today] - Local today, `YYYY-MM-DD`.
@@ -42,6 +47,7 @@ export function emptyDebtFields(currency = '', today) {
     due_day: '',
     due_month: '',
     instalment_count: '',
+    ...emptyScheduleFields(),
   };
 }
 
@@ -61,6 +67,7 @@ export function debtFieldsFromAccount(account) {
     opening_balance: negateAmount(common.opening_balance),
     ...Object.fromEntries(DEBT_FIELD_NAMES.map((name) => [name, text(debt.get(name))])),
     instalment_frequency: debt.get('instalment_frequency') ?? 'monthly',
+    ...scheduleFieldsFromAccount(account.debt),
   };
 }
 
@@ -119,16 +126,19 @@ export function validateDebtFields(fields, { nameOnly = false, now = new Date() 
 
   const rate = rateEntries(fields, RATE_NAMES);
   const instalment = instalmentEntries(fields);
+  const schedule = validateScheduleFields(fields);
   const errors = {
     ...common.errors,
-    ...Object.fromEntries([...rate.errors, ...instalment.errors].filter(([, error]) => error)),
+    ...Object.fromEntries(
+      [...rate.errors, ...instalment.errors, ...schedule.errors].filter(([, error]) => error),
+    ),
   };
 
   if (Object.keys(errors).length) {
     return { errors, body: null };
   }
 
-  return { errors, body: { ...common.body, debt: { ...rate.values, ...instalment.values } } };
+  return { errors, body: { ...common.body, debt: { ...rate.values, ...instalment.values, ...schedule.values } } };
 }
 
 /**

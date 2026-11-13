@@ -1,5 +1,6 @@
 import NotFound from '../../../../common/notFound/NotFound.jsx';
 import useAccountEditPage from '../../common/form/hooks/useAccountEditPage.js';
+import useScheduleForm from '../../common/form/hooks/useScheduleForm.js';
 import BankProviderEditController from './controllers/BankProviderEditController.js';
 import { providerFieldsFromAccount } from './controllers/providerFormFields.js';
 import BankProviderFormHelper from './helpers/BankProviderFormHelper.jsx';
@@ -14,11 +15,13 @@ import { PROVIDERS_BASE } from '../../common/sections.js';
  * @returns {React.ReactElement} The rendered page.
  */
 export default function BankProviderEdit() {
-  const {
-    context, notFound, accountId, account, state, handlers,
-  } = useAccountEditPage(BankProviderEditController, {
+  const page = useAccountEditPage(BankProviderEditController, {
     base: PROVIDERS_BASE, fieldsFrom: providerFieldsFromAccount, idPrefix: 'bank-provider-edit-',
   });
+  const {
+    context, notFound, accountId, account,
+  } = page;
+  const { state, handlers } = useScheduleForm(page);
 
   if (notFound) {
     return <NotFound orgId={context.orgId ?? null} />;

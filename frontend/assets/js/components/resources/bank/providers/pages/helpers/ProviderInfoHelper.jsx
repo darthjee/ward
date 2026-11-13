@@ -1,4 +1,5 @@
 import DetailEntry from '../../../common/detail/DetailEntry.jsx';
+import ScheduleInfoHelper from '../../../common/detail/helpers/ScheduleInfoHelper.jsx';
 import { monthName } from '../../../common/dates.js';
 import {
   PROVIDER_FIELD_LABELS, forAccountantLabel, formatExpected, frequencyLabel,
@@ -37,7 +38,7 @@ function renderAccountFields(account) {
 
 /**
  * Render the provider info block: tax id, expected amount with its frequency, frequency, due
- * day and due month (each only when set) and the for-accountant flag.
+ * day and due month (each only when set), the for-accountant flag and the schedule values.
  *
  * @param {object} account - The provider account.
  * @returns {React.ReactElement} The definition list.
@@ -56,6 +57,7 @@ function renderProviderFields(account) {
       {renderOptionalEntry('Due day', details.due_day ? String(details.due_day) : '')}
       {renderOptionalEntry('Due month', monthName(details.due_month))}
       <DetailEntry label="For accountant" value={forAccountantLabel(details.for_accountant)} />
+      {ScheduleInfoHelper.render(account.provider_expense)}
     </dl>
   );
 }

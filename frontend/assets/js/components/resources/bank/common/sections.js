@@ -20,3 +20,6 @@ export const SECTION_BY_TYPE = new Map([
 
 /** Account type shown by each section base. */
 export const TYPE_BY_SECTION = new Map([...SECTION_BY_TYPE].map(([type, base]) => [base, type]));
+
+/** Section base of the one-off bill pages (no list: bills belong to their provider). */
+export const BILLS_BASE = '/bank/bills';

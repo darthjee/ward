@@ -30,6 +30,32 @@ describe('TypedAccountsClient', () => {
     });
   });
 
+  const SCHEDULE = { bills_from: '2026-01-01', show_in_calendar: false, paying_account_id: 9 };
+
+  [
+    ['createDebt', 'debt'],
+    ['createProviderExpense', 'provider_expense'],
+  ].forEach(([method, key]) => {
+    it(`${method} passes the schedule fields through`, async () => {
+      await TypedAccountsClient[method](CONTEXT, { name: 'A', [key]: { ...SCHEDULE, paying_account: { id: 9 } } });
+
+      expect(ApiClient.postJson.calls.mostRecent().args[1][key]).toEqual(SCHEDULE);
+    });
+  });
+
+  [
+    ['updateDebt', 'debt'],
+    ['updateProviderExpense', 'provider_expense'],
+  ].forEach(([method, key]) => {
+    it(`${method} keeps null schedule fields (they clear)`, async () => {
+      await TypedAccountsClient[method](CONTEXT, 4, { [key]: { bills_from: null, paying_account_id: null } });
+
+      expect(ApiClient.patchJson).toHaveBeenCalledWith('/bank/accounts/4.json', {
+        [key]: { bills_from: null, paying_account_id: null },
+      });
+    });
+  });
+
   it('is exposed through BankClient', () => {
     expect(BankClient.createProviderExpense).toBe(TypedAccountsClient.createProviderExpense);
     expect(BankClient.updateDebt).toBe(TypedAccountsClient.updateDebt);

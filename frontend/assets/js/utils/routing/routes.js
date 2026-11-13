@@ -57,14 +57,17 @@ export const ROUTES_CONTEXT = [
   ['/bank/providers/accountant', 'bank-provider-accountant'],
   ['/bank/providers/:accountId/edit', 'bank-provider-edit'],
   ['/bank/providers/:accountId', 'bank-provider'],
+  ['/bank/bills/new', 'bank-bill-new'],
+  ['/bank/bills/:billId/edit', 'bank-bill-edit'],
 ];
 
 /**
  * Section registry for context switches: an ordered `[path prefix, list path]` list of
  * context-relative paths. A switch made from a page under a prefix lands on that section's list
  * in the new context; anything else lands on the new context's landing page. Each bank submenu
- * (Debts, Investments, Providers, then #57 Calendar) adds its own row here; the Providers
- * prefix also covers its hand-off page (`/bank/providers/accountant`).
+ * (Debts, Investments, Providers, then #77 Calendar) adds its own row here; the Providers
+ * prefix also covers its hand-off page (`/bank/providers/accountant`). The one-off bill pages
+ * (`/bank/bills/...`) have no list of their own: they land on the Providers list.
  *
  * @type {Array<Array<string>>}
  */
@@ -73,4 +76,5 @@ export const SECTIONS_CONTEXT = [
   ['/bank/debts', '/bank/debts'],
   ['/bank/investments', '/bank/investments'],
   ['/bank/providers', '/bank/providers'],
+  ['/bank/bills', '/bank/providers'],
 ];

@@ -1,4 +1,5 @@
 import DetailEntry from '../../../common/detail/DetailEntry.jsx';
+import ScheduleInfoHelper from '../../../common/detail/helpers/ScheduleInfoHelper.jsx';
 import { formatMoney, negateAmount } from '../../../common/amounts.js';
 import { formatRate } from '../../../common/rates.js';
 import { monthName } from '../../../common/dates.js';
@@ -30,7 +31,7 @@ function renderAccountFields(account) {
 
 /**
  * Render the debt info block: interest rate and period, instalment amount, frequency, due day,
- * due month and instalment count.
+ * due month, instalment count and the schedule values.
  *
  * @param {object} account - The debt account.
  * @returns {React.ReactElement} The definition list.
@@ -46,6 +47,7 @@ function renderDebtFields(account) {
       <DetailEntry label="Due day" value={debt.due_day ? String(debt.due_day) : ''} />
       <DetailEntry label="Due month" value={monthName(debt.due_month)} />
       <DetailEntry label="Instalment count" value={debt.instalment_count ? String(debt.instalment_count) : ''} />
+      {ScheduleInfoHelper.render(account.debt)}
     </dl>
   );
 }

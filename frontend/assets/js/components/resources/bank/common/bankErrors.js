@@ -15,8 +15,9 @@ function validationMessages(error) {
  * Classify an error raised by a bank request.
  *
  * @description Branches on `status` / `code`, never on the message text:
- * `notFound` (404), `conflict` (409, with its `code`), `validation` (400, with its messages) and
- * `transient` (network failure, 5xx, or anything that is not an {@link ApiError}).
+ * `notFound` (404), `conflict` (409, with its `code`), `validation` (400, with its messages;
+ * 422, with its message alone) and `transient` (network failure, 5xx, or anything that is not
+ * an {@link ApiError}).
  * @param {*} error - The caught error.
  * @returns {{kind: string, code: (string|undefined), message: string, messages: Array<string>}}
  *   The classification.
@@ -40,6 +41,10 @@ export function classifyError(error) {
 
   if (error.status === 400) {
     return { ...base, kind: 'validation', messages: validationMessages(error) };
+  }
+
+  if (error.status === 422) {
+    return { ...base, kind: 'validation' };
   }
 
   return { ...base, kind: 'transient' };

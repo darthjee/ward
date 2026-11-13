@@ -1,6 +1,7 @@
 import BankProviderDetailHelper from '../../../../../../../../../assets/js/components/resources/bank/providers/pages/helpers/BankProviderDetailHelper.jsx';
 import { initialLedgerForm } from '../../../../../../../../../assets/js/components/resources/bank/common/detail/hooks/useLedgerForm.js';
 import { localToday } from '../../../../../../../../../assets/js/components/resources/bank/common/dates.js';
+import BillHistoryHelper from '../../../../../../../../../assets/js/components/resources/bank/common/bills/helpers/BillHistoryHelper.jsx';
 import { renderedOutput } from '../../../../../../../../support/renderedOutput.js';
 
 const SENT_AT = '2026-03-02T15:00:00.000Z';
@@ -77,6 +78,20 @@ function findAll(node, predicate, acc = []) {
 }
 
 describe('BankProviderDetailHelper', () => {
+  it('renders the Bill history after the ledger', () => {
+    expect(output().containsInOrder('Ledger', 'Bill history', 'Loading')).toBeTrue();
+  });
+
+  it('hands the account and its source type to the Bill history', () => {
+    spyOn(BillHistoryHelper, 'render').and.returnValue(null);
+    output();
+
+    expect(BillHistoryHelper.render).toHaveBeenCalledWith(
+      jasmine.objectContaining({ sourceType: 'provider_expense', account: jasmine.objectContaining({ id: jasmine.anything() }) }),
+      jasmine.any(Object),
+    );
+  });
+
   it('renders the header, the info block, the shortcuts, the plain inline add and the ledger', () => {
     expect(output().containsInOrder(
       'Office rent', 'Provider', 'Provider info', 'Ledger', 'Add charge', 'Add payment', 'New transaction', 'Payment Mar', 'Opening balance',
@@ -107,9 +122,17 @@ describe('BankProviderDetailHelper', () => {
     expect(page.containsInOrder('Mark as unsent', 'Mark as unsent')).toBeFalse();
   });
 
+  it('links Add bill to the new bill page with the provider pre-selected', () => {
+    expect(output().containsInOrder('Ledger', 'Add charge', 'Add payment', 'href="#/bank/bills/new?provider=4"', 'Add bill'))
+      .toBeTrue();
+    expect(output({ context: { kind: 'organization', orgId: 5 } }).containsAttribute('href', '#/orgs/5/bank/bills/new?provider=4'))
+      .toBeTrue();
+  });
+
   it('keeps Mark as unsent on an archived provider, without shortcuts, inline form, Edit or Delete', () => {
     const page = output({}, { archived_at: '2026-04-01T00:00:00.000Z' });
 
+    expect(page.contains('Add bill')).toBeFalse();
     expect(page.containsInOrder('Charge Feb', 'Mark as unsent')).toBeTrue();
     expect(page.contains('Add charge')).toBeFalse();
     expect(page.contains('New transaction')).toBeFalse();

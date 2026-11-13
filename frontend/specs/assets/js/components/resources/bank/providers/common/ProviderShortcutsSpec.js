@@ -16,6 +16,11 @@ describe('ProviderShortcuts', () => {
     onStartNew = jasmine.createSpy('onStartNew');
   });
 
+  it('renders its children after the shortcuts', () => {
+    expect(renderedOutput(React.createElement(ProviderShortcuts, { account: PROVIDER, onStartNew }, React.createElement('a', null, 'Extra')))
+      .containsInOrder('Add charge', 'Add payment', 'Extra')).toBeTrue();
+  });
+
   it('renders Add charge then Add payment', () => {
     expect(renderedOutput(React.createElement(ProviderShortcuts, { account: PROVIDER, onStartNew }))
       .containsInOrder('Add charge', 'Add payment')).toBeTrue();

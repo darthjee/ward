@@ -155,6 +155,9 @@ describe('HashRouteResolver', () => {
       ['/bank/providers/4', 'bank-provider'],
       ['/bank/providers/4?page=2', 'bank-provider'],
       ['/bank/providers/4/edit', 'bank-provider-edit'],
+      ['/bank/bills/new', 'bank-bill-new'],
+      ['/bank/bills/new?provider=4', 'bank-bill-new'],
+      ['/bank/bills/9/edit', 'bank-bill-edit'],
     ].forEach(([path, page]) => {
       it(`resolves #${path} to ${page} in the Personal context`, () => {
         expect(resolve(`#${path}`)).toEqual({ page, context: PERSONAL });

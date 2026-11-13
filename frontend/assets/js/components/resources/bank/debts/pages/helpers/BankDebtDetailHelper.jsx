@@ -2,6 +2,7 @@ import AccountDetailHelper from '../../../common/detail/helpers/AccountDetailHel
 import AccountHeaderHelper from '../../../common/detail/helpers/AccountHeaderHelper.jsx';
 import DebtInfoHelper from './DebtInfoHelper.jsx';
 import DebtShortcuts from '../../common/DebtShortcuts.jsx';
+import BillHistory from '../../../common/bills/BillHistory.jsx';
 import { DEBTS_BASE } from '../../../common/sections.js';
 
 /**
@@ -30,12 +31,25 @@ function renderShortcuts(account, handlers) {
 }
 
 /**
+ * Render the debt's Bill history after the ledger; an undo reloads the debt and its ledger.
+ *
+ * @param {object} account - The debt account.
+ * @param {{onRetryLoad: Function}} handlers - Page handlers.
+ * @param {{context: object}} state - Page state.
+ * @returns {React.ReactElement} The Bill history.
+ */
+function renderAfterLedger(account, handlers, state) {
+  return <BillHistory context={state.context} account={account} sourceType="debt" onUndone={handlers.onRetryLoad} />;
+}
+
+/**
  * Rendering helper composing the debt detail page.
  */
 const BankDebtDetailHelper = {
   /**
    * Render the debt detail page: the shared detail page under the Debts section, with the debt
-   * header (info block) and the Add payment / Add interest shortcuts above the ledger.
+   * header (info block), the Add payment / Add interest shortcuts above the ledger and the
+   * Bill history after it.
    *
    * @param {{context: object, accountId: (number|string), page: number,
    *   data: ({account: object, ledger: object}|null), loadError: (object|null),
@@ -46,7 +60,7 @@ const BankDebtDetailHelper = {
    */
   render(state, handlers) {
     return AccountDetailHelper.render(state, handlers, {
-      base: DEBTS_BASE, backLabel: 'Debts', renderHeader, renderShortcuts,
+      base: DEBTS_BASE, backLabel: 'Debts', renderHeader, renderShortcuts, renderAfterLedger,
     });
   },
 };
