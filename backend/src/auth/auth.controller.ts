@@ -7,6 +7,7 @@ import { AuthService } from './auth.service.js';
 import { SessionStatusService } from './session-status.service.js';
 import type { AccessTokenPayload } from '../core/access-token-payload.js';
 import { CacheClass } from '../core/cache-class.js';
+import { NoCacheInvalidation } from '../core/cache-invalidation.decorator.js';
 import { CachePolicy } from '../core/cache-policy.decorator.js';
 import { CurrentUser } from '../core/current-user.decorator.js';
 import { Public } from '../core/public.decorator.js';
@@ -33,6 +34,7 @@ const ACCESS_TOKEN_COOKIE = 'access_token';
  */
 @Controller('auth')
 @CachePolicy(CacheClass.Never)
+@NoCacheInvalidation()
 export class AuthController {
   private readonly authService: AuthService;
   private readonly configService: ConfigService;

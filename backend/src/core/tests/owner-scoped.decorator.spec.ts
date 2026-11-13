@@ -2,6 +2,7 @@ import 'reflect-metadata';
 import { Get } from '@nestjs/common';
 import { PATH_METADATA } from '@nestjs/common/constants.js';
 import { CacheClass } from '../cache-class.js';
+import { INVALIDATION_KEY } from '../cache-invalidation.decorator.js';
 import { CACHE_CLASS_KEY } from '../cache-policy.decorator.js';
 import { IS_OWNER_SCOPED_KEY, OwnerScoped, OwnerScopedController } from '../owner-scoped.decorator.js';
 
@@ -29,6 +30,10 @@ describe('OwnerScopedController', () => {
 
   it('declares the user-scoped cache class', () => {
     expect(Reflect.getMetadata(CACHE_CLASS_KEY, ThingsController)).toBe(CacheClass.UserScoped);
+  });
+
+  it('declares the owner invalidation by default', () => {
+    expect(Reflect.getMetadata(INVALIDATION_KEY, ThingsController)).toEqual({ kind: 'owner' });
   });
 });
 
