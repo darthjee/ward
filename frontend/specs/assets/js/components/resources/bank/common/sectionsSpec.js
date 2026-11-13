@@ -1,5 +1,5 @@
 import {
-  ACCOUNTS_BASE, DEBTS_BASE, INVESTMENTS_BASE, PROVIDERS_BASE, SECTION_BY_TYPE, TYPE_BY_SECTION,
+  ACCOUNTS_BASE, BILLS_BASE, DEBTS_BASE, INVESTMENTS_BASE, PROVIDERS_BASE, SECTION_BY_TYPE, TYPE_BY_SECTION,
 } from '../../../../../../../assets/js/components/resources/bank/common/sections.js';
 
 describe('bank sections', () => {
@@ -8,6 +8,7 @@ describe('bank sections', () => {
     expect(DEBTS_BASE).toBe('/bank/debts');
     expect(INVESTMENTS_BASE).toBe('/bank/investments');
     expect(PROVIDERS_BASE).toBe('/bank/providers');
+    expect(BILLS_BASE).toBe('/bank/bills');
   });
 
   it('maps each account type to its section and back', () => {
