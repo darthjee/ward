@@ -3,6 +3,7 @@ import AccountHeaderHelper from '../../../common/detail/helpers/AccountHeaderHel
 import ProviderInfoHelper from './ProviderInfoHelper.jsx';
 import ProviderShortcuts from '../../common/ProviderShortcuts.jsx';
 import SentMark from '../../common/SentMark.jsx';
+import BillHistory from '../../../common/bills/BillHistory.jsx';
 import { PROVIDERS_BASE } from '../../../common/sections.js';
 
 /**
@@ -50,13 +51,29 @@ function renderRowExtra(transaction, handlers, state) {
 }
 
 /**
+ * Render the provider's Bill history after the ledger; an undo reloads the provider and its
+ * ledger.
+ *
+ * @param {object} account - The provider account.
+ * @param {{onRetryLoad: Function}} handlers - Page handlers.
+ * @param {{context: object}} state - Page state.
+ * @returns {React.ReactElement} The Bill history.
+ */
+function renderAfterLedger(account, handlers, state) {
+  return (
+    <BillHistory context={state.context} account={account} sourceType="provider_expense" onUndone={handlers.onRetryLoad} />
+  );
+}
+
+/**
  * Rendering helper composing the provider detail page.
  */
 const BankProviderDetailHelper = {
   /**
    * Render the provider detail page: the shared detail page under the Providers section, with
    * the provider header (info block), the Add charge / Add payment shortcuts above the ledger
-   * and each sent charge's mark with **Mark as unsent** (also on an archived provider).
+   * and each sent charge's mark with **Mark as unsent** (also on an archived provider), and the
+   * Bill history after the ledger.
    *
    * @param {{context: object, accountId: (number|string), page: number,
    *   data: ({account: object, ledger: object}|null), loadError: (object|null),
@@ -69,6 +86,7 @@ const BankProviderDetailHelper = {
   render(state, handlers) {
     return AccountDetailHelper.render(state, handlers, {
       base: PROVIDERS_BASE, backLabel: 'Providers', renderHeader, renderShortcuts, renderRowExtra,
+      renderAfterLedger,
     });
   },
 };

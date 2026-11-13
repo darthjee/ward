@@ -1,5 +1,6 @@
 import BankDebtDetailHelper from '../../../../../../../../../assets/js/components/resources/bank/debts/pages/helpers/BankDebtDetailHelper.jsx';
 import { initialLedgerForm } from '../../../../../../../../../assets/js/components/resources/bank/common/detail/hooks/useLedgerForm.js';
+import BillHistoryHelper from '../../../../../../../../../assets/js/components/resources/bank/common/bills/helpers/BillHistoryHelper.jsx';
 import { renderedOutput } from '../../../../../../../../support/renderedOutput.js';
 
 const DEBT = {
@@ -46,6 +47,20 @@ function output(overrides = {}, account = {}) {
 }
 
 describe('BankDebtDetailHelper', () => {
+  it('renders the Bill history after the ledger', () => {
+    expect(output().containsInOrder('Ledger', 'Bill history', 'Loading')).toBeTrue();
+  });
+
+  it('hands the account and its source type to the Bill history', () => {
+    spyOn(BillHistoryHelper, 'render').and.returnValue(null);
+    output();
+
+    expect(BillHistoryHelper.render).toHaveBeenCalledWith(
+      jasmine.objectContaining({ sourceType: 'debt', account: jasmine.objectContaining({ id: jasmine.anything() }) }),
+      jasmine.any(Object),
+    );
+  });
+
   it('renders the header, the info block, the shortcuts, the plain inline add and the ledger', () => {
     expect(output().containsInOrder(
       'Car loan', 'Creditor', 'Debt info', '1.99% / month', 'Ledger', 'Add payment', 'Add interest', 'New transaction', 'Payment', 'Opening balance',
