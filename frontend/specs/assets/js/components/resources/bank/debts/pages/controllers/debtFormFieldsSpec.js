@@ -55,6 +55,9 @@ describe('debtFormFields', () => {
         due_day: '',
         due_month: '',
         instalment_count: '',
+        bills_from: '',
+        show_in_calendar: true,
+        paying_account_id: '',
       }));
     });
   });
@@ -75,6 +78,19 @@ describe('debtFormFields', () => {
         due_day: '10',
         due_month: '',
         instalment_count: '24',
+      }));
+    });
+
+    it('loads the schedule fields, the paying account id from its object', () => {
+      const account = {
+        ...STORED,
+        debt: {
+          ...STORED.debt, bills_from: '2026-02-01', show_in_calendar: false, paying_account: { id: 9, name: 'Main' },
+        },
+      };
+
+      expect(debtFieldsFromAccount(account)).toEqual(jasmine.objectContaining({
+        bills_from: '2026-02-01', show_in_calendar: false, paying_account_id: '9',
       }));
     });
 
@@ -106,9 +122,21 @@ describe('debtFormFields', () => {
             due_day: null,
             due_month: null,
             instalment_count: null,
+            bills_from: null,
+            show_in_calendar: true,
+            paying_account_id: null,
           },
         },
       });
+    });
+
+    it('sends the schedule fields nested in debt', () => {
+      expect(validate({ bills_from: '2026-02-01', show_in_calendar: false, paying_account_id: '9' }).body.debt)
+        .toEqual(jasmine.objectContaining({ bills_from: '2026-02-01', show_in_calendar: false, paying_account_id: 9 }));
+    });
+
+    it('rejects an invalid Bills from date', () => {
+      expect(validate({ bills_from: 'soon' }).errors).toEqual({ bills_from: jasmine.any(String) });
     });
 
     it('sends a negative amount owed as a positive opening balance', () => {
@@ -208,6 +236,12 @@ describe('debtFormFields', () => {
       const body = validateDebtFields({ ...debtFieldsFromAccount(STORED), interest_rate: '' }, { now: NOW }).body;
 
       expect(changedDebtFields(body, original)).toEqual({ debt: { interest_rate: null, interest_period: null } });
+    });
+
+    it('sends only the changed schedule fields', () => {
+      const body = validateDebtFields({ ...debtFieldsFromAccount(STORED), show_in_calendar: false, bills_from: '2026-03-01' }, { now: NOW }).body;
+
+      expect(changedDebtFields(body, original)).toEqual({ debt: { bills_from: '2026-03-01', show_in_calendar: false } });
     });
 
     it('keeps a name-only body as-is', () => {

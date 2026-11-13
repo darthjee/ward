@@ -11,8 +11,9 @@ import BankAccountLoader, { buildBankSettingsLoadEffect } from '../../detail/con
  * @param {Function} Controller - The form controller class (an `AccountFormController`).
  * @param {object} initialFields - The empty form fields.
  * @param {string} idPrefix - The input id prefix.
- * @returns {{context: object, notFound: boolean, state: object, handlers: object}} The owner
- *   context, whether to show Not-found, the form helper state and its handlers.
+ * @returns {{context: object, notFound: boolean, setFields: Function, state: object,
+ *   handlers: object}} The owner context, whether to show Not-found, the form fields setter
+ *   (for section-specific handlers), the form helper state and its handlers.
  */
 export default function useAccountNewPage(Controller, initialFields, idPrefix) {
   const form = useBankAccountForm(initialFields);
@@ -40,6 +41,7 @@ export default function useAccountNewPage(Controller, initialFields, idPrefix) {
   return {
     context,
     notFound: form.notFound,
+    setFields,
     state: {
       fields: form.fields,
       fieldErrors: form.fieldErrors,

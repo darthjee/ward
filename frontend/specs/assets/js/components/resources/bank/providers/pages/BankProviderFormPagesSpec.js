@@ -59,6 +59,8 @@ describe('bank provider form pages', () => {
       expect(state.fields.charge_frequency).toBe('monthly');
       expect(state.fields.for_accountant).toBeTrue();
       expect(state.idPrefix).toBe('bank-provider-new-');
+      expect(state.fields).toEqual(jasmine.objectContaining({ bills_from: '', show_in_calendar: true, paying_account_id: '' }));
+      expect(state.payingAccounts).toBeNull();
     });
 
     it('submits the current fields through the provider controller', async () => {
@@ -93,6 +95,7 @@ describe('bank provider form pages', () => {
       expect(options.cancelHref).toBe('#/orgs/5/bank/providers/7');
       expect(state.fields).toBeNull();
       expect(state.idPrefix).toBe('bank-provider-edit-');
+      expect(state.payingAccounts).toBeNull();
     });
 
     it('does not submit before the provider is loaded, and wires retries', () => {

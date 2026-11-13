@@ -4,6 +4,7 @@ import AccountFormHelper, {
 } from '../../../common/form/helpers/AccountFormHelper.jsx';
 import AccountFormInput from '../../../common/form/AccountFormInput.jsx';
 import AccountFormSelect from '../../../common/form/AccountFormSelect.jsx';
+import ScheduleFieldsHelper from '../../../common/form/helpers/ScheduleFieldsHelper.jsx';
 import RatePeriodSelect, { PERIOD_OPTIONS } from '../../../common/form/RatePeriodSelect.jsx';
 import { monthName } from '../../../common/dates.js';
 
@@ -44,13 +45,15 @@ function renderDueMonth(state, onChange) {
 
 /**
  * Render the debt fields: interest rate (and its period), instalment amount, frequency, due
- * day, due month (yearly only) and instalment count.
+ * day, due month (yearly only), instalment count and the schedule inputs.
  *
  * @param {object} state - Form state.
  * @param {{onFieldChange: Function}} handlers - Field handlers.
  * @returns {React.ReactElement} The fields.
  */
-function renderDebtFields(state, { onFieldChange }) {
+function renderDebtFields(state, handlers) {
+  const { onFieldChange } = handlers;
+
   return (
     <fieldset>
       <legend className="h5">Debt</legend>
@@ -67,6 +70,7 @@ function renderDebtFields(state, { onFieldChange }) {
       <AccountFormInput name="due_day" label="Due day" extra={{ inputMode: 'numeric' }} state={state} onChange={onFieldChange} />
       {renderDueMonth(state, onFieldChange)}
       <AccountFormInput name="instalment_count" label="Instalment count" extra={{ inputMode: 'numeric' }} state={state} onChange={onFieldChange} />
+      {ScheduleFieldsHelper.render(state, handlers)}
     </fieldset>
   );
 }

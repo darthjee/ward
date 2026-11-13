@@ -1,5 +1,6 @@
 import NotFound from '../../../../common/notFound/NotFound.jsx';
 import useAccountEditPage from '../../common/form/hooks/useAccountEditPage.js';
+import useScheduleForm from '../../common/form/hooks/useScheduleForm.js';
 import BankDebtEditController from './controllers/BankDebtEditController.js';
 import { debtFieldsFromAccount } from './controllers/debtFormFields.js';
 import BankDebtFormHelper from './helpers/BankDebtFormHelper.jsx';
@@ -14,11 +15,13 @@ import { DEBTS_BASE } from '../../common/sections.js';
  * @returns {React.ReactElement} The rendered page.
  */
 export default function BankDebtEdit() {
-  const {
-    context, notFound, accountId, account, state, handlers,
-  } = useAccountEditPage(BankDebtEditController, {
+  const page = useAccountEditPage(BankDebtEditController, {
     base: DEBTS_BASE, fieldsFrom: debtFieldsFromAccount, idPrefix: 'bank-debt-edit-',
   });
+  const {
+    context, notFound, accountId, account,
+  } = page;
+  const { state, handlers } = useScheduleForm(page);
 
   if (notFound) {
     return <NotFound orgId={context.orgId ?? null} />;

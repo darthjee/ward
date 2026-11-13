@@ -6,6 +6,7 @@ import BankExtrasHelper from '../../../common/form/helpers/BankExtrasHelper.jsx'
 import AccountFormCheckbox from '../../../common/form/AccountFormCheckbox.jsx';
 import AccountFormInput from '../../../common/form/AccountFormInput.jsx';
 import AccountFormSelect from '../../../common/form/AccountFormSelect.jsx';
+import ScheduleFieldsHelper from '../../../common/form/helpers/ScheduleFieldsHelper.jsx';
 import { monthName } from '../../../common/dates.js';
 import { FREQUENCY_OPTIONS, PROVIDER_FIELD_LABELS } from '../../common/providerLabels.js';
 
@@ -50,13 +51,15 @@ function renderDueMonth(state, onChange) {
 
 /**
  * Render the provider fields: For accountant, provider tax id, expected amount, frequency,
- * due day and due month (yearly only).
+ * due day, due month (yearly only) and the schedule inputs.
  *
  * @param {object} state - Form state.
  * @param {{onFieldChange: Function}} handlers - Field handlers.
  * @returns {React.ReactElement} The fields.
  */
-function renderProviderFields(state, { onFieldChange }) {
+function renderProviderFields(state, handlers) {
+  const { onFieldChange } = handlers;
+
   return (
     <fieldset>
       <legend className="h5">Provider</legend>
@@ -66,6 +69,7 @@ function renderProviderFields(state, { onFieldChange }) {
       <AccountFormSelect name="charge_frequency" label="Frequency" options={FREQUENCY_OPTIONS} state={state} onChange={onFieldChange} />
       <AccountFormInput name="due_day" label="Due day" extra={{ inputMode: 'numeric' }} state={state} onChange={onFieldChange} />
       {renderDueMonth(state, onFieldChange)}
+      {ScheduleFieldsHelper.render(state, handlers)}
     </fieldset>
   );
 }

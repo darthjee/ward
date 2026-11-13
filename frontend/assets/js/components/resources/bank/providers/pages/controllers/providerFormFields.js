@@ -9,6 +9,11 @@ import {
   integerIn,
   text,
 } from '../../../common/form/controllers/nestedFields.js';
+import {
+  emptyScheduleFields,
+  scheduleFieldsFromAccount,
+  validateScheduleFields,
+} from '../../../common/form/controllers/scheduleFields.js';
 
 /** The provider-specific form fields (flat in the form, nested as `provider_expense`). */
 export const PROVIDER_FIELD_NAMES = [
@@ -21,7 +26,8 @@ export const TAX_ID_MAX_LENGTH = 32;
 
 /**
  * Build the empty provider create form: the common fields plus the provider fields, For
- * accountant on and the frequency defaulting to `monthly`.
+ * accountant on and the frequency defaulting to `monthly`, and the schedule fields (shown in
+ * the Calendar).
  *
  * @param {string} [currency] - The default currency (`''` when unknown).
  * @param {string} [today] - Local today, `YYYY-MM-DD`.
@@ -36,6 +42,7 @@ export function emptyProviderFields(currency = '', today = undefined) {
     charge_frequency: 'monthly',
     due_day: '',
     due_month: '',
+    ...emptyScheduleFields(),
   };
 }
 
@@ -54,6 +61,7 @@ export function providerFieldsFromAccount(account) {
     ...Object.fromEntries(PROVIDER_FIELD_NAMES.map((name) => [name, text(details.get(name))])),
     for_accountant: details.get('for_accountant') ?? true,
     charge_frequency: details.get('charge_frequency') ?? 'monthly',
+    ...scheduleFieldsFromAccount(account.provider_expense),
   };
 }
 
@@ -143,16 +151,17 @@ export function validateProviderFields(fields, { nameOnly = false, now = new Dat
   }
 
   const provider = providerEntries(fields);
+  const schedule = validateScheduleFields(fields);
   const errors = {
     ...common.errors,
-    ...Object.fromEntries(provider.errors.filter(([, error]) => error)),
+    ...Object.fromEntries([...provider.errors, ...schedule.errors].filter(([, error]) => error)),
   };
 
   if (Object.keys(errors).length) {
     return { errors, body: null };
   }
 
-  return { errors, body: { ...common.body, provider_expense: provider.values } };
+  return { errors, body: { ...common.body, provider_expense: { ...provider.values, ...schedule.values } } };
 }
 
 /**

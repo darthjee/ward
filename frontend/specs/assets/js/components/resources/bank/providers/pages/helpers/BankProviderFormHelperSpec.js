@@ -24,6 +24,7 @@ function output(state = {}, fields = {}) {
     currencyLocked: false,
     archived: false,
     idPrefix: 'prov-',
+    payingAccounts: [{ id: 3, name: 'Main BRL', currency: 'BRL' }, { id: 4, name: 'Main USD', currency: 'USD' }],
     ...state,
   }, HANDLERS, OPTIONS));
 }
@@ -53,6 +54,20 @@ describe('BankProviderFormHelper', () => {
       .toBeFalse();
   });
 
+  it('renders the schedule inputs after the provider fields, Show in Calendar checked', () => {
+    const page = output();
+
+    expect(page.containsInOrder('Due day', 'Bills from', 'Show in Calendar', 'Default paying account', 'Notes')).toBeTrue();
+    expect(page.containsInOrder('id="prov-show_in_calendar"', 'checked=""')).toBeTrue();
+  });
+
+  it('lists only the paying accounts in the provider currency', () => {
+    const page = output({}, { currency: 'USD' });
+
+    expect(page.containsElement('option', 'Main USD')).toBeTrue();
+    expect(page.containsElement('option', 'Main BRL')).toBeFalse();
+  });
+
   it('offers the monthly and yearly frequencies', () => {
     expect(output().containsInOrder('<option value="monthly" selected="">Monthly', 'Yearly')).toBeTrue();
   });
@@ -75,5 +90,6 @@ describe('BankProviderFormHelper', () => {
 
     expect(page.contains(ARCHIVED_NOTICE)).toBeTrue();
     expect(page.contains('Provider tax id')).toBeFalse();
+    expect(page.contains('Default paying account')).toBeFalse();
   });
 });
