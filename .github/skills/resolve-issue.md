@@ -1,6 +1,6 @@
 ---
 name: resolve issue
-description: Execute a planned Majora issue from its issue branch by reading the issue brief and plan, delegating work through the architect, committing agent changes, and opening a PR when validation passes.
+description: Execute a planned Ward issue from its issue branch by reading the issue brief and plan, delegating work through the architect, committing agent changes, and opening a PR when validation passes.
 parameters:
   - name: issue_id
     type: integer
@@ -9,7 +9,7 @@ parameters:
 
 # Resolve issue
 
-Execute an already planned Majora issue from its dedicated issue branch.
+Execute an already planned Ward issue from its dedicated issue branch.
 
 ## Goal
 
@@ -65,4 +65,4 @@ The skill must leave the repository in a ready-to-review state:
 
 ## Final result
 
-This skill is for the case where a Majora issue has already been planned and documented. It should coordinate execution of that plan, not create the issue or plan from scratch. The work ends in a verified, committed implementation and a pull request when the environment permits repository writes and PR creation.
+This skill is for the case where a Ward issue has already been planned and documented. It should coordinate execution of that plan, not create the issue or plan from scratch. The work ends in a verified, committed implementation and a pull request when the environment permits repository writes and PR creation.

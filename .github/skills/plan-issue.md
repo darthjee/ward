@@ -1,6 +1,6 @@
 ---
 name: plan issue
-description: Create an issue brief and a role-based implementation plan for a Majora issue on a dedicated issue branch.
+description: Create an issue brief and a role-based implementation plan for a Ward issue on a dedicated issue branch.
 parameters:
   - name: issue_id
     type: integer
@@ -9,7 +9,7 @@ parameters:
 
 # Plan issue
 
-Create a complete planning package for a Majora issue in a dedicated branch.
+Create a complete planning package for a Ward issue in a dedicated branch.
 
 ## Goal
 
