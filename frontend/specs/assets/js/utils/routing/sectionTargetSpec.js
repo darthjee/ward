@@ -22,6 +22,10 @@ describe('sectionTarget', () => {
       expect(SECTIONS_CONTEXT).toContain(['/bank/providers', '/bank/providers']);
     });
 
+    it('registers the bank calendar section', () => {
+      expect(SECTIONS_CONTEXT).toContain(['/bank/calendar', '/bank/calendar']);
+    });
+
     it('lands the one-off bill pages on the providers list', () => {
       expect(SECTIONS_CONTEXT).toContain(['/bank/bills', '/bank/providers']);
     });
@@ -136,6 +140,12 @@ describe('sectionTarget', () => {
     it('lands on the providers list from a bill page, in both directions', () => {
       expect(switchTargetFor('#/bank/bills/new?provider=3')(ORG_5)).toBe('#/orgs/5/bank/providers');
       expect(switchTargetFor('#/orgs/5/bank/bills/9/edit')(PERSONAL)).toBe('#/bank/providers');
+    });
+
+    it('lands on the calendar list from the list and the month view, in both directions', () => {
+      expect(switchTargetFor('#/bank/calendar')(ORG_5)).toBe('#/orgs/5/bank/calendar');
+      expect(switchTargetFor('#/bank/calendar/month?m=2026-12')(ORG_5)).toBe('#/orgs/5/bank/calendar');
+      expect(switchTargetFor('#/orgs/5/bank/calendar/month')(PERSONAL)).toBe('#/bank/calendar');
     });
 
     it('lands on the landing page outside a section', () => {

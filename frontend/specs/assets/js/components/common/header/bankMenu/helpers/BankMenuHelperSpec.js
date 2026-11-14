@@ -4,17 +4,17 @@ import BankMenuHelper, {
 import { renderedOutput } from '../../../../../../../support/renderedOutput.js';
 
 describe('BankMenuHelper', () => {
-  it('lists the Accounts, Debts, Investments then Providers entry', () => {
+  it('lists the Accounts, Debts, Investments Providers then Calendar entry', () => {
     expect(BANK_MENU_ENTRIES).toEqual([
       ['Accounts', '/bank/accounts'], ['Debts', '/bank/debts'], ['Investments', '/bank/investments'],
-      ['Providers', '/bank/providers'],
+      ['Providers', '/bank/providers'], ['Calendar', '/bank/calendar'],
     ]);
   });
 
   it('builds every entry from the Personal context', () => {
     const page = renderedOutput(BankMenuHelper.render({ context: { kind: 'personal' } }));
 
-    expect(page.containsInOrder('href="#/bank/accounts"', 'Accounts', 'href="#/bank/debts"', 'Debts', 'href="#/bank/investments"', 'Investments', 'href="#/bank/providers"', 'Providers'))
+    expect(page.containsInOrder('href="#/bank/accounts"', 'Accounts', 'href="#/bank/debts"', 'Debts', 'href="#/bank/investments"', 'Investments', 'href="#/bank/providers"', 'Providers', 'href="#/bank/calendar"', 'Calendar'))
       .toBeTrue();
   });
 
