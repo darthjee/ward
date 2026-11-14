@@ -18,7 +18,7 @@ import { NOT_FOUND_CASES, ownerKeysIn, type OwnerFixtures } from './support/owne
 jest.mock('../ledger.query.js', () => jest.requireActual('./support/in-memory-ledger.query.js'));
 jest.mock('../account-balances.query.js', () => jest.requireActual('./support/in-memory-ledger.query.js'));
 
-// Debt accounts (docs/agents/specs/banking/accounts/debt.md, *Required tests*): the generic
+// Debt accounts (docs/agents/modules/bank/debt.md, docs/agents/backend/routes/bank.md): the generic
 // account routes with `type: debt` and a nested `debt` object, in both owner contexts.
 
 type Method = 'get' | 'post' | 'patch' | 'delete';

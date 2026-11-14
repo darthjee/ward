@@ -19,7 +19,7 @@ import { DebtDetails } from '../entities/debt-details.entity.js';
 import { todayUtc } from '../ledger-date.js';
 
 /**
- * Handler of `debt` accounts (see `docs/agents/specs/banking/accounts/debt.md`):
+ * Handler of `debt` accounts (see `docs/agents/modules/bank/debt.md`):
  * a loan with the regular ledger plus a 1:1 `bank_debt_details` row, which
  * every debt account has (created with defaults when the body sends no
  * `debt` object). PATCH merges the sent `debt` fields onto the stored row and

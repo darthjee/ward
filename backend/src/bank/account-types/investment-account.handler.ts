@@ -16,7 +16,7 @@ import { InvestmentDetails } from '../entities/investment-details.entity.js';
 
 /**
  * Handler of `investment` accounts (see
- * `docs/agents/specs/banking/accounts/investment.md`): one investment with
+ * `docs/agents/modules/bank/investment.md`): one investment with
  * the regular ledger (its balance is the current value) plus a 1:1
  * `bank_investment_details` row, which every investment account has (all
  * fields `null` when the body sends no `investment` object). Its opening

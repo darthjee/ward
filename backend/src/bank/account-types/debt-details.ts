@@ -16,7 +16,7 @@ import type { DebtDetailsDto } from '../dto/debt-details.dto.js';
 import type { DebtDetails, DebtPeriod } from '../entities/debt-details.entity.js';
 
 // Pure helpers of the debt account type: defaults, PATCH merge, paired rules,
-// currency rescale and serialization (see `docs/agents/specs/banking/accounts/debt.md`).
+// currency rescale and serialization (see `docs/agents/modules/bank/debt.md`).
 
 /** The debt fields of a `bank_debt_details` row (no key, no timestamps). */
 export type DebtState = Pick<

@@ -16,7 +16,7 @@ import type { ProviderChargeFrequency, ProviderExpenseDetails } from '../entitie
 
 // Pure helpers of the provider-expense account type: defaults, PATCH merge,
 // paired rule, currency rescale and serialization (see
-// `docs/agents/specs/banking/accounts/provider-expense.md`).
+// `docs/agents/modules/bank/provider-expense.md`).
 
 /** The provider-expense fields of a `bank_provider_expense_details` row (no key, no timestamps). */
 export type ProviderExpenseState = Pick<

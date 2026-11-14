@@ -2,7 +2,7 @@ import { Column, CreateDateColumn, Entity, PrimaryGeneratedColumn, UpdateDateCol
 import { bigintTransformer } from './bigint.transformer.js';
 
 /**
- * A one-off bill (see `docs/agents/specs/banking/bills.md`, *One-off bills*).
+ * A one-off bill (see `docs/agents/modules/bank/bills.md`, *One-off bills*).
  * Owns table `bank_bills`. It never stores an owner: it inherits it through
  * its provider-expense account (`providerAccountId`, a real FK
  * `ON DELETE CASCADE`). `payingAccountId` is a real FK `ON DELETE SET NULL`.

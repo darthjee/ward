@@ -12,7 +12,7 @@ export const PAYING_ACCOUNT_TYPE = 'regular';
 /**
  * Resolves a paying account sent in a request body (`paying_account_id`): a
  * `regular`, non-archived account of the same owner and the required
- * currency (see `docs/agents/specs/banking/bills.md`, *Validation*).
+ * currency (see `docs/agents/modules/bank/bills.md`, *Validation*).
  */
 @Injectable()
 export class PayingAccountResolver {

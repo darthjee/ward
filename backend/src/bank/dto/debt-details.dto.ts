@@ -6,7 +6,7 @@ export const DEBT_PERIODS = RATE_PERIODS;
 
 /**
  * The nested `debt` object of an account body (see
- * `docs/agents/specs/banking/accounts/debt.md`). Every field is optional, and
+ * `docs/agents/modules/bank/debt.md`). Every field is optional, and
  * all but `instalment_frequency` accept `null` (clears it). Only formats and
  * ranges are checked here: the paired rules (rate ↔ period, yearly ↔
  * `due_month`) and the `instalment_amount` parsing against the account

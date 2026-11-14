@@ -1,7 +1,7 @@
 import type { AccountRef } from '../account-refs.js';
 
 // Pure helpers of the bill schedule fields shared by the debt and
-// provider-expense details (see `docs/agents/specs/banking/bills.md`,
+// provider-expense details (see `docs/agents/modules/bank/bills.md`,
 // "Schedule fields on source accounts").
 
 /** The schedule fields stored on a details row. */

@@ -19,7 +19,7 @@ import { paymentCommand } from './payment-body.js';
 
 /**
  * Pay, skip and undo of bill occurrences (lazy `BankModule`, see
- * `docs/agents/specs/banking/bills.md`, *Paying a bill*). Path ids answer the
+ * `docs/agents/modules/bank/bills.md`, *Paying, skipping and undoing*). Path ids answer the
  * uniform 404; body account ids the generic 422; the writes are atomic (see
  * {@link BillPaymentWriter}).
  *

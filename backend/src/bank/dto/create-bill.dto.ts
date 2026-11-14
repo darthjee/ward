@@ -5,7 +5,7 @@ import { MaxCodePoints, trimString } from '../../core/string-validators.js';
 
 /**
  * Request body for `POST <base>/bills.json` (see
- * `docs/agents/specs/banking/bills.md`, *One-off bills*), taken through
+ * `docs/agents/modules/bank/bills.md`, *One-off bills*), taken through
  * `@StrictBody()`: owner fields and unknown fields answer 400. `amount` is a
  * decimal string, validated against the **provider's** currency by the
  * service (> 0, its exponent, at most 10^13 minor units). Values out of bounds

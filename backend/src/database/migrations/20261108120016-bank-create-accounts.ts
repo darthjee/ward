@@ -28,7 +28,7 @@ export const ACCOUNTS_CONSTRAINTS_SQL = `ALTER TABLE \`${ACCOUNTS}\`
 
 /**
  * Creates the Bank module's `bank_accounts` table (see
- * `docs/agents/specs/banking/accounts/regular.md`). `user_id` and
+ * `docs/agents/modules/bank/accounts.md`, *Regular accounts*). `user_id` and
  * `organization_id` are **logical** references to `auth` (no FK); exactly one
  * of them is set (DB check). Amounts (`opening_balance`) are integer minor
  * units. `down` drops the table with raw SQL, because TypeORM's `dropTable`

@@ -41,7 +41,7 @@ export function parseBillAmount(value: string, currency: string): bigint {
 }
 
 /**
- * One-off bills (lazy `BankModule`, see `docs/agents/specs/banking/bills.md`).
+ * One-off bills (lazy `BankModule`, see `docs/agents/modules/bank/bills.md`).
  * A bill has no owner column: it is reached only through an owned, active
  * provider-expense account, so a bill of another owner or context, or of an
  * archived provider, answers the uniform 404. Body account ids answer the

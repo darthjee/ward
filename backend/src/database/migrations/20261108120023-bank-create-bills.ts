@@ -38,7 +38,7 @@ export const BILL_PAYMENTS_DERIVED_KEY_SQL = `ALTER TABLE \`${BILL_PAYMENTS}\`
   ADD UNIQUE INDEX \`uq_bank_bill_payments_derived\` (\`source_account_id\`, \`derived_due_date\`)`;
 
 /**
- * Creates the Bank module's bill tables (see `docs/agents/specs/banking/bills.md`):
+ * Creates the Bank module's bill tables (see `docs/agents/modules/bank/bills.md`):
  * - `bank_bills`, the one-off bills, owned through their provider-expense
  *   account (`ON DELETE CASCADE`), with a default paying account
  *   (`ON DELETE SET NULL`);

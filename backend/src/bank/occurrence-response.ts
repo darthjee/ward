@@ -19,7 +19,7 @@ export interface PaymentResponse {
   paying_account: AccountRef | null;
 }
 
-/** The occurrence shape of `docs/agents/specs/banking/bills.md` (never an owner field). */
+/** The occurrence shape of `docs/agents/modules/bank/bills.md` (never an owner field). */
 export interface OccurrenceResponse {
   kind: OccurrenceKind;
   source_account: AccountRef & { type: string };

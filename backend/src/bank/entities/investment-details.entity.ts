@@ -9,7 +9,7 @@ export type InvestmentYieldPeriod = 'monthly' | 'yearly';
 
 /**
  * The investment-specific details of an {@link Account} of type `investment`
- * (see `docs/agents/specs/banking/accounts/investment.md`). Owns table
+ * (see `docs/agents/modules/bank/investment.md`). Owns table
  * `bank_investment_details`, 1:1 with `bank_accounts`: `accountId` is both
  * the primary key and a real FK (`ON DELETE CASCADE`). It never stores an
  * owner: it inherits it through its account. Every field is informational

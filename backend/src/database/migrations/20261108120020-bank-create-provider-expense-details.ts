@@ -6,7 +6,7 @@ const PROVIDER_EXPENSE_DETAILS = 'bank_provider_expense_details';
 
 /**
  * Creates the Bank module's `bank_provider_expense_details` table (see
- * `docs/agents/specs/banking/accounts/provider-expense.md`): the 1:1 details
+ * `docs/agents/modules/bank/provider-expense.md`): the 1:1 details
  * of a `provider_expense` account. `account_id` is both the primary key and a
  * **real** FK to `bank_accounts.id` with `ON DELETE CASCADE`. No owner column:
  * the owner comes from the account. `expected_amount` is integer minor units

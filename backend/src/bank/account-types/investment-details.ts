@@ -4,7 +4,7 @@ import type { InvestmentDetailsDto } from '../dto/investment-details.dto.js';
 import type { InvestmentDetails, InvestmentKind, InvestmentYieldPeriod } from '../entities/investment-details.entity.js';
 
 // Pure helpers of the investment account type: defaults, PATCH merge, paired
-// rule and serialization (see `docs/agents/specs/banking/accounts/investment.md`).
+// rule and serialization (see `docs/agents/modules/bank/investment.md`).
 
 /** The investment fields of a `bank_investment_details` row (no key, no timestamps). */
 export type InvestmentState = Pick<

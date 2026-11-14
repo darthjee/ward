@@ -7,7 +7,7 @@ export type DebtPeriod = 'monthly' | 'yearly';
 
 /**
  * The debt-specific details of an {@link Account} of type `debt` (see
- * `docs/agents/specs/banking/accounts/debt.md`). Owns table
+ * `docs/agents/modules/bank/debt.md`). Owns table
  * `bank_debt_details`, 1:1 with `bank_accounts`: `accountId` is both the
  * primary key and a real FK (`ON DELETE CASCADE`). It never stores an owner:
  * it inherits it through its account.

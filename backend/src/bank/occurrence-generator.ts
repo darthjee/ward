@@ -1,5 +1,5 @@
 // Pure occurrence generator of the recurring bills derived from debt and
-// provider-expense accounts (see `docs/agents/specs/banking/bills.md`,
+// provider-expense accounts (see `docs/agents/modules/bank/bills.md`,
 // *Recurrence model*). Dates are `YYYY-MM-DD` strings; the maths goes through
 // `Date.UTC` only, with no date library. One-off bills never go through it
 // (their nominal and effective dates are both their `dueDate`).
