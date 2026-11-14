@@ -19,4 +19,12 @@ describe('assertAnyFieldPresent', () => {
   it('does not throw when only newPassword is present', () => {
     expect(() => assertAnyFieldPresent({ newPassword: 'new-password' })).not.toThrow();
   });
+
+  it('does not throw when locale is an allowlisted value', () => {
+    expect(() => assertAnyFieldPresent({ locale: 'pt-BR' })).not.toThrow();
+  });
+
+  it('does not throw when locale is an explicit null', () => {
+    expect(() => assertAnyFieldPresent({ locale: null })).not.toThrow();
+  });
 });

@@ -28,6 +28,7 @@ export const ErrorCodes = {
   CURRENCY_MISMATCH: 'CURRENCY_MISMATCH',
   BILL_PAID: 'BILL_PAID',
   OCCURRENCE_ALREADY_PAID: 'OCCURRENCE_ALREADY_PAID',
+  INVALID_LOCALE: 'INVALID_LOCALE',
 } as const;
 
 // Message used for every unexpected (non-HTTP) error — the real message and

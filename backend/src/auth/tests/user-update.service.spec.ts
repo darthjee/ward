@@ -36,6 +36,30 @@ describe('UserUpdateService', () => {
   });
 
   describe('applyUserUpdate', () => {
+    describe('when a locale change is given', () => {
+      it('writes the locale and returns it', async () => {
+        const result = await service.applyUserUpdate(user, { locale: 'pt-BR' });
+
+        expect(userRepository.update).toHaveBeenCalledWith(user.id, { locale: 'pt-BR' });
+        expect(result.locale).toBe('pt-BR');
+      });
+
+      it('writes an explicit null', async () => {
+        user.locale = 'pt-BR';
+
+        const result = await service.applyUserUpdate(user, { locale: null });
+
+        expect(userRepository.update).toHaveBeenCalledWith(user.id, { locale: null });
+        expect(result.locale).toBeNull();
+      });
+
+      it('leaves the locale alone when absent', async () => {
+        await service.applyUserUpdate(user, { username: 'new-username' });
+
+        expect(userRepository.update).toHaveBeenCalledWith(user.id, { username: 'new-username' });
+      });
+    });
+
     describe('when only a username change is given', () => {
       it('updates the username and returns the resulting { username, email }', async () => {
         const result = await service.applyUserUpdate(user, { username: 'new-username' });
