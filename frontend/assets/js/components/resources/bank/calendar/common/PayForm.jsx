@@ -32,7 +32,7 @@ export default function PayForm({
         onChange={onChange}
       />
       {CHARGE_KINDS.includes(occurrence.kind) && (
-        <AccountFormCheckbox name="record_charge" label="Record charge" state={formState} onChange={onChange} />
+        <AccountFormCheckbox name="record_charge" label="Also record the charge" state={formState} onChange={onChange} />
       )}
     </>
   );

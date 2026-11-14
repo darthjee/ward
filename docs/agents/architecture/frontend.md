@@ -252,7 +252,8 @@ themselves are described in [Bank — UI](../modules/bank/ui.md).
   string is dropped, and each switcher item's `href` uses the same target. Each module adds its
   own rows: `bank` registers `/bank/accounts`, `/bank/debts`, `/bank/investments` and
   `/bank/providers` (each mapping to its own list; the Providers prefix also covers the
-  accountant hand-off page), and maps `/bank/bills` to the Providers list, since the one-off bill
+  accountant hand-off page) and `/bank/calendar` (which also covers the month view and maps to
+  the Calendar list), and maps `/bank/bills` to the Providers list, since the one-off bill
   pages have no list of their own.
 - **Hash query** (`utils/routing/hashQuery.js`): `hashQuery` / `withHashQuery` read and write
   the `?...` part of the hash (e.g. the ledger's `?page=`, the list's `?archived=true`).
