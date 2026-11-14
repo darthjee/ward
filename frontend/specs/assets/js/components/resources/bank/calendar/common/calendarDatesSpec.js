@@ -1,6 +1,6 @@
 import {
   addDays, weekStart, monthRange, shiftMonth, maxMonth, parseMonth, monthGridWeeks,
-  formatWeekdayDay, upcomingRange,
+  formatWeekdayDay, formatWeekday, upcomingRange,
 } from '../../../../../../../../assets/js/components/resources/bank/calendar/common/calendarDates.js';
 
 describe('calendarDates', () => {
@@ -91,6 +91,12 @@ describe('calendarDates', () => {
   describe('formatWeekdayDay', () => {
     it('contains the day number', () => {
       expect(formatWeekdayDay('2026-11-14')).toContain('14');
+    });
+  });
+
+  describe('formatWeekday', () => {
+    it('does not contain the day number', () => {
+      expect(formatWeekday('2026-11-14')).not.toContain('14');
     });
   });
 

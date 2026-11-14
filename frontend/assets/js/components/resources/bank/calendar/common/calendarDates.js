@@ -162,3 +162,13 @@ export function formatWeekdayDay(isoDate) {
 export function upcomingRange(today) {
   return { from: today, to: addDays(today, UPCOMING_DAYS) };
 }
+
+/**
+ * Format the short weekday name of a date, in the display locale.
+ *
+ * @param {string} isoDate - The `YYYY-MM-DD` date.
+ * @returns {string} For example `Mon`.
+ */
+export function formatWeekday(isoDate) {
+  return new Intl.DateTimeFormat(DisplayLocale.get(), { weekday: 'short', timeZone: 'UTC' }).format(new Date(toUtc(isoDate)));
+}
