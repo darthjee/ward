@@ -4,9 +4,9 @@
 [![Codacy Badge](https://app.codacy.com/project/badge/Grade/5083c4c055424e449e9de5b37fdd76d4)](https://app.codacy.com/gh/darthjee/ward/dashboard?utm_source=gh&utm_medium=referral&utm_content=&utm_campaign=Badge_grade)
 [![Codacy Badge](https://app.codacy.com/project/badge/Coverage/5083c4c055424e449e9de5b37fdd76d4)](https://app.codacy.com/gh/darthjee/ward/dashboard?utm_source=gh&utm_medium=referral&utm_content=&utm_campaign=Badge_coverage)
 
-**Current Version:** [0.1.0](https://github.com/darthjee/ward/releases/tag/0.1.0)
+**Current Version:** [0.2.0](https://github.com/darthjee/ward/releases/tag/0.2.0)
 
-**Next Release:** [0.1.1](https://github.com/darthjee/ward/compare/0.1.0...main)
+**Next Release:** [0.2.1](https://github.com/darthjee/ward/compare/0.2.0...main)
 
 ![ward](https://raw.githubusercontent.com/darthjee/ward/main/ward.png)
 
