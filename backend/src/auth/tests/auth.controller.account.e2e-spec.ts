@@ -6,6 +6,24 @@ import { ErrorCodes } from '../../core/error-codes.js';
 describe('AuthController (e2e)', () => {
   const ctx = useTestApp();
 
+  describe('GET /auth/account.json', () => {
+    it('returns the caller own fields only, with X-Skip-Cache', async () => {
+      const cookie = await loginCookie(ctx.app);
+
+      const response = await request(ctx.app.getHttpServer())
+        .get('/auth/account.json')
+        .set('Cookie', [cookie])
+        .expect(200);
+
+      expect(response.body).toEqual({ username: 'darthjee', email: 'darthjee@example.com', locale: null });
+      expect(response.headers['x-skip-cache']).toBe('true');
+    });
+
+    it('rejects an unauthenticated request', async () => {
+      await request(ctx.app.getHttpServer()).get('/auth/account.json').expect(401);
+    });
+  });
+
   describe('PATCH /auth/account.json', () => {
     function patchAccount(cookie: string, body: Record<string, string>): request.Test {
       return request(ctx.app.getHttpServer())
@@ -34,7 +52,7 @@ describe('AuthController (e2e)', () => {
       });
 
       it('updates the username and responds with { username, email }', () => {
-        expect(response.body).toEqual({ username: 'new-username', email: 'darthjee@example.com' });
+        expect(response.body).toEqual({ username: 'new-username', email: 'darthjee@example.com', locale: null });
       });
 
       it('sets the X-Skip-Cache header', () => {

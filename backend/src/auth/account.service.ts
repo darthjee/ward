@@ -45,6 +45,18 @@ export class AccountService {
   }
 
   /**
+   * Returns the caller's own account summary.
+   * @param {number} userId - The id of the authenticated user (from the access-token session).
+   * @returns {Promise<AccountSummary>} The caller's username, email and display locale.
+   * @throws {UnauthorizedException} When the user no longer exists.
+   */
+  async getAccount(userId: number): Promise<AccountSummary> {
+    const user = await this.#loadUser(userId);
+
+    return { username: user.username, email: user.email, locale: user.locale ?? null };
+  }
+
+  /**
    * Updates the caller's own username, email, and/or password, always
    * confirmed by their current password. Leaves other active sessions
    * (refresh tokens) untouched — deliberately, per the issue's Expected

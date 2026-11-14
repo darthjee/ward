@@ -40,7 +40,7 @@ describe('UserUpdateService', () => {
       it('updates the username and returns the resulting { username, email }', async () => {
         const result = await service.applyUserUpdate(user, { username: 'new-username' });
 
-        expect(result).toEqual({ username: 'new-username', email: 'darthjee@example.com' });
+        expect(result).toEqual({ username: 'new-username', email: 'darthjee@example.com', locale: null });
       });
 
       it('leaves the password digest untouched', async () => {
@@ -54,7 +54,7 @@ describe('UserUpdateService', () => {
       it('updates the email and returns the resulting { username, email }', async () => {
         const result = await service.applyUserUpdate(user, { email: 'new-email@example.com' });
 
-        expect(result).toEqual({ username: 'darthjee', email: 'new-email@example.com' });
+        expect(result).toEqual({ username: 'darthjee', email: 'new-email@example.com', locale: null });
       });
     });
 
@@ -69,7 +69,7 @@ describe('UserUpdateService', () => {
       it('returns the unchanged { username, email }', async () => {
         const result = await service.applyUserUpdate(user, { newPassword: 'brand-new-password' });
 
-        expect(result).toEqual({ username: 'darthjee', email: 'darthjee@example.com' });
+        expect(result).toEqual({ username: 'darthjee', email: 'darthjee@example.com', locale: null });
       });
     });
 
@@ -81,7 +81,7 @@ describe('UserUpdateService', () => {
           newPassword: 'brand-new-password',
         });
 
-        expect(result).toEqual({ username: 'new-username', email: 'new-email@example.com' });
+        expect(result).toEqual({ username: 'new-username', email: 'new-email@example.com', locale: null });
         expect(userRepository.update).toHaveBeenCalledWith(1, {
           username: 'new-username',
           email: 'new-email@example.com',
@@ -95,7 +95,7 @@ describe('UserUpdateService', () => {
       it('persists nothing and returns the unchanged { username, email }', async () => {
         const result = await service.applyUserUpdate(user, {});
 
-        expect(result).toEqual({ username: 'darthjee', email: 'darthjee@example.com' });
+        expect(result).toEqual({ username: 'darthjee', email: 'darthjee@example.com', locale: null });
         expect(userRepository.update).not.toHaveBeenCalled();
         expect(userRepository.save).not.toHaveBeenCalled();
       });

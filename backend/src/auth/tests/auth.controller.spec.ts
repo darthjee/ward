@@ -54,7 +54,7 @@ describe('AuthController', () => {
   function buildController(
     { configService = defaultConfigService(), accountService }: {
       configService?: { get: jest.Mock };
-      accountService?: { updateAccount: jest.Mock };
+      accountService?: { updateAccount?: jest.Mock; getAccount?: jest.Mock };
     } = {},
   ): AuthController {
     return new AuthController(
@@ -106,6 +106,20 @@ describe('AuthController', () => {
 
       expect(authService.logout).toHaveBeenCalledWith('a-refresh-token');
       expect(res.clearCookie).toHaveBeenCalledWith('access_token');
+    });
+  });
+
+  describe('GET /auth/account.json', () => {
+    it('delegates to AccountService with the session user id', async () => {
+      const summary = { username: 'darthjee', email: 'darthjee@example.com', locale: null };
+      const accountService = { getAccount: jest.fn().mockResolvedValue(summary) };
+      const controller = buildController({ accountService });
+      const currentUser = { sub: 1, sid: '3f2b8c1e-9d4a-4e6b-8a1f-2c5d7e9f0a1b', username: 'darthjee', isAdmin: false };
+
+      const result = await controller.getAccount(currentUser);
+
+      expect(accountService.getAccount).toHaveBeenCalledWith(1);
+      expect(result).toBe(summary);
     });
   });
 

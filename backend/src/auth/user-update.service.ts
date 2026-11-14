@@ -3,11 +3,13 @@ import { InjectRepository } from '@nestjs/typeorm';
 import bcrypt from 'bcryptjs';
 import { Repository } from 'typeorm';
 import { User } from './entities/user.entity.js';
+import type { UserLocale } from './user-locale.js';
 
-/** The `{username, email}` shape returned to the caller after an account update. */
+/** The `{username, email, locale}` shape returned to the caller by the account routes. */
 export interface AccountSummary {
   username: string;
   email: string;
+  locale: UserLocale | null;
 }
 
 /**
@@ -49,7 +51,7 @@ export class UserUpdateService {
    * @param {string} [changes.username] - The new username, when being changed.
    * @param {string} [changes.email] - The new email, when being changed.
    * @param {string} [changes.newPassword] - The new plaintext password, when being changed.
-   * @returns {Promise<AccountSummary>} The user's resulting username and email.
+   * @returns {Promise<AccountSummary>} The user's resulting username, email and locale.
    */
   async applyUserUpdate(
     user: User,
@@ -62,7 +64,7 @@ export class UserUpdateService {
       Object.assign(user, columns);
     }
 
-    return { username: user.username, email: user.email };
+    return { username: user.username, email: user.email, locale: user.locale ?? null };
   }
 
   async #changedColumns(

@@ -60,6 +60,29 @@ describe('AccountService', () => {
     );
   });
 
+  describe('getAccount', () => {
+    it('returns exactly { username, email, locale }', async () => {
+      user.locale = 'pt-BR';
+      user.status = UserStatus.APPROVED;
+
+      expect(await service.getAccount(1)).toEqual({
+        username: 'darthjee',
+        email: 'darthjee@example.com',
+        locale: 'pt-BR',
+      });
+    });
+
+    it('returns locale null for a user without a preference', async () => {
+      expect((await service.getAccount(1)).locale).toBeNull();
+    });
+
+    it('rejects an unknown user', async () => {
+      userRepository.findOneBy.mockResolvedValue(null);
+
+      await expect(service.getAccount(1)).rejects.toBeInstanceOf(UnauthorizedException);
+    });
+  });
+
   describe('updateAccount', () => {
     describe('when only the username is provided', () => {
       it('updates the username and returns the resulting { username, email }', async () => {
@@ -68,7 +91,7 @@ describe('AccountService', () => {
           username: 'new-username',
         });
 
-        expect(result).toEqual({ username: 'new-username', email: 'darthjee@example.com' });
+        expect(result).toEqual({ username: 'new-username', email: 'darthjee@example.com', locale: null });
       });
 
       it('resets the abuse-guard lockout counter on success', async () => {
@@ -88,7 +111,7 @@ describe('AccountService', () => {
           email: 'new-email@example.com',
         });
 
-        expect(result).toEqual({ username: 'darthjee', email: 'new-email@example.com' });
+        expect(result).toEqual({ username: 'darthjee', email: 'new-email@example.com', locale: null });
       });
     });
 
@@ -113,7 +136,7 @@ describe('AccountService', () => {
           newPassword: 'brand-new-password',
         });
 
-        expect(result).toEqual({ username: 'darthjee', email: 'darthjee@example.com' });
+        expect(result).toEqual({ username: 'darthjee', email: 'darthjee@example.com', locale: null });
       });
     });
 
@@ -126,7 +149,7 @@ describe('AccountService', () => {
           newPassword: 'brand-new-password',
         });
 
-        expect(result).toEqual({ username: 'new-username', email: 'new-email@example.com' });
+        expect(result).toEqual({ username: 'new-username', email: 'new-email@example.com', locale: null });
 
         const [, savedUser] = userRepository.update.mock.calls[0];
         await expect(bcrypt.compare('brand-new-password', savedUser.passwordDigest)).resolves.toBe(true);
