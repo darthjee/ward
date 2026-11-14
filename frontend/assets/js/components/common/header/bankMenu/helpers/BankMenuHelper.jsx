@@ -3,7 +3,7 @@ import { contextHash } from '../../../../../utils/context/ownerContext.js';
 
 /**
  * The Bank menu entries, as ordered `[label, context-relative path]` pairs. Each bank submenu
- * (Debts, Investments, Providers, then #57 Calendar) appends its own entry here.
+ * (Debts, Investments, Providers, Calendar) appends its own entry here.
  *
  * @type {Array<Array<string>>}
  */
@@ -12,6 +12,7 @@ export const BANK_MENU_ENTRIES = [
   ['Debts', '/bank/debts'],
   ['Investments', '/bank/investments'],
   ['Providers', '/bank/providers'],
+  ['Calendar', '/bank/calendar'],
 ];
 
 /**

@@ -20,6 +20,8 @@ import BankInvestmentList from '../../../../../assets/js/components/resources/ba
 import BankInvestmentNew from '../../../../../assets/js/components/resources/bank/investments/pages/BankInvestmentNew.jsx';
 import BankInvestmentEdit from '../../../../../assets/js/components/resources/bank/investments/pages/BankInvestmentEdit.jsx';
 import BankInvestmentDetail from '../../../../../assets/js/components/resources/bank/investments/pages/BankInvestmentDetail.jsx';
+import BankCalendarList from '../../../../../assets/js/components/resources/bank/calendar/pages/BankCalendarList.jsx';
+import BankCalendarMonth from '../../../../../assets/js/components/resources/bank/calendar/pages/BankCalendarMonth.jsx';
 import BankProviderList from '../../../../../assets/js/components/resources/bank/providers/pages/BankProviderList.jsx';
 import BankProviderNew from '../../../../../assets/js/components/resources/bank/providers/pages/BankProviderNew.jsx';
 import BankProviderEdit from '../../../../../assets/js/components/resources/bank/providers/pages/BankProviderEdit.jsx';
@@ -98,6 +100,8 @@ describe('AppHelper', () => {
     ['bank-investment-edit', BankInvestmentEdit],
     ['bank-investment', BankInvestmentDetail],
     ['bank-providers', BankProviderList],
+    ['bank-calendar', BankCalendarList],
+    ['bank-calendar-month', BankCalendarMonth],
     ['bank-provider-new', BankProviderNew],
     ['bank-provider-edit', BankProviderEdit],
     ['bank-provider', BankProviderDetail],

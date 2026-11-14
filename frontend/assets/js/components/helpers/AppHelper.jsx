@@ -25,6 +25,8 @@ import BankInvestmentList from '../resources/bank/investments/pages/BankInvestme
 import BankInvestmentNew from '../resources/bank/investments/pages/BankInvestmentNew.jsx';
 import BankInvestmentEdit from '../resources/bank/investments/pages/BankInvestmentEdit.jsx';
 import BankInvestmentDetail from '../resources/bank/investments/pages/BankInvestmentDetail.jsx';
+import BankCalendarList from '../resources/bank/calendar/pages/BankCalendarList.jsx';
+import BankCalendarMonth from '../resources/bank/calendar/pages/BankCalendarMonth.jsx';
 import BankProviderList from '../resources/bank/providers/pages/BankProviderList.jsx';
 import BankProviderNew from '../resources/bank/providers/pages/BankProviderNew.jsx';
 import BankProviderEdit from '../resources/bank/providers/pages/BankProviderEdit.jsx';
@@ -57,6 +59,8 @@ const PAGES = new Map([
   ['bank-investment-edit', <BankInvestmentEdit />],
   ['bank-investment', <BankInvestmentDetail />],
   ['bank-providers', <BankProviderList />],
+  ['bank-calendar', <BankCalendarList />],
+  ['bank-calendar-month', <BankCalendarMonth />],
   ['bank-provider-new', <BankProviderNew />],
   ['bank-provider-edit', <BankProviderEdit />],
   ['bank-provider-accountant', <BankProviderAccountant />],

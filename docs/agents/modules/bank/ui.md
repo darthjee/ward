@@ -31,8 +31,7 @@ values and the accountant CSV do not change. See the Display locale section of
 
 ## Bank menu
 
-The header's **Bank** dropdown has **Accounts**, **Debts**, **Investments** and **Providers**.
-The **Calendar** entry comes with the Calendar views (see [Calendar](#calendar)).
+The header's **Bank** dropdown has **Accounts**, **Debts**, **Investments**, **Providers** and **Calendar** (see [Calendar](#calendar)).
 
 ## Shared pages
 
@@ -162,9 +161,8 @@ On the Debts and Providers pages:
 
 ## Calendar
 
-**Pending [#77](https://github.com/darthjee/ward/issues/77)** — the Calendar views are not built
-yet. Until then a one-off bill can be created and edited, but it is listed nowhere in the UI
-(the backend `calendar.json` / `overdue.json` / `bills.json` routes exist). The agreed design:
+The Calendar lists the occurrences of debts, providers and one-off bills
+([#77](https://github.com/darthjee/ward/issues/77)):
 
 - **Menu** — a **Calendar** entry in the Bank menu, at `<ui>/calendar`, per owner context.
 - **List view** (`<ui>/calendar`, the default):
@@ -189,14 +187,33 @@ yet. Until then a one-off bill can be created and edited, but it is listed nowhe
   entries only, on by default. A 409 reloads the entry.
 - **Skip** (open / overdue) and **Undo** (paid / skipped) ask for confirmation.
 
+Decisions:
+
+- Weeks start on **Monday** (ISO) for the Upcoming groups and for the month grid, regardless of
+  the display locale.
+- Below the `md` breakpoint the month view is an **agenda** list of only the days that have
+  entries; the grid is shown from `md` up.
+- List-view totals show `open` (Overdue from `overdue.json`, Upcoming from `calendar.json`); the
+  month view shows `expected` / `paid` / `open`. Totals are never summed across currencies.
+- "Today" is the browser's local date. Upcoming covers `[today, today + 59]`; Overdue uses the
+  server's UTC today. Upcoming drops the occurrences already listed in Overdue (same kind,
+  source account, bill and nominal date).
+- A 409 on Pay or Skip (and a 404 / `ACCOUNT_ARCHIVED` on Undo) reloads the view's data; so does
+  every successful Pay, Skip or Undo.
+- The paying account defaults to `default_paying_account` only when it is among the offered
+  non-archived accounts of the entry's currency; otherwise it starts empty and is required.
+- The context switch from either calendar page lands on the Calendar list.
+
 Deferred: one view across Personal and every organization, *Combined calendar across owners*
 ([#101](https://github.com/darthjee/ward/issues/101)); subscribing from an external calendar
 app, *Calendar feed (iCal / `.ics`)* ([#102](https://github.com/darthjee/ward/issues/102)).
 
 ## Differences from the original spec
 
-- **The Calendar** (list and month views, Pay / Skip / Undo dialogs, menu entry and
-  `calendar.json` client calls) is not built yet: pending #77.
+- **Paid on** may not be after the browser's local today, while the server accepts up to the
+  UTC today plus one day.
+- The **Also record the charge** box is shown for provider and one-off bill entries (the server
+  rejects `record_charge` for debts).
 - **Accounts list** has an extra Branch column.
 - **Delete** shows only on active accounts with no transactions.
 - **Add / edit bill**: save, cancel and delete return to the provider page (or the Providers

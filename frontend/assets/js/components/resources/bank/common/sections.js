@@ -23,3 +23,6 @@ export const TYPE_BY_SECTION = new Map([...SECTION_BY_TYPE].map(([type, base]) =
 
 /** Section base of the one-off bill pages (no list: bills belong to their provider). */
 export const BILLS_BASE = '/bank/bills';
+
+/** Section base of the Calendar pages (list view and month view). */
+export const CALENDAR_BASE = '/bank/calendar';
