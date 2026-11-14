@@ -15,7 +15,7 @@ export const INVESTMENT_KINDS: readonly InvestmentKind[] = [
 
 /**
  * The nested `investment` object of an account body (see
- * `docs/agents/specs/banking/accounts/investment.md`). Every field is
+ * `docs/agents/modules/bank/investment.md`). Every field is
  * optional and accepts `null` (clears it). Only formats and ranges are
  * checked here: the paired `yield_rate` ↔ `yield_period` rule runs in the
  * investment handler, on the merged state for a PATCH. Unknown keys answer

@@ -12,7 +12,7 @@ function payingAccountForeignKey(table: string): string {
 }
 
 /**
- * Adds the bill schedule fields (see `docs/agents/specs/banking/bills.md`) to
+ * Adds the bill schedule fields (see `docs/agents/modules/bank/bills.md`) to
  * `bank_debt_details` and `bank_provider_expense_details`: `bills_from`
  * (nullable `DATE`), `show_in_calendar` (`NOT NULL DEFAULT true`) and the
  * default `paying_account_id` (nullable real FK to `bank_accounts.id`,

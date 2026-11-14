@@ -2,7 +2,7 @@ import { Column, CreateDateColumn, Entity, PrimaryGeneratedColumn, UpdateDateCol
 
 /**
  * An organization: a group of users sharing user-or-organization-owned data
- * (see `docs/agents/specs/auth/organizations.md`). Ownership lives only in the
+ * (see `docs/agents/modules/auth/organizations.md`). Ownership lives only in the
  * membership role — there is no owner column here. Owns table
  * `auth_organizations`. The name is user input: trimmed, at most 255
  * characters, **not unique**, and never logged.

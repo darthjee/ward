@@ -7,7 +7,7 @@ export type ProviderChargeFrequency = 'monthly' | 'yearly';
 
 /**
  * The provider-expense-specific details of an {@link Account} of type
- * `provider_expense` (see `docs/agents/specs/banking/accounts/provider-expense.md`).
+ * `provider_expense` (see `docs/agents/modules/bank/provider-expense.md`).
  * Owns table `bank_provider_expense_details`, 1:1 with `bank_accounts`:
  * `accountId` is both the primary key and a real FK (`ON DELETE CASCADE`). It
  * never stores an owner: it inherits it through its account.

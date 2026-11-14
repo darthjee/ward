@@ -9,7 +9,7 @@ export const PROVIDER_CHARGE_FREQUENCIES = RATE_PERIODS;
 
 /**
  * The nested `provider_expense` object of an account body (see
- * `docs/agents/specs/banking/accounts/provider-expense.md`). Every field is
+ * `docs/agents/modules/bank/provider-expense.md`). Every field is
  * optional; all but `for_accountant` and `charge_frequency` accept `null`
  * (clears it). Only formats and ranges are checked here: the paired
  * `charge_frequency` ↔ `due_month` rule and the `expected_amount` parsing

@@ -6,7 +6,7 @@ export type BillPaymentStatus = 'paid' | 'skipped';
 
 /**
  * The payment (or skip) of one bill occurrence (see
- * `docs/agents/specs/banking/bills.md`, *Payment row*). Owns table
+ * `docs/agents/modules/bank/bills.md`, *Paying, skipping and undoing*). Owns table
  * `bank_bill_payments`. Keyed by the occurrence's **nominal** `dueDate`;
  * `billId` is set for one-offs only. It never stores an owner: it inherits it
  * through its source account. The generated `derived_due_date` column (the

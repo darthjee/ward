@@ -18,8 +18,8 @@ import { NOT_FOUND_CASES, ownerKeysIn, type OwnerFixtures } from './support/owne
 jest.mock('../ledger.query.js', () => jest.requireActual('./support/in-memory-ledger.query.js'));
 jest.mock('../account-balances.query.js', () => jest.requireActual('./support/in-memory-ledger.query.js'));
 
-// Provider-expense accounts (docs/agents/specs/banking/accounts/provider-expense.md, *Required
-// tests → Account routes*): the generic account routes with `type: provider_expense` and a nested
+// Provider-expense accounts (docs/agents/modules/bank/provider-expense.md,
+// docs/agents/backend/routes/bank.md): the generic account routes with `type: provider_expense` and a nested
 // `provider_expense` object, in both owner contexts.
 
 type Method = 'get' | 'post' | 'patch' | 'delete';

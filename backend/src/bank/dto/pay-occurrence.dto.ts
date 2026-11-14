@@ -3,7 +3,7 @@ import { IsLedgerDate, IsOptionalNonNull, MAX_INT_COLUMN } from './field-validat
 import type { BillPaymentStatus } from '../entities/bill-payment.entity.js';
 
 /**
- * Request body of the pay / skip routes (see `docs/agents/specs/banking/bills.md`,
+ * Request body of the pay / skip routes (see `docs/agents/modules/bank/bills.md`,
  * *Validation*), taken through `@StrictBody()`: unknown fields answer 400.
  * Only formats are checked here; which fields a `paid` / `skipped` body
  * requires or refuses, and `record_charge` on a debt, are checked by

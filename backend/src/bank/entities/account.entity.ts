@@ -2,7 +2,7 @@ import { Column, CreateDateColumn, Entity, PrimaryGeneratedColumn, UpdateDateCol
 import { bigintTransformer } from './bigint.transformer.js';
 
 /**
- * A bank account of any type (see `docs/agents/specs/banking/accounts/`).
+ * A bank account of any type (see `docs/agents/modules/bank/accounts.md`).
  * Owns table `bank_accounts`. Exactly one of `userId` / `organizationId` is
  * set (DB check); both are logical references to `auth` (no FK) and their
  * property names are relied on by `ownerWhere()`. Neither is ever returned in

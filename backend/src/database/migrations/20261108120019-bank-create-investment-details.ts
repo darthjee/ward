@@ -6,7 +6,7 @@ const INVESTMENT_DETAILS = 'bank_investment_details';
 
 /**
  * Creates the Bank module's `bank_investment_details` table (see
- * `docs/agents/specs/banking/accounts/investment.md`): the 1:1 details of an
+ * `docs/agents/modules/bank/investment.md`): the 1:1 details of an
  * `investment` account. `account_id` is both the primary key and a **real**
  * FK to `bank_accounts.id` with `ON DELETE CASCADE`. No owner column: the
  * owner comes from the account. `yield_rate` is a percentage with 4 decimals.

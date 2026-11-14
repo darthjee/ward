@@ -19,8 +19,8 @@ jest.mock('../ledger.query.js', () => jest.requireActual('./support/in-memory-le
 jest.mock('../account-balances.query.js', () => jest.requireActual('./support/in-memory-ledger.query.js'));
 jest.mock('../accountant-charges.query.js', () => jest.requireActual('./support/in-memory-accountant-charges.query.js'));
 
-// The accountant hand-off (docs/agents/specs/banking/accounts/provider-expense.md, *Required
-// tests → Transactions, Hand-off preview, Mark sent / unsent*, plus the decisions of #71), in both
+// The accountant hand-off (docs/agents/modules/bank/provider-expense.md and
+// docs/agents/backend/routes/bank.md, plus the decisions of #71), in both
 // owner contexts. The real SQL is covered by `accountant-charges.integration-spec.ts`.
 
 type Body = Record<string, unknown>;

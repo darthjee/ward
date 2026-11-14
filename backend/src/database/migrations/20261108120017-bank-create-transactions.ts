@@ -6,7 +6,7 @@ const TRANSACTIONS = 'bank_transactions';
 
 /**
  * Creates the Bank module's `bank_transactions` table (see
- * `docs/agents/specs/banking/accounts/transactions.md`). A transaction never
+ * `docs/agents/modules/bank/transactions.md`). A transaction never
  * stores an owner: it inherits it through its account. `account_id` is a
  * **real** FK (both tables belong to `bank`) with `ON DELETE RESTRICT`, so the
  * DB refuses to delete an account that has transactions. The

@@ -8,7 +8,7 @@ const MEMBERSHIPS = 'auth_organization_memberships';
 /**
  * Creates the Auth module's `auth_organizations` and
  * `auth_organization_memberships` tables (see
- * `docs/agents/specs/auth/organizations.md`). Unlike the module's other
+ * `docs/agents/modules/auth/organizations.md`). Unlike the module's other
  * user references, `organization_id` and `user_id` are **real** FKs: all three
  * tables are owned by `auth`. The indexes and FKs are declared inside the
  * `CREATE TABLE`, so MySQL backs each FK with the declared index — the unique

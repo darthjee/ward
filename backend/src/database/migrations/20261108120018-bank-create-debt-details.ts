@@ -6,7 +6,7 @@ const DEBT_DETAILS = 'bank_debt_details';
 
 /**
  * Creates the Bank module's `bank_debt_details` table (see
- * `docs/agents/specs/banking/accounts/debt.md`): the 1:1 details of a `debt`
+ * `docs/agents/modules/bank/debt.md`): the 1:1 details of a `debt`
  * account. `account_id` is both the primary key and a **real** FK to
  * `bank_accounts.id` with `ON DELETE CASCADE`. No owner column: the owner
  * comes from the account. `instalment_amount` is integer minor units of the

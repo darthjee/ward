@@ -20,7 +20,7 @@ import { todayUtc } from '../ledger-date.js';
 
 /**
  * Handler of `provider_expense` accounts (see
- * `docs/agents/specs/banking/accounts/provider-expense.md`): a provider's
+ * `docs/agents/modules/bank/provider-expense.md`): a provider's
  * charges and payments on the regular ledger plus a 1:1
  * `bank_provider_expense_details` row, which every provider account has
  * (created with defaults when the body sends no `provider_expense` object).
