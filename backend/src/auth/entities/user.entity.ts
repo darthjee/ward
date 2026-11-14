@@ -5,6 +5,7 @@ import {
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
+import type { UserLocale } from '../user-locale.js';
 
 /**
  * An account's approval status. Only `APPROVED` users are authenticated (the
@@ -48,6 +49,10 @@ export class User {
   // No default: every write path must set the status explicitly (see the migration).
   @Column({ type: 'varchar', length: 16 })
     status!: UserStatus;
+
+  /** Display locale; `null` means "browser default". */
+  @Column({ type: 'varchar', length: 16, nullable: true, default: null })
+    locale!: UserLocale | null;
 
   @CreateDateColumn({ name: 'created_at' })
     createdAt!: Date;
