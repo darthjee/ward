@@ -2,6 +2,8 @@ import {
   isAfterLocalToday, lastFullMonth, localToday, monthName,
 } from '../../../../../../../assets/js/components/resources/bank/common/dates.js';
 
+import DisplayLocale from '../../../../../../../assets/js/utils/locale/DisplayLocale.js';
+
 describe('dates', () => {
   const now = new Date(2026, 0, 5, 23, 30);
 
@@ -37,6 +39,16 @@ describe('dates', () => {
     it('names a month in the browser locale', () => {
       expect(monthName(1)).toBe(new Intl.DateTimeFormat(undefined, { month: 'long' }).format(new Date(2000, 0, 1)));
       expect(monthName(12)).toBe(new Intl.DateTimeFormat(undefined, { month: 'long' }).format(new Date(2000, 11, 1)));
+    });
+
+    it('names a month in the display locale', () => {
+      DisplayLocale.set('pt-BR');
+      const pt = monthName(3);
+      DisplayLocale.set('en-US');
+      const en = monthName(3);
+      DisplayLocale.set(null);
+
+      expect([pt, en]).toEqual(['março', 'March']);
     });
 
     it('is empty when unset', () => {

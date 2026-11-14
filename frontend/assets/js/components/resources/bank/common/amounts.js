@@ -1,3 +1,5 @@
+import DisplayLocale from '../../../../utils/locale/DisplayLocale.js';
+
 /** Largest accepted `|amount|`, in minor units (10¹³). */
 export const MAX_ABS_MINOR_UNITS = 10n ** 13n;
 
@@ -129,7 +131,7 @@ export function negateAmount(amount) {
 /**
  * Format an API decimal string as money in the account's currency.
  *
- * @description Uses the browser's default locale (display preferences are #65). Amounts are
+ * @description Uses the user's display locale (browser default when unset). Amounts are
  * bounded by the 10¹³ minor-unit cap, well within `Number`'s safe range.
  * @param {string} decimalString - The API's decimal string.
  * @param {string} currency - ISO 4217 code.
@@ -140,7 +142,7 @@ export function formatMoney(decimalString, currency) {
     return '';
   }
 
-  return new Intl.NumberFormat(undefined, { style: 'currency', currency })
+  return new Intl.NumberFormat(DisplayLocale.get(), { style: 'currency', currency })
     .format(Number(decimalString));
 }
 

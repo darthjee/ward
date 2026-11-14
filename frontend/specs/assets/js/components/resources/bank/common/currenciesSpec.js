@@ -2,11 +2,16 @@ import {
   currencyOptions,
   filterCurrencies,
 } from '../../../../../../../assets/js/components/resources/bank/common/currencies.js';
+import DisplayLocale from '../../../../../../../assets/js/utils/locale/DisplayLocale.js';
 
 function fakeIntl(codes, names) {
   return {
     supportedValuesOf: () => codes,
     DisplayNames: class {
+      constructor(locale) {
+        fakeIntl.lastLocale = locale;
+      }
+
       of(code) {
         if (code === 'ERR') {
           throw new RangeError('bad');
@@ -19,6 +24,14 @@ function fakeIntl(codes, names) {
 }
 
 describe('currencies', () => {
+  it('passes the display locale to DisplayNames', () => {
+    DisplayLocale.set('pt-BR');
+    currencyOptions('BRL', fakeIntl(['BRL'], {}));
+    DisplayLocale.set(null);
+
+    expect(fakeIntl.lastLocale).toBe('pt-BR');
+  });
+
   const intl = fakeIntl(['USD', 'BRL', 'EUR', 'XXX', 'ERR'], {
     USD: 'US Dollar', BRL: 'Brazilian Real', EUR: 'Euro', XXX: 'XXX',
   });

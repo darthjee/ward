@@ -1,3 +1,5 @@
+import DisplayLocale from '../../../../utils/locale/DisplayLocale.js';
+
 /**
  * Pad a date part to two digits.
  *
@@ -30,7 +32,7 @@ export function isAfterLocalToday(date, now = new Date()) {
 }
 
 /**
- * Name a month (1–12) in the browser's locale.
+ * Name a month (1–12) in the display locale.
  *
  * @param {number|null} month - The 1-based month.
  * @returns {string} The month name, or `''` when unset.
@@ -40,7 +42,7 @@ export function monthName(month) {
     return '';
   }
 
-  return new Intl.DateTimeFormat(undefined, { month: 'long' }).format(new Date(2000, month - 1, 1));
+  return new Intl.DateTimeFormat(DisplayLocale.get(), { month: 'long' }).format(new Date(2000, month - 1, 1));
 }
 
 /**
