@@ -7,8 +7,8 @@ import { assertAnyFieldPresent } from './assert-any-field-present.js';
 import { AuthService } from './auth.service.js';
 import { UpdateAccountDto } from './dto/update-account.dto.js';
 import { User } from './entities/user.entity.js';
-import { AccountChanges, AccountSummary, UserUpdateService } from './user-update.service.js';
 import { isUserLocale, UserLocale } from './user-locale.js';
+import { AccountChanges, AccountSummary, UserUpdateService } from './user-update.service.js';
 import { ErrorCodes } from '../core/error-codes.js';
 import { LockedException } from '../core/locked.exception.js';
 
