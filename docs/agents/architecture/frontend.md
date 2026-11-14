@@ -151,6 +151,18 @@ session is pending approval. Logging out calls
 `AccountsClient.logout` and redirects home regardless of whether the request succeeded, since
 `AccountsClient.logout` already clears `AuthSession` unconditionally.
 
+## Display locale
+
+Each user can pick a display locale (*My account*, `LocaleSelect`) or *Browser default*.
+`utils/locale/DisplayLocale.js` is a module-level store (`get`/`set`/`subscribe`);
+`DisplayLocaleLoader` loads it via `AccountsClient.getAccount()` (`GET /auth/account.json`) on
+login and clears it on logout (a late GET after logout is dropped; a failed GET keeps the browser
+default); `useDisplayLocale` re-renders `App` on change. `utils/locale/locales.js` mirrors the
+backend allowlist and must stay in sync. Every display `Intl` call (amounts, rates, month and
+currency names) reads the store, and displayed ISO dates go through the calendar-safe
+`formatDate` (UTC-based, so no day shift). Parsing, native date inputs, API values and the
+accountant CSV are unaffected.
+
 ## User approval
 
 The frontend side of [User approval](../modules/auth/user-approval.md):

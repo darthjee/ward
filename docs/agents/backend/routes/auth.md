@@ -294,6 +294,29 @@ The body is validated before `:orgId` and membership, so an invalid body answers
 an unknown or foreign organization. The `400` depends only on the body, so it cannot be used to
 enumerate organizations. Concurrent renames: last write wins.
 
+## Account routes
+
+### `GET /auth/account.json`
+
+Authenticated (default `JwtGuard`). Returns the caller's own profile only:
+`{ "username", "email", "locale" }` where `locale` is `string | null` (`null` = browser default).
+No `id`, `isAdmin`, `status` or `passwordDigest`. Cache class `never` (`X-Skip-Cache: true`).
+
+### `PATCH /auth/account.json`
+
+Body: `{ currentPassword?, username?, email?, newPassword?, locale? }`; answers
+`{ username, email, locale }`.
+
+- No field among `username`, `email`, `newPassword`, `locale` present: the usual "no field" `400`.
+- `locale` must be `null` or exactly one of `USER_LOCALES` (`auth/user-locale.ts`: `en-US`,
+  `en-GB`, `pt-BR`, `pt-PT`, `es-ES`, `fr-FR`, `de-DE`, case-sensitive); anything else is
+  `422 INVALID_LOCALE`. This runs before the password check and is not a lockout failure.
+- Any of `username`, `email`, `newPassword` present: `currentPassword` is required, and the
+  lockout guard applies, as before. `locale` sent alongside is saved in the same update.
+- **Only** `locale` present: no `currentPassword` needed (an extra one is ignored, not
+  verified); the lockout guard is neither checked nor updated.
+- `POST /admin/users/:id/edit.json` does not accept `locale`.
+
 ## Shared behavior
 
 ### Gate `401`
@@ -323,6 +346,7 @@ its throw site:
 | --- | --- | --- | --- |
 | `USER_DENIED` | `403` | `This account has been denied access` | `login.json`, correct password on a `denied` user |
 | `USER_NOT_PENDING` | `422` | `Only pending users can be approved` | `POST /admin/users/:id/approve.json` (see [Admin routes](admin.md)) |
+| `INVALID_LOCALE` | `422` | `Unsupported display locale` | `PATCH /auth/account.json` with a non-allowlisted `locale` |
 | `CANNOT_DENY_SELF` | `422` | `You cannot deny your own account` | `POST /admin/users/:id/deny.json` (see [Admin routes](admin.md)) |
 
 ### Cache policy
