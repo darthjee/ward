@@ -1,4 +1,5 @@
 import DetailEntry from '../DetailEntry.jsx';
+import { formatDate } from '../../dates.js';
 
 /**
  * Rendering helper of the schedule values shared by the debt and provider detail pages.
@@ -16,7 +17,7 @@ const ScheduleInfoHelper = {
 
     return (
       <>
-        <DetailEntry label="Bills from" value={source.bills_from} />
+        <DetailEntry label="Bills from" value={formatDate(source.bills_from)} />
         <DetailEntry label="Show in Calendar" value={source.show_in_calendar === false ? 'No' : 'Yes'} />
         <DetailEntry label="Default paying account" value={source.paying_account?.name} />
       </>

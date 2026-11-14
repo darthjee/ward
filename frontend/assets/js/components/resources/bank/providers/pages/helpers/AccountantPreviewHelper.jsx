@@ -1,19 +1,19 @@
 import Table from 'react-bootstrap/cjs/Table.js';
 import { formatMoney } from '../../../common/amounts.js';
-import { localToday } from '../../../common/dates.js';
+import { formatDate, localToday } from '../../../common/dates.js';
 import { PROVIDERS_BASE } from '../../../common/sections.js';
 import { EMPTY_MARK } from '../../common/providerLabels.js';
 import { totalsByCurrency } from '../../common/chargeTotals.js';
 import { contextHash } from '../../../../../../utils/context/ownerContext.js';
 
 /**
- * Format a sent mark as the browser's local date.
+ * Format a sent mark as the browser's local date, in the display locale.
  *
  * @param {string|null} sentAt - The `sent_to_accountant_at` ISO timestamp.
- * @returns {string} The local `YYYY-MM-DD` date, or "—" when unsent.
+ * @returns {string} The local date, or "—" when unsent.
  */
 function sentDate(sentAt) {
-  return sentAt ? localToday(new Date(sentAt)) : EMPTY_MARK;
+  return sentAt ? formatDate(localToday(new Date(sentAt))) : EMPTY_MARK;
 }
 
 /**
@@ -29,7 +29,7 @@ function renderRow(charge, context) {
 
   return (
     <tr key={charge.id}>
-      <td className="text-nowrap">{charge.date}</td>
+      <td className="text-nowrap">{formatDate(charge.date)}</td>
       <td className="text-break">
         <a href={contextHash(context, `${PROVIDERS_BASE}/${account.id}`)}>{account.name}</a>
         <div className="small text-muted">{account.bank_name}</div>

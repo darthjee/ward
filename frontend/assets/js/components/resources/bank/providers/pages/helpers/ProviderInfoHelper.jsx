@@ -1,6 +1,6 @@
 import DetailEntry from '../../../common/detail/DetailEntry.jsx';
 import ScheduleInfoHelper from '../../../common/detail/helpers/ScheduleInfoHelper.jsx';
-import { monthName } from '../../../common/dates.js';
+import { formatDate, monthName } from '../../../common/dates.js';
 import {
   PROVIDER_FIELD_LABELS, forAccountantLabel, formatExpected, frequencyLabel,
 } from '../../common/providerLabels.js';
@@ -30,7 +30,7 @@ function renderAccountFields(account) {
       <DetailEntry label={PROVIDER_FIELD_LABELS.branch} value={account.branch} />
       <DetailEntry label={PROVIDER_FIELD_LABELS.accountNumber} value={account.account_number} />
       <DetailEntry label="Currency" value={account.currency} />
-      <DetailEntry label="Opening date" value={account.opening_date} />
+      <DetailEntry label="Opening date" value={formatDate(account.opening_date)} />
       <DetailEntry label="Notes" value={account.notes} />
     </dl>
   );

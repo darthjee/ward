@@ -1,6 +1,6 @@
 import React from 'react';
 import SentMark from '../../../../../../../../assets/js/components/resources/bank/providers/common/SentMark.jsx';
-import { localToday } from '../../../../../../../../assets/js/components/resources/bank/common/dates.js';
+import { formatDate, localToday } from '../../../../../../../../assets/js/components/resources/bank/common/dates.js';
 import { renderedOutput } from '../../../../../../../support/renderedOutput.js';
 
 const SENT_AT = '2026-03-02T15:00:00.000Z';
@@ -10,7 +10,7 @@ describe('SentMark', () => {
   it('shows the local sent date and Mark as unsent', () => {
     const page = renderedOutput(React.createElement(SentMark, { transaction: SENT, onMarkUnsent: () => undefined }));
 
-    expect(page.containsInOrder(`Sent ${localToday(new Date(SENT_AT))}`, 'Mark as unsent')).toBeTrue();
+    expect(page.containsInOrder(`Sent ${formatDate(localToday(new Date(SENT_AT)))}`, 'Mark as unsent')).toBeTrue();
     expect(page.contains('disabled')).toBeFalse();
   });
 

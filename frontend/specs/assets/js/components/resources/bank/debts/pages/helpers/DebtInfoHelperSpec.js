@@ -1,3 +1,4 @@
+import { formatDate } from '../../../../../../../../../assets/js/components/resources/bank/common/dates.js';
 import DebtInfoHelper from '../../../../../../../../../assets/js/components/resources/bank/debts/pages/helpers/DebtInfoHelper.jsx';
 import { monthName } from '../../../../../../../../../assets/js/components/resources/bank/common/dates.js';
 import { formatMoney } from '../../../../../../../../../assets/js/components/resources/bank/common/amounts.js';
@@ -34,7 +35,7 @@ describe('DebtInfoHelper', () => {
       'Currency',
       'BRL',
       'Loan date',
-      '2026-01-01',
+      formatDate('2026-01-01'),
       'Amount owed',
       formatMoney('10000.00', 'BRL'),
       'Notes',
@@ -86,7 +87,7 @@ describe('DebtInfoHelper', () => {
     });
 
     expect(page.containsInOrder(
-      'Instalment count', 'Bills from', '2026-02-01', 'Show in Calendar', 'Yes', 'Default paying account', 'Main',
+      'Instalment count', 'Bills from', formatDate('2026-02-01'), 'Show in Calendar', 'Yes', 'Default paying account', 'Main',
     )).toBeTrue();
   });
 

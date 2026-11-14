@@ -2,7 +2,7 @@ import DetailEntry from '../../../common/detail/DetailEntry.jsx';
 import ScheduleInfoHelper from '../../../common/detail/helpers/ScheduleInfoHelper.jsx';
 import { formatMoney, negateAmount } from '../../../common/amounts.js';
 import { formatRate } from '../../../common/rates.js';
-import { monthName } from '../../../common/dates.js';
+import { formatDate, monthName } from '../../../common/dates.js';
 
 /** Display labels of the instalment frequency. */
 const FREQUENCY_LABELS = new Map([
@@ -22,7 +22,7 @@ function renderAccountFields(account) {
     <dl className="row">
       <DetailEntry label="Creditor" value={account.bank_name} />
       <DetailEntry label="Currency" value={account.currency} />
-      <DetailEntry label="Loan date" value={account.opening_date} />
+      <DetailEntry label="Loan date" value={formatDate(account.opening_date)} />
       <DetailEntry label="Amount owed" value={formatMoney(negateAmount(account.opening_balance), account.currency)} />
       <DetailEntry label="Notes" value={account.notes} />
     </dl>

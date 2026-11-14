@@ -1,3 +1,4 @@
+import { formatDate } from '../../../../../../../../../assets/js/components/resources/bank/common/dates.js';
 import ProviderInfoHelper from '../../../../../../../../../assets/js/components/resources/bank/providers/pages/helpers/ProviderInfoHelper.jsx';
 import { formatMoney } from '../../../../../../../../../assets/js/components/resources/bank/common/amounts.js';
 import { monthName } from '../../../../../../../../../assets/js/components/resources/bank/common/dates.js';
@@ -31,7 +32,7 @@ function output(details = {}, account = {}) {
 describe('ProviderInfoHelper', () => {
   it('renders the common fields with the provider labels', () => {
     expect(output().containsInOrder(
-      'Provider', 'Landlord Ltd', 'Branch', '—', 'Customer / contract number', 'C-123', 'Currency', 'BRL', 'Opening date', '2026-01-01',
+      'Provider', 'Landlord Ltd', 'Branch', '—', 'Customer / contract number', 'C-123', 'Currency', 'BRL', 'Opening date', formatDate('2026-01-01'),
     )).toBeTrue();
   });
 
@@ -71,7 +72,7 @@ describe('ProviderInfoHelper', () => {
     const page = output({ bills_from: '2026-02-01', show_in_calendar: false, paying_account: { id: 9, name: 'Main' } });
 
     expect(page.containsInOrder(
-      'For accountant', 'Bills from', '2026-02-01', 'Show in Calendar', 'No', 'Default paying account', 'Main',
+      'For accountant', 'Bills from', formatDate('2026-02-01'), 'Show in Calendar', 'No', 'Default paying account', 'Main',
     )).toBeTrue();
   });
 

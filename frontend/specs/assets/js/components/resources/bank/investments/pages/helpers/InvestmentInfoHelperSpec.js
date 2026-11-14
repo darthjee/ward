@@ -1,3 +1,4 @@
+import { formatDate } from '../../../../../../../../../assets/js/components/resources/bank/common/dates.js';
 import InvestmentInfoHelper from '../../../../../../../../../assets/js/components/resources/bank/investments/pages/helpers/InvestmentInfoHelper.jsx';
 import { renderedOutput } from '../../../../../../../../support/renderedOutput.js';
 
@@ -22,7 +23,7 @@ describe('InvestmentInfoHelper', () => {
   it('renders the common fields with the investment labels, without an opening balance', () => {
     const page = output();
 
-    expect(page.containsInOrder('Institution', 'Broker A', 'Currency', 'BRL', 'Start date', '2026-01-01', 'Notes', '110% CDI'))
+    expect(page.containsInOrder('Institution', 'Broker A', 'Currency', 'BRL', 'Start date', formatDate('2026-01-01'), 'Notes', '110% CDI'))
       .toBeTrue();
     expect(page.contains('Opening balance')).toBeFalse();
   });
@@ -30,7 +31,7 @@ describe('InvestmentInfoHelper', () => {
   it('renders the investment info block: kind, yield rate, maturity date (past allowed) and liquidity', () => {
     expect(output().containsInOrder(
       'Investment info', 'aria-label="Investment info"', 'Kind', 'Fixed income', 'Yield rate', '12.5% / year',
-      'Maturity date', '2020-01-01', 'Liquidity', 'D+30',
+      'Maturity date', formatDate('2020-01-01'), 'Liquidity', 'D+30',
     )).toBeTrue();
   });
 

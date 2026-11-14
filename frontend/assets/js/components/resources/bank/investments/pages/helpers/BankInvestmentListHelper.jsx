@@ -1,6 +1,7 @@
 import Table from 'react-bootstrap/cjs/Table.js';
 import BankErrorAlert from '../../../common/BankErrorAlert.jsx';
 import { formatMoney } from '../../../common/amounts.js';
+import { formatDate } from '../../../common/dates.js';
 import { formatRate } from '../../../common/rates.js';
 import ArchivedBadge from '../../../common/list/ArchivedBadge.jsx';
 import AccountListHeader from '../../../common/list/AccountListHeader.jsx';
@@ -29,7 +30,7 @@ function renderRow(investment, context) {
       <td>{kindLabel(details.kind)}</td>
       <td className="text-end text-nowrap">{formatMoney(investment.balance, investment.currency)}</td>
       <td className="text-end text-nowrap">{formatRate(details.yield_rate, details.yield_period)}</td>
-      <td className="text-nowrap">{details.maturity_date}</td>
+      <td className="text-nowrap">{formatDate(details.maturity_date)}</td>
       <td>{investment.currency}</td>
     </tr>
   );
