@@ -475,6 +475,8 @@ describe('bank schema (MySQL)', () => {
 
   describe('down', () => {
     it('drops the bill tables, then the schedule fields, then sent_to_accountant_at, then bank_provider_expense_details, bank_investment_details, bank_debt_details, then bank_transactions, then bank_accounts', async () => {
+      // First undo the later, non-bank auth locale migration.
+      await ds.undoLastMigration();
       await ds.undoLastMigration();
       expect(await tableNames(ds)).not.toContain(BILL_PAYMENTS);
       expect(await tableNames(ds)).not.toContain(BILLS);
