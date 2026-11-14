@@ -190,6 +190,17 @@ describe('AdminController (e2e)', () => {
     });
 
     describe('POST /admin/users/:id/edit.json', () => {
+      it('strips a locale instead of writing it', async () => {
+        await request(ctx.app.getHttpServer())
+          .post(`/admin/users/${targetUserId}/edit.json`)
+          .set('Cookie', [adminCookie])
+          .send({ username: 'darthjee-renamed', locale: 'pt-BR' })
+          .expect(201);
+
+        const target = ctx.userRepo.rows.find((row) => row.id === targetUserId);
+        expect(target?.locale ?? null).toBeNull();
+      });
+
       describe('for an existing user', () => {
         let response: request.Response;
 

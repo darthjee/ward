@@ -1,6 +1,7 @@
 import {
   ACCOUNTANT_CSV_HEADER, CSV_BOM, accountantCsvFilename, buildAccountantCsv,
 } from '../../../../../../../../assets/js/components/resources/bank/providers/common/accountantCsv.js';
+import DisplayLocale from '../../../../../../../../assets/js/utils/locale/DisplayLocale.js';
 
 const HEADER_LINE = '"Date","Account","Provider","Provider tax id","Description","Amount","Currency"\r\n';
 
@@ -94,5 +95,18 @@ describe('accountantCsv', () => {
 
   it('names the file after the range', () => {
     expect(accountantCsvFilename('2026-02-01', '2026-02-28')).toBe('ward-accountant-2026-02-01-2026-02-28.csv');
+  });
+
+  describe('with a display locale set', () => {
+    afterEach(() => {
+      DisplayLocale.set(null);
+    });
+
+    it('keeps ISO dates and dot decimals', () => {
+      const before = buildAccountantCsv([charge()]);
+      DisplayLocale.set('pt-BR');
+
+      expect(buildAccountantCsv([charge()])).toBe(before);
+    });
   });
 });

@@ -29,4 +29,20 @@ describe('MyAccountHelper', () => {
       expect(handlers.onChange).toHaveBeenCalledWith('currentPassword');
     });
   });
+
+  describe('.render (display locale)', () => {
+    it('renders the select with every locale option', () => {
+      const page = renderPage(buildState({ locale: 'pt-BR' }), buildHandlers());
+
+      expect(page.containsInOrder('Display locale', 'Browser default', 'English (United States)', 'Deutsch (Deutschland)'))
+        .toBeTrue();
+    });
+
+    it('wires the locale change handler', () => {
+      const handlers = buildHandlers();
+      renderPage(buildState(), handlers);
+
+      expect(handlers.onChange).toHaveBeenCalledWith('locale');
+    });
+  });
 });

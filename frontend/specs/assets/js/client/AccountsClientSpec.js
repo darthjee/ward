@@ -185,6 +185,17 @@ describe('AccountsClient', () => {
     });
   });
 
+  describe('.getAccount', () => {
+    it('gets the account endpoint', async () => {
+      spyOn(ApiClient, 'getJson').and.resolveTo({ username: 'a', email: 'a@b.c', locale: null });
+
+      const result = await AccountsClient.getAccount();
+
+      expect([ApiClient.getJson.calls.argsFor(0), result.locale])
+        .toEqual([['/auth/account.json'], null]);
+    });
+  });
+
   describe('.updateAccount', () => {
     it('patches the current password and every filled-in field to the account endpoint', async () => {
       spyOn(ApiClient, 'patchJson').and.resolveTo({ username: 'newname', email: 'foo@example.com' });
@@ -199,6 +210,14 @@ describe('AccountsClient', () => {
         email: 'foo@example.com',
         newPassword: 'longenough',
       });
+    });
+
+    it('sends only the locale, including an explicit null, without a password', async () => {
+      spyOn(ApiClient, 'patchJson').and.resolveTo({ username: 'foo', email: 'foo@example.com', locale: null });
+
+      await AccountsClient.updateAccount({ locale: null });
+
+      expect(ApiClient.patchJson).toHaveBeenCalledWith('/auth/account.json', { locale: null });
     });
 
     it('omits username, email, and newPassword when not provided', async () => {

@@ -1,3 +1,4 @@
+import DisplayLocale from '../../../../utils/locale/DisplayLocale.js';
 import { formatMoney } from './amounts.js';
 
 /** Unit label of a rate period / frequency (`monthly` → "month"). */
@@ -20,10 +21,26 @@ function withPeriod(value, period) {
 }
 
 /**
+ * Format a rate string as a locale number, keeping the string's own precision.
+ *
+ * @param {string} rate - The decimal string.
+ * @returns {string} The locale-formatted number.
+ */
+function formatRateNumber(rate) {
+  const digits = (String(rate).split('.')[1] ?? '').length;
+
+  return new Intl.NumberFormat(DisplayLocale.get(), {
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
+  }).format(Number(rate));
+}
+
+/**
  * Format a rate with its period, e.g. "1.99% / month" (a debt's interest rate, an
  * investment's yield rate).
  *
- * @description The API's decimal string is shown as-is (no trailing zeros, no rounding).
+ * @description The API's decimal string is shown in the display locale with its own precision
+ * (no trailing zeros added, no rounding).
  * @param {string|null} rate - The `interest_rate` / `yield_rate` decimal string.
  * @param {string|null} period - The `interest_period` / `yield_period` (`monthly` | `yearly`).
  * @returns {string} The formatted rate, or `''` when no rate is set.
@@ -33,7 +50,7 @@ export function formatRate(rate, period) {
     return '';
   }
 
-  return withPeriod(`${rate}%`, period);
+  return withPeriod(`${formatRateNumber(rate)}%`, period);
 }
 
 /**

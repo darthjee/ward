@@ -36,11 +36,35 @@ describe('UserUpdateService', () => {
   });
 
   describe('applyUserUpdate', () => {
+    describe('when a locale change is given', () => {
+      it('writes the locale and returns it', async () => {
+        const result = await service.applyUserUpdate(user, { locale: 'pt-BR' });
+
+        expect(userRepository.update).toHaveBeenCalledWith(user.id, { locale: 'pt-BR' });
+        expect(result.locale).toBe('pt-BR');
+      });
+
+      it('writes an explicit null', async () => {
+        user.locale = 'pt-BR';
+
+        const result = await service.applyUserUpdate(user, { locale: null });
+
+        expect(userRepository.update).toHaveBeenCalledWith(user.id, { locale: null });
+        expect(result.locale).toBeNull();
+      });
+
+      it('leaves the locale alone when absent', async () => {
+        await service.applyUserUpdate(user, { username: 'new-username' });
+
+        expect(userRepository.update).toHaveBeenCalledWith(user.id, { username: 'new-username' });
+      });
+    });
+
     describe('when only a username change is given', () => {
       it('updates the username and returns the resulting { username, email }', async () => {
         const result = await service.applyUserUpdate(user, { username: 'new-username' });
 
-        expect(result).toEqual({ username: 'new-username', email: 'darthjee@example.com' });
+        expect(result).toEqual({ username: 'new-username', email: 'darthjee@example.com', locale: null });
       });
 
       it('leaves the password digest untouched', async () => {
@@ -54,7 +78,7 @@ describe('UserUpdateService', () => {
       it('updates the email and returns the resulting { username, email }', async () => {
         const result = await service.applyUserUpdate(user, { email: 'new-email@example.com' });
 
-        expect(result).toEqual({ username: 'darthjee', email: 'new-email@example.com' });
+        expect(result).toEqual({ username: 'darthjee', email: 'new-email@example.com', locale: null });
       });
     });
 
@@ -69,7 +93,7 @@ describe('UserUpdateService', () => {
       it('returns the unchanged { username, email }', async () => {
         const result = await service.applyUserUpdate(user, { newPassword: 'brand-new-password' });
 
-        expect(result).toEqual({ username: 'darthjee', email: 'darthjee@example.com' });
+        expect(result).toEqual({ username: 'darthjee', email: 'darthjee@example.com', locale: null });
       });
     });
 
@@ -81,7 +105,7 @@ describe('UserUpdateService', () => {
           newPassword: 'brand-new-password',
         });
 
-        expect(result).toEqual({ username: 'new-username', email: 'new-email@example.com' });
+        expect(result).toEqual({ username: 'new-username', email: 'new-email@example.com', locale: null });
         expect(userRepository.update).toHaveBeenCalledWith(1, {
           username: 'new-username',
           email: 'new-email@example.com',
@@ -95,7 +119,7 @@ describe('UserUpdateService', () => {
       it('persists nothing and returns the unchanged { username, email }', async () => {
         const result = await service.applyUserUpdate(user, {});
 
-        expect(result).toEqual({ username: 'darthjee', email: 'darthjee@example.com' });
+        expect(result).toEqual({ username: 'darthjee', email: 'darthjee@example.com', locale: null });
         expect(userRepository.update).not.toHaveBeenCalled();
         expect(userRepository.save).not.toHaveBeenCalled();
       });

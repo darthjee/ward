@@ -1,3 +1,4 @@
+import { formatDate } from '../../../../../../../../../assets/js/components/resources/bank/common/dates.js';
 import BankInvestmentListHelper from '../../../../../../../../../assets/js/components/resources/bank/investments/pages/helpers/BankInvestmentListHelper.jsx';
 import { formatMoney } from '../../../../../../../../../assets/js/components/resources/bank/common/amounts.js';
 import { classifyError } from '../../../../../../../../../assets/js/components/resources/bank/common/bankErrors.js';
@@ -59,7 +60,7 @@ describe('BankInvestmentListHelper', () => {
 
   it('formats kind, current value, rate with period and maturity date', () => {
     expect(output().containsInOrder(
-      'CDB', 'Broker A', 'Fixed income', formatMoney('10500.00', 'BRL'), '1.1% / month', '2028-01-01', 'BRL',
+      'CDB', 'Broker A', 'Fixed income', formatMoney('10500.00', 'BRL'), '1.1% / month', formatDate('2028-01-01'), 'BRL',
     )).toBeTrue();
     expect(output().containsInOrder('Nikkei fund', formatMoney('100000', 'JPY'), 'JPY')).toBeTrue();
   });

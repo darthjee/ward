@@ -1,5 +1,5 @@
 import Button from 'react-bootstrap/cjs/Button.js';
-import { localToday } from '../../common/dates.js';
+import { formatDate, localToday } from '../../common/dates.js';
 
 /**
  * The sent mark of a ledger charge: "Sent <local date>" and a **Mark as unsent** link, shown
@@ -16,7 +16,7 @@ export default function SentMark({ transaction, pending = false, onMarkUnsent })
 
   return (
     <div className="small text-muted">
-      {`Sent ${localToday(new Date(transaction.sent_to_accountant_at))}`}
+      {`Sent ${formatDate(localToday(new Date(transaction.sent_to_accountant_at)))}`}
       <Button size="sm" variant="link" className="py-0" onClick={() => onMarkUnsent(transaction)} disabled={pending}>
         Mark as unsent
       </Button>

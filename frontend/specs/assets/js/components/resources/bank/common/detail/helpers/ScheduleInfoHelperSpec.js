@@ -1,3 +1,4 @@
+import { formatDate } from '../../../../../../../../../assets/js/components/resources/bank/common/dates.js';
 import ScheduleInfoHelper from '../../../../../../../../../assets/js/components/resources/bank/common/detail/helpers/ScheduleInfoHelper.jsx';
 import { renderedOutput } from '../../../../../../../../support/renderedOutput.js';
 
@@ -7,7 +8,7 @@ describe('ScheduleInfoHelper', () => {
       bills_from: '2026-02-01', show_in_calendar: true, paying_account: { id: 1, name: 'Main' },
     }));
 
-    expect(page.containsInOrder('Bills from', '2026-02-01', 'Show in Calendar', 'Yes', 'Default paying account', 'Main'))
+    expect(page.containsInOrder('Bills from', formatDate('2026-02-01'), 'Show in Calendar', 'Yes', 'Default paying account', 'Main'))
       .toBeTrue();
   });
 

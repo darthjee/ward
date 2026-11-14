@@ -210,25 +210,37 @@ const AccountsClient = {
   },
 
   /**
-   * Update the caller's own account, confirming with the current password. Unlike
+   * Fetch the caller's own account.
+   *
+   * @returns {Promise<{username: string, email: string, locale: string|null}>} The account.
+   */
+  async getAccount() {
+    return ApiClient.getJson('/auth/account.json');
+  },
+
+  /**
+   * Update the caller's own account. Unlike
    * {@link AccountsClient.login}/{@link AccountsClient.register}, this never touches
    * `AuthSession` — no token refresh or re-login is triggered on success. `username`, `email`,
    * and `newPassword` are only included in the request body when defined, so callers may update
    * any subset of them; a `newPasswordConfirmation` field is never sent — that check is
    * client-side only.
    *
-   * @param {{currentPassword: string, username?: string, email?: string,
-   *   newPassword?: string}} fields - The current password (always required) plus any fields
-   *   to update.
-   * @returns {Promise<{username: string, email: string}>} The account's updated username and
-   *   email.
+   * @param {{currentPassword?: string, username?: string, email?: string,
+   *   newPassword?: string, locale?: (string|null)}} fields - The current password (required
+   *   by the backend unless only `locale` changes) plus any fields to update; `locale` may be
+   *   an explicit `null` (browser default).
+   * @returns {Promise<{username: string, email: string, locale: (string|null)}>} The
+   *   account's updated username, email and locale.
    */
   async updateAccount({
-    currentPassword, username, email, newPassword,
+    currentPassword, username, email, newPassword, locale,
   }) {
     return ApiClient.patchJson('/auth/account.json', {
-      currentPassword,
-      ...pickDefined({ username, email, newPassword }),
+      ...pickDefined({
+        currentPassword, username, email, newPassword,
+      }),
+      ...(locale !== undefined && { locale }),
     });
   },
 };

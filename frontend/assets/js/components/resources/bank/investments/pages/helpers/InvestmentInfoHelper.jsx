@@ -1,4 +1,5 @@
 import DetailEntry from '../../../common/detail/DetailEntry.jsx';
+import { formatDate } from '../../../common/dates.js';
 import { formatRate } from '../../../common/rates.js';
 import { formatLiquidity, kindLabel } from '../../common/investmentLabels.js';
 
@@ -14,7 +15,7 @@ function renderAccountFields(account) {
     <dl className="row">
       <DetailEntry label="Institution" value={account.bank_name} />
       <DetailEntry label="Currency" value={account.currency} />
-      <DetailEntry label="Start date" value={account.opening_date} />
+      <DetailEntry label="Start date" value={formatDate(account.opening_date)} />
       <DetailEntry label="Notes" value={account.notes} />
     </dl>
   );
@@ -34,7 +35,7 @@ function renderInvestmentFields(account) {
     <dl className="row" aria-label="Investment info">
       <DetailEntry label="Kind" value={kindLabel(investment.kind)} />
       <DetailEntry label="Yield rate" value={formatRate(investment.yield_rate, investment.yield_period)} />
-      <DetailEntry label="Maturity date" value={investment.maturity_date} />
+      <DetailEntry label="Maturity date" value={formatDate(investment.maturity_date)} />
       <DetailEntry label="Liquidity" value={formatLiquidity(investment.liquidity_days)} />
     </dl>
   );

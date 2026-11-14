@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 /**
  * Shared state and handlers for the account-edit form pages (`MyAccount`, `AdminUserEdit`).
@@ -14,15 +14,20 @@ import { useMemo, useState } from 'react';
  *   page's controller.
  * @param {Function} options.submit - Per-page adapter called on submit as
  *   `submit(controller, fields)`; it must invoke the controller's own `handleSubmit`.
+ * @param {Function} [options.load] - Optional loader called once on mount as `load(controller)`;
+ *   `state.loading` is `true` until its promise settles.
  * @returns {{state: object, handlers: {onSubmit: Function, onChange: Function}}} The form state
  *   (the fields spread together with `fieldErrors`, `submitError` and `success`) and the
  *   `onSubmit`/`onChange` handlers.
  */
-export default function useAccountEditForm({ initialFields, createController, submit }) {
+export default function useAccountEditForm({
+  initialFields, createController, submit, load,
+}) {
   const [fields, setFields] = useState(initialFields);
   const [fieldErrors, setFieldErrors] = useState({});
   const [submitError, setSubmitError] = useState(null);
   const [success, setSuccess] = useState(false);
+  const [loading, setLoading] = useState(Boolean(load));
 
   // The controller is built once per mount; the factory is not expected to change.
   const controller = useMemo(
@@ -30,6 +35,13 @@ export default function useAccountEditForm({ initialFields, createController, su
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [],
   );
+
+  useEffect(() => {
+    if (load) {
+      Promise.resolve(load(controller)).finally(() => setLoading(false));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [controller]);
 
   const onChange = (field) => (event) => {
     const { value } = event.target;
@@ -44,6 +56,7 @@ export default function useAccountEditForm({ initialFields, createController, su
   return {
     state: {
       ...fields, fieldErrors, submitError, success,
+      ...(load && { loading }),
     },
     handlers: { onSubmit, onChange },
   };

@@ -110,6 +110,13 @@ attack.
 - **Allowlist changes are trust changes**: `WARD_ALLOWED_ORIGINS`/`FRONTEND_BASE_URL` define
   both CORS and CSRF trust (see `docs/agents/environment-variables.md`).
 
+## Locale-only account edits
+
+`PATCH /auth/account.json` with only `locale` (a harmless, allowlisted display preference) does
+not require `currentPassword` and neither checks nor updates the lockout guard. Any change to
+`username`, `email` or `newPassword` still requires it. Non-allowlisted values answer `422
+INVALID_LOCALE` before any password check.
+
 ## Session-lookup gate
 
 `JwtGuard` (`backend/src/core/jwt.guard.ts`) does not trust the access token's claims alone: on

@@ -120,6 +120,8 @@ table, the accepted residual risks and the rules future changes must keep.
   `approved` / `denied`, `varchar(16) NOT NULL` with **no default**, so every write path sets it
   explicitly; existing rows were backfilled to `approved` by
   `20261019120014-auth-add-users-status.ts` — see [User approval](auth/user-approval.md)),
+  `locale` (nullable `varchar(16)`, the display locale from `USER_LOCALES`; `NULL` = browser
+  default; set only through `PATCH /auth/account.json`, see [Auth routes](../backend/routes/auth.md)),
   `createdAt`, `updatedAt`.
 - `auth_refresh_tokens` (`entities/refresh-token.entity.ts`) — `id`, `tokenHash` (SHA-256 of the
   token, unique — the plaintext value is returned to the client once and never stored),

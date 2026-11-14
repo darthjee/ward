@@ -1,5 +1,12 @@
-import { BadRequestException, ConflictException, HttpException, UnauthorizedException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  HttpException,
+  UnauthorizedException,
+  UnprocessableEntityException,
+} from '@nestjs/common';
 import bcrypt from 'bcryptjs';
+import { ErrorCodes } from '../../core/error-codes.js';
 import { LockedException } from '../../core/locked.exception.js';
 import { AccountEditAbuseGuardService } from '../account-edit-abuse-guard.service.js';
 import { AccountService } from '../account.service.js';
@@ -60,6 +67,82 @@ describe('AccountService', () => {
     );
   });
 
+  describe('getAccount', () => {
+    it('returns exactly { username, email, locale }', async () => {
+      user.locale = 'pt-BR';
+      user.status = UserStatus.APPROVED;
+
+      expect(await service.getAccount(1)).toEqual({
+        username: 'darthjee',
+        email: 'darthjee@example.com',
+        locale: 'pt-BR',
+      });
+    });
+
+    it('returns locale null for a user without a preference', async () => {
+      expect((await service.getAccount(1)).locale).toBeNull();
+    });
+
+    it('rejects an unknown user', async () => {
+      userRepository.findOneBy.mockResolvedValue(null);
+
+      await expect(service.getAccount(1)).rejects.toBeInstanceOf(UnauthorizedException);
+    });
+  });
+
+  describe('updateAccount with a locale', () => {
+    it('saves a locale-only change without a password or lockout check', async () => {
+      const result = await service.updateAccount(1, { locale: 'de-DE' });
+
+      expect(result).toEqual({ username: 'darthjee', email: 'darthjee@example.com', locale: 'de-DE' });
+      expect(accountEditAbuseGuardService.isLockedOut).not.toHaveBeenCalled();
+      expect(accountEditAbuseGuardService.reset).not.toHaveBeenCalled();
+    });
+
+    it('saves an explicit null', async () => {
+      user.locale = 'de-DE';
+
+      const result = await service.updateAccount(1, { locale: null });
+
+      expect(result.locale).toBeNull();
+    });
+
+    it('ignores a wrong currentPassword on a locale-only change', async () => {
+      await expect(service.updateAccount(1, { currentPassword: 'wrong', locale: 'fr-FR' })).resolves.toMatchObject({
+        locale: 'fr-FR',
+      });
+      expect(accountEditAbuseGuardService.registerFailure).not.toHaveBeenCalled();
+    });
+
+    it.each(['pt-br', 'xx-XX', '', 1, {}])('rejects %p with 422 INVALID_LOCALE before any password check', async (locale) => {
+      const error = await service.updateAccount(1, { currentPassword: 'wrong', username: 'x', locale }).catch((e) => e);
+
+      expect(error).toBeInstanceOf(UnprocessableEntityException);
+      expect(error.getResponse()).toEqual({ code: ErrorCodes.INVALID_LOCALE, message: 'Unsupported display locale' });
+      expect(accountEditAbuseGuardService.registerFailure).not.toHaveBeenCalled();
+    });
+
+    it('requires currentPassword for a credential change', async () => {
+      await expect(service.updateAccount(1, { username: 'new-username' })).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('records a failure for a wrong password on a credential change', async () => {
+      await expect(service.updateAccount(1, { currentPassword: 'wrong', username: 'new-username', locale: 'fr-FR' }))
+        .rejects.toBeInstanceOf(BadRequestException);
+      expect(accountEditAbuseGuardService.registerFailure).toHaveBeenCalledWith(1);
+    });
+
+    it('saves a credential change together with the locale', async () => {
+      const result = await service.updateAccount(1, {
+        currentPassword: 'current-password',
+        username: 'new-username',
+        locale: 'es-ES',
+      });
+
+      expect(result).toEqual({ username: 'new-username', email: 'darthjee@example.com', locale: 'es-ES' });
+    });
+  });
+
   describe('updateAccount', () => {
     describe('when only the username is provided', () => {
       it('updates the username and returns the resulting { username, email }', async () => {
@@ -68,7 +151,7 @@ describe('AccountService', () => {
           username: 'new-username',
         });
 
-        expect(result).toEqual({ username: 'new-username', email: 'darthjee@example.com' });
+        expect(result).toEqual({ username: 'new-username', email: 'darthjee@example.com', locale: null });
       });
 
       it('resets the abuse-guard lockout counter on success', async () => {
@@ -88,7 +171,7 @@ describe('AccountService', () => {
           email: 'new-email@example.com',
         });
 
-        expect(result).toEqual({ username: 'darthjee', email: 'new-email@example.com' });
+        expect(result).toEqual({ username: 'darthjee', email: 'new-email@example.com', locale: null });
       });
     });
 
@@ -113,7 +196,7 @@ describe('AccountService', () => {
           newPassword: 'brand-new-password',
         });
 
-        expect(result).toEqual({ username: 'darthjee', email: 'darthjee@example.com' });
+        expect(result).toEqual({ username: 'darthjee', email: 'darthjee@example.com', locale: null });
       });
     });
 
@@ -126,7 +209,7 @@ describe('AccountService', () => {
           newPassword: 'brand-new-password',
         });
 
-        expect(result).toEqual({ username: 'new-username', email: 'new-email@example.com' });
+        expect(result).toEqual({ username: 'new-username', email: 'new-email@example.com', locale: null });
 
         const [, savedUser] = userRepository.update.mock.calls[0];
         await expect(bcrypt.compare('brand-new-password', savedUser.passwordDigest)).resolves.toBe(true);

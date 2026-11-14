@@ -1,5 +1,7 @@
+import { formatDate } from '../../../../../../../../../assets/js/components/resources/bank/common/dates.js';
 import LedgerTableHelper from '../../../../../../../../../assets/js/components/resources/bank/common/detail/helpers/LedgerTableHelper.jsx';
 import { formatMoney } from '../../../../../../../../../assets/js/components/resources/bank/common/amounts.js';
+import DisplayLocale from '../../../../../../../../../assets/js/utils/locale/DisplayLocale.js';
 import { renderedOutput } from '../../../../../../../../support/renderedOutput.js';
 
 const ROWS = [
@@ -59,7 +61,7 @@ describe('LedgerTableHelper', () => {
 
   it('renders rows newest first, as returned, with formatted amounts and running balances', () => {
     expect(output().containsInOrder(
-      '2026-05-02', 'Coffee', 'beans', formatMoney('-12.50', 'BRL'), formatMoney('87.50', 'BRL'), '2026-05-01', 'Salary',
+      formatDate('2026-05-02'), 'Coffee', 'beans', formatMoney('-12.50', 'BRL'), formatMoney('87.50', 'BRL'), formatDate('2026-05-01'), 'Salary',
     )).toBeTrue();
   });
 
@@ -132,5 +134,13 @@ describe('LedgerTableHelper', () => {
     expect(page.contains('<b>x</b>')).toBeFalse();
     expect(page.contains('<i>y</i>')).toBeFalse();
     expect(page.contains('&lt;b&gt;x&lt;/b&gt;')).toBeTrue();
+  });
+
+  it('renders dates in the display locale', () => {
+    DisplayLocale.set('pt-BR');
+    const page = output();
+    DisplayLocale.set(null);
+
+    expect(page.containsInOrder('02/05/2026', 'Coffee', '01/05/2026', 'Salary')).toBeTrue();
   });
 });

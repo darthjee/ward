@@ -38,6 +38,7 @@ import { BankCreateProviderExpenseDetails20261108120020 } from '../../migrations
 import { BankAddTransactionsSentToAccountantAt20261108120021 } from '../../migrations/20261108120021-bank-add-transactions-sent-to-accountant-at.js';
 import { BankAddScheduleFields20261108120022 } from '../../migrations/20261108120022-bank-add-schedule-fields.js';
 import { BankCreateBills20261108120023 } from '../../migrations/20261108120023-bank-create-bills.js';
+import { AuthAddUsersLocale20261113120024 } from '../../migrations/20261113120024-auth-add-users-locale.js';
 
 type MigrationClass = new () => MigrationInterface;
 type MysqlOptions = MysqlConnectionOptions;
@@ -72,6 +73,7 @@ export const MIGRATIONS: ReadonlyArray<{ file: string; migration: MigrationClass
   { file: '20261108120021-bank-add-transactions-sent-to-accountant-at', migration: BankAddTransactionsSentToAccountantAt20261108120021 },
   { file: '20261108120022-bank-add-schedule-fields', migration: BankAddScheduleFields20261108120022 },
   { file: '20261108120023-bank-create-bills', migration: BankCreateBills20261108120023 },
+  { file: '20261113120024-auth-add-users-locale', migration: AuthAddUsersLocale20261113120024 },
 ];
 
 /** Every entity the app maps, so repositories resolve against the test database. */

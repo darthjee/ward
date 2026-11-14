@@ -1,3 +1,5 @@
+import DisplayLocale from '../../../../utils/locale/DisplayLocale.js';
+
 /**
  * Build the label of a currency.
  *
@@ -29,7 +31,7 @@ function buildOption(code, names) {
  * @returns {object|null} The display names, or `null` when unavailable.
  */
 function displayNames(intl) {
-  return intl.DisplayNames ? new intl.DisplayNames(undefined, { type: 'currency' }) : null;
+  return intl.DisplayNames ? new intl.DisplayNames(DisplayLocale.get(), { type: 'currency' }) : null;
 }
 
 /**

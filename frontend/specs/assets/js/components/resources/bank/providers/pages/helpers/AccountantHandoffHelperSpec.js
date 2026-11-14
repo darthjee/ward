@@ -1,6 +1,6 @@
 import AccountantHandoffHelper from '../../../../../../../../../assets/js/components/resources/bank/providers/pages/helpers/AccountantHandoffHelper.jsx';
 import { formatMoney } from '../../../../../../../../../assets/js/components/resources/bank/common/amounts.js';
-import { localToday } from '../../../../../../../../../assets/js/components/resources/bank/common/dates.js';
+import { formatDate, localToday } from '../../../../../../../../../assets/js/components/resources/bank/common/dates.js';
 import { classifyError } from '../../../../../../../../../assets/js/components/resources/bank/common/bankErrors.js';
 import ApiError from '../../../../../../../../../assets/js/client/ApiError.js';
 import { renderedOutput } from '../../../../../../../../support/renderedOutput.js';
@@ -93,9 +93,9 @@ describe('AccountantHandoffHelper', () => {
 
     expect(page.containsInOrder('Date', 'Provider', 'Description', 'Amount', 'Currency', 'Sent')).toBeTrue();
     expect(page.containsInOrder(
-      '2026-02-05', 'href="#/bank/providers/4"', 'Office ISP', 'Fiber Co', 'Internet', formatMoney('-129.90', 'BRL'), 'BRL', '—',
+      formatDate('2026-02-05'), 'href="#/bank/providers/4"', 'Office ISP', 'Fiber Co', 'Internet', formatMoney('-129.90', 'BRL'), 'BRL', '—',
     )).toBeTrue();
-    expect(page.containsInOrder('Phone', localToday(new Date(SENT_AT)), 'Hosting', formatMoney('-20.00', 'USD'), 'USD')).toBeTrue();
+    expect(page.containsInOrder('Phone', formatDate(localToday(new Date(SENT_AT))), 'Hosting', formatMoney('-20.00', 'USD'), 'USD')).toBeTrue();
   });
 
   it('shows one total line per currency, never a grand total', () => {

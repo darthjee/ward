@@ -22,6 +22,13 @@ Code: `frontend/assets/js/components/resources/bank/` and
 - User input (names, notes, descriptions) is always rendered escaped, and no owner field is
   shown or sent.
 
+## Display locale
+
+Amounts, rates, month and currency names follow the user's display locale (*My account*), and
+every displayed date goes through `formatDate`. Amount input parsing, native date inputs, API
+values and the accountant CSV do not change. See the Display locale section of
+[frontend architecture](../../architecture/frontend.md).
+
 ## Bank menu
 
 The header's **Bank** dropdown has **Accounts**, **Debts**, **Investments** and **Providers**.

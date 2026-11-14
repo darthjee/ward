@@ -1,7 +1,13 @@
 import { formatInstalment, formatRate } from '../../../../../../../assets/js/components/resources/bank/common/rates.js';
 import { formatMoney } from '../../../../../../../assets/js/components/resources/bank/common/amounts.js';
 
+import DisplayLocale from '../../../../../../../assets/js/utils/locale/DisplayLocale.js';
+
 describe('rates', () => {
+  afterEach(() => {
+    DisplayLocale.set(null);
+  });
+
   describe('formatRate', () => {
     it('shows the rate as returned, with its period', () => {
       expect(formatRate('1.99', 'monthly')).toBe('1.99% / month');
@@ -11,6 +17,18 @@ describe('rates', () => {
 
     it('shows the rate alone without a known period', () => {
       expect(formatRate('3', null)).toBe('3%');
+    });
+
+    it('formats in the display locale keeping precision', () => {
+      DisplayLocale.set('pt-BR');
+      const pt = [formatRate('1.5', null), formatRate('12.345', 'yearly'), formatRate('3', null)];
+      DisplayLocale.set('en-US');
+      const en = [formatRate('1.5', null), formatRate('12.345', 'yearly'), formatRate('3', null)];
+
+      expect([pt, en]).toEqual([
+        ['1,5%', '12,345% / year', '3%'],
+        ['1.5%', '12.345% / year', '3%'],
+      ]);
     });
 
     it('is empty without a rate', () => {

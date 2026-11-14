@@ -27,14 +27,18 @@ const AccountEditFormHelper = {
    * @param {{onSubmit: Function, onChange: Function}} handlers - Event handlers; `onChange` is
    *   curried by field name.
    * @param {{heading: string, successMessage: string, idPrefix: string,
-   *   leadingPasswordFields: (Array<Array<string>>|undefined)}} options - Page-specific
+   *   leadingPasswordFields: (Array<Array<string>>|undefined),
+   *   afterProfileFields: (Function|undefined), submitDisabled: (boolean|undefined)}} options - Page-specific
    *   heading, success message, input-id prefix (used verbatim, so it includes any trailing
    *   `-`) and optional `[name, type, label]` fields rendered in the "Change password" section
-   *   before the new-password fields.
+   *   before the new-password fields, an optional `afterProfileFields(state, handlers)`
+   *   render function for extra profile controls, and an optional `submitDisabled` flag.
    * @returns {React.ReactElement} The rendered account-edit page.
    */
   render(state, handlers, options) {
-    const { heading, successMessage, idPrefix, leadingPasswordFields = [] } = options;
+    const {
+      heading, successMessage, idPrefix, leadingPasswordFields = [], afterProfileFields, submitDisabled,
+    } = options;
     const renderField = ([name, type, label]) => FormFieldsHelper.renderField(
       name, type, label, state, handlers.onChange(name), idPrefix,
     );
@@ -46,11 +50,12 @@ const AccountEditFormHelper = {
           {FormFieldsHelper.renderSubmitError(state)}
           {FormFieldsHelper.renderSuccess(state, successMessage)}
           {PROFILE_FIELDS.map(renderField)}
+          {afterProfileFields?.(state, handlers)}
           <hr />
           <h2 className="h5">Change password</h2>
           {leadingPasswordFields.map(renderField)}
           {PASSWORD_FIELDS.map(renderField)}
-          <button type="submit" className="btn btn-primary">Save</button>
+          <button type="submit" className="btn btn-primary" disabled={Boolean(submitDisabled)}>Save</button>
         </form>
       </div>
     );

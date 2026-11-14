@@ -1,3 +1,4 @@
+import { formatDate } from '../../../../../../../../../assets/js/components/resources/bank/common/dates.js';
 import BankAccountHeaderHelper, {
   ARCHIVED_BANNER,
 } from '../../../../../../../../../assets/js/components/resources/bank/accounts/pages/helpers/BankAccountHeaderHelper.jsx';
@@ -35,7 +36,7 @@ describe('BankAccountHeaderHelper', () => {
   it('renders every field with the full account number and the balance', () => {
     const page = output();
 
-    expect(page.containsInOrder('Main', formatMoney('-1234.56', 'BRL'), 'Bank A', '001', '0012345-6', 'BRL', '2026-01-01'))
+    expect(page.containsInOrder('Main', formatMoney('-1234.56', 'BRL'), 'Bank A', '001', '0012345-6', 'BRL', formatDate('2026-01-01')))
       .toBeTrue();
     expect(page.contains('Some notes')).toBeTrue();
   });

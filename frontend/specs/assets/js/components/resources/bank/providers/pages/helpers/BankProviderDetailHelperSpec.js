@@ -1,6 +1,6 @@
 import BankProviderDetailHelper from '../../../../../../../../../assets/js/components/resources/bank/providers/pages/helpers/BankProviderDetailHelper.jsx';
 import { initialLedgerForm } from '../../../../../../../../../assets/js/components/resources/bank/common/detail/hooks/useLedgerForm.js';
-import { localToday } from '../../../../../../../../../assets/js/components/resources/bank/common/dates.js';
+import { formatDate, localToday } from '../../../../../../../../../assets/js/components/resources/bank/common/dates.js';
 import BillHistoryHelper from '../../../../../../../../../assets/js/components/resources/bank/common/bills/helpers/BillHistoryHelper.jsx';
 import { renderedOutput } from '../../../../../../../../support/renderedOutput.js';
 
@@ -115,7 +115,7 @@ describe('BankProviderDetailHelper', () => {
 
   it('shows the sent date and Mark as unsent on sent charges only', () => {
     const page = output();
-    const sent = `Sent ${localToday(new Date(SENT_AT))}`;
+    const sent = `Sent ${formatDate(localToday(new Date(SENT_AT)))}`;
 
     expect(page.containsInOrder('Charge Feb', sent, 'Mark as unsent')).toBeTrue();
     expect(page.containsInOrder('Payment Mar', 'Charge Mar', 'Charge Feb', sent)).toBeTrue();

@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, HttpCode, HttpStatus, Patch, Post, Res } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Patch, Post, Res } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { Response } from 'express';
 import { AccountService } from './account.service.js';
@@ -58,6 +58,17 @@ export class AuthController {
     this.configService = configService;
     this.accountService = accountService;
     this.sessionStatusService = sessionStatusService;
+  }
+
+  /**
+   * `GET /auth/account.json`. Authenticated (default `JwtGuard`, no `@Public()`).
+   * Returns the caller's own username, email and display locale.
+   * @param {AccessTokenPayload} user - The caller's own authenticated user, supplying the user ID.
+   * @returns {Promise<object>} `{ username, email, locale }`.
+   */
+  @Get('account.json')
+  async getAccount(@CurrentUser() user: AccessTokenPayload): Promise<object> {
+    return this.accountService.getAccount(user.sub);
   }
 
   /**

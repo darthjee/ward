@@ -1,6 +1,7 @@
 import AccountHeaderHelper, { ARCHIVED_BANNER } from '../../../common/detail/helpers/AccountHeaderHelper.jsx';
 import DetailEntry from '../../../common/detail/DetailEntry.jsx';
 import { formatMoney } from '../../../common/amounts.js';
+import { formatDate } from '../../../common/dates.js';
 import { ACCOUNTS_BASE } from '../../../common/sections.js';
 
 export { ARCHIVED_BANNER };
@@ -18,7 +19,7 @@ function renderDetails(account) {
       <DetailEntry label="Branch" value={account.branch} />
       <DetailEntry label="Account number" value={account.account_number} />
       <DetailEntry label="Currency" value={account.currency} />
-      <DetailEntry label="Opening date" value={account.opening_date} />
+      <DetailEntry label="Opening date" value={formatDate(account.opening_date)} />
       <DetailEntry label="Opening balance" value={formatMoney(account.opening_balance, account.currency)} />
       <DetailEntry label="Notes" value={account.notes} />
     </dl>

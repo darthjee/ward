@@ -1,6 +1,7 @@
 import Table from 'react-bootstrap/cjs/Table.js';
 import Button from 'react-bootstrap/cjs/Button.js';
 import { formatMoney } from '../../amounts.js';
+import { formatDate } from '../../dates.js';
 
 /**
  * Render a transaction's notes, read-only, beneath its description.
@@ -52,7 +53,7 @@ function renderRow(transaction, state, handlers) {
 
   return (
     <tr key={transaction.id} className={editing ? 'table-warning' : undefined}>
-      <td className="text-nowrap">{transaction.date}</td>
+      <td className="text-nowrap">{formatDate(transaction.date)}</td>
       <td className="text-break">
         {transaction.description}
         {renderNotes(transaction.notes)}
@@ -79,7 +80,7 @@ function renderOpening(opening, state) {
 
   return (
     <tr className="text-muted fst-italic">
-      <td className="text-nowrap">{opening.date}</td>
+      <td className="text-nowrap">{formatDate(opening.date)}</td>
       <td>Opening balance</td>
       <td className="text-end text-nowrap">{formatMoney(opening.amount, state.currency)}</td>
       <td className="text-end text-nowrap">{formatMoney(opening.balance, state.currency)}</td>

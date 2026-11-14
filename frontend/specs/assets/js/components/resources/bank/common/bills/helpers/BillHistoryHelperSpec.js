@@ -1,3 +1,4 @@
+import { formatDate } from '../../../../../../../../../assets/js/components/resources/bank/common/dates.js';
 import BillHistoryHelper, {
   EMPTY_HISTORY_TEXT,
 } from '../../../../../../../../../assets/js/components/resources/bank/common/bills/helpers/BillHistoryHelper.jsx';
@@ -70,23 +71,23 @@ function element(type, overrides, handlers = HANDLERS) {
 
 describe('BillHistoryHelper', () => {
   it('lists the rows as returned (newest due date first)', () => {
-    expect(output().containsInOrder('Bill history', '2026-04-10', '2026-03-10', '2026-02-20')).toBeTrue();
+    expect(output().containsInOrder('Bill history', formatDate('2026-04-10'), formatDate('2026-03-10'), formatDate('2026-02-20'))).toBeTrue();
   });
 
   it('shows a paid row: status, due date, paid-on, amount and paying account', () => {
-    expect(output().containsInOrder('Paid', '2026-04-10', '2026-04-11', formatMoney('120.50', 'BRL'), 'Main')).toBeTrue();
+    expect(output().containsInOrder('Paid', formatDate('2026-04-10'), formatDate('2026-04-11'), formatMoney('120.50', 'BRL'), 'Main')).toBeTrue();
   });
 
   it('shows a skipped row with dashes for the payment fields', () => {
     expect(output({ data: { payments: [SKIPPED], pagination: { total_pages: 1 } } }).containsInOrder(
-      'Skipped', '2026-03-10', '—', '—', '—',
+      'Skipped', formatDate('2026-03-10'), '—', '—', '—',
     )).toBeTrue();
   });
 
   it('marks off-schedule rows and shows the one-off description', () => {
     const page = output({ data: { payments: [PAID, ONE_OFF], pagination: { total_pages: 1 } } });
 
-    expect(page.containsInOrder('2026-04-10', 'Paid', 'Off-schedule', '2026-02-20', 'Boiler repair')).toBeTrue();
+    expect(page.containsInOrder(formatDate('2026-04-10'), 'Paid', 'Off-schedule', formatDate('2026-02-20'), 'Boiler repair')).toBeTrue();
     expect(output({ data: { payments: [PAID], pagination: { total_pages: 1 } } }).contains('Off-schedule')).toBeFalse();
   });
 

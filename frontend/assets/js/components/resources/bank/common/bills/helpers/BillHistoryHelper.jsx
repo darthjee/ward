@@ -5,6 +5,7 @@ import BankPagination from '../../BankPagination.jsx';
 import OffScheduleBadge from '../OffScheduleBadge.jsx';
 import UndoPaymentConfirm, { undoWarnsCharge } from '../UndoPaymentConfirm.jsx';
 import { formatMoney } from '../../amounts.js';
+import { formatDate } from '../../dates.js';
 
 /** Display labels of a bill payment's status. */
 const STATUS_LABELS = new Map([
@@ -51,8 +52,8 @@ function renderRow(payment, state, handlers) {
         {STATUS_LABELS.get(payment.status) ?? payment.status}
         <OffScheduleBadge payment={payment} />
       </td>
-      <td className="text-nowrap">{payment.due_date}</td>
-      <td className="text-nowrap">{payment.paid_on ?? '—'}</td>
+      <td className="text-nowrap">{formatDate(payment.due_date)}</td>
+      <td className="text-nowrap">{payment.paid_on ? formatDate(payment.paid_on) : '—'}</td>
       <td className="text-end text-nowrap">{formatMoney(payment.amount, state.account.currency) || '—'}</td>
       <td className="text-break">{payment.paying_account?.name ?? '—'}</td>
       <td className="text-break">{payment.bill?.description ?? ''}</td>
