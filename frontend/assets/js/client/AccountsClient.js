@@ -210,6 +210,15 @@ const AccountsClient = {
   },
 
   /**
+   * Fetch the caller's own account.
+   *
+   * @returns {Promise<{username: string, email: string, locale: string|null}>} The account.
+   */
+  async getAccount() {
+    return ApiClient.getJson('/auth/account.json');
+  },
+
+  /**
    * Update the caller's own account, confirming with the current password. Unlike
    * {@link AccountsClient.login}/{@link AccountsClient.register}, this never touches
    * `AuthSession` — no token refresh or re-login is triggered on success. `username`, `email`,

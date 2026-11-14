@@ -185,6 +185,17 @@ describe('AccountsClient', () => {
     });
   });
 
+  describe('.getAccount', () => {
+    it('gets the account endpoint', async () => {
+      spyOn(ApiClient, 'getJson').and.resolveTo({ username: 'a', email: 'a@b.c', locale: null });
+
+      const result = await AccountsClient.getAccount();
+
+      expect([ApiClient.getJson.calls.argsFor(0), result.locale])
+        .toEqual([['/auth/account.json'], null]);
+    });
+  });
+
   describe('.updateAccount', () => {
     it('patches the current password and every filled-in field to the account endpoint', async () => {
       spyOn(ApiClient, 'patchJson').and.resolveTo({ username: 'newname', email: 'foo@example.com' });
