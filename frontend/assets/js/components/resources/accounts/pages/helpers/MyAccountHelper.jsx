@@ -1,8 +1,27 @@
 import AccountEditFormHelper from '../../../../common/forms/helpers/AccountEditFormHelper.jsx';
+import LocaleSelect from '../LocaleSelect.jsx';
 
 const LEADING_PASSWORD_FIELDS = [
   ['currentPassword', 'password', 'Current password'],
 ];
+
+/**
+ * Render the display-locale select slot.
+ *
+ * @param {object} state - Page state.
+ * @param {{onChange: Function}} handlers - Event handlers.
+ * @returns {React.ReactElement} The select.
+ */
+function renderLocaleSelect(state, handlers) {
+  return (
+    <LocaleSelect
+      id="my-account-locale"
+      value={state.locale ?? ''}
+      error={state.fieldErrors?.locale}
+      onChange={handlers.onChange('locale')}
+    />
+  );
+}
 
 /**
  * Rendering helper for the "My account" page.
@@ -15,7 +34,7 @@ const MyAccountHelper = {
    *
    * @param {{username: string, email: string, currentPassword: string, newPassword: string,
    *   newPasswordConfirmation: string, fieldErrors: object, submitError: (string|null),
-   *   success: boolean}} state - Page state.
+   *   success: boolean, locale: string, loading: boolean}} state - Page state.
    * @param {{onSubmit: Function, onChange: Function}} handlers - Event handlers.
    * @returns {React.ReactElement} The rendered My Account page.
    */
@@ -25,6 +44,8 @@ const MyAccountHelper = {
       successMessage: 'Account updated.',
       idPrefix: 'my-account-',
       leadingPasswordFields: LEADING_PASSWORD_FIELDS,
+      afterProfileFields: renderLocaleSelect,
+      submitDisabled: state.loading,
     });
   },
 };

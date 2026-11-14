@@ -12,12 +12,14 @@ describe('MyAccount', () => {
     defaultState: {
       username: '',
       email: '',
+      locale: '',
       currentPassword: '',
       newPassword: '',
       newPasswordConfirmation: '',
       fieldErrors: {},
       submitError: null,
       success: false,
+      loading: true,
     },
   });
 
@@ -31,6 +33,7 @@ describe('MyAccount', () => {
     expect(MyAccountController.prototype.handleSubmit).toHaveBeenCalledWith({
       username: '',
       email: '',
+      locale: '',
       currentPassword: '',
       newPassword: '',
       newPasswordConfirmation: '',

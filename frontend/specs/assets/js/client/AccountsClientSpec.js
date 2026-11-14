@@ -212,6 +212,14 @@ describe('AccountsClient', () => {
       });
     });
 
+    it('sends only the locale, including an explicit null, without a password', async () => {
+      spyOn(ApiClient, 'patchJson').and.resolveTo({ username: 'foo', email: 'foo@example.com', locale: null });
+
+      await AccountsClient.updateAccount({ locale: null });
+
+      expect(ApiClient.patchJson).toHaveBeenCalledWith('/auth/account.json', { locale: null });
+    });
+
     it('omits username, email, and newPassword when not provided', async () => {
       spyOn(ApiClient, 'patchJson').and.resolveTo({ username: 'foo', email: 'foo@example.com' });
 
