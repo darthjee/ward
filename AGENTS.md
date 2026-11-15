@@ -160,3 +160,7 @@ See `.claude/agents/` for the full roster (`architect`, `backend`, `infra`, `fro
   current conversation or through a standing user instruction (for example a user memory entry).
 - Keep backend controllers thin — business logic belongs in each module's service, not the
   controller, unless a change explicitly documents why an exception is warranted.
+
+## Commit Attribution
+
+Commit co-author trailers follow arcanum's resolved `git.omit_model_coauthor` and `git.remove_coauthors` config (check them with `/arcanum-check-config`); this overrides Claude Code's own attribution reminder for every commit, including ones written by hand.
