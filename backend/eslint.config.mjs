@@ -121,6 +121,11 @@ export default [
       'no-var': 'error',
       'prefer-const': 'error',
 
+      'no-restricted-syntax': ['error', {
+        selector: "ClassDeclaration[decorators.length>0] > ClassBody > :matches(MethodDefinition, PropertyDefinition)[static=true][key.type='PrivateIdentifier']",
+        message: 'static #private members are not allowed in decorated classes (TS18036). Use a module-level function instead.',
+      }],
+
       // TypeScript's own compiler (via `strict`/`noImplicitAny`, see
       // tsconfig.json) already catches unused vars/undefined members with
       // more precision than the JS-oriented rules below.

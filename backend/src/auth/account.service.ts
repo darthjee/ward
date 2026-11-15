@@ -82,23 +82,13 @@ export class AccountService {
    */
   async updateAccount(userId: number, dto: UpdateAccountDto): Promise<AccountSummary> {
     assertAnyFieldPresent(dto);
-    AccountService.#assertValidLocale(dto.locale);
+    assertValidLocale(dto.locale);
 
-    if (!AccountService.#isCredentialChange(dto)) {
+    if (!isCredentialChange(dto)) {
       return this.#applyLocaleOnly(userId, dto.locale as UserLocale | null);
     }
 
     return this.#applyCredentialChange(userId, dto);
-  }
-
-  static #assertValidLocale(locale: unknown): void {
-    if (locale !== undefined && locale !== null && !isUserLocale(locale)) {
-      throw new UnprocessableEntityException({ code: ErrorCodes.INVALID_LOCALE, message: INVALID_LOCALE_MESSAGE });
-    }
-  }
-
-  static #isCredentialChange(dto: UpdateAccountDto): boolean {
-    return dto.username !== undefined || dto.email !== undefined || dto.newPassword !== undefined;
   }
 
   async #applyLocaleOnly(userId: number, locale: UserLocale | null): Promise<AccountSummary> {
@@ -165,4 +155,25 @@ export class AccountService {
       throw new BadRequestException('Invalid current password');
     }
   }
+}
+
+/**
+ * Rejects a locale that is neither absent/null nor an allowlisted value.
+ * @param {unknown} locale - The locale supplied in the request.
+ * @returns {void}
+ * @throws {UnprocessableEntityException} `INVALID_LOCALE` for a non-allowlisted locale.
+ */
+function assertValidLocale(locale: unknown): void {
+  if (locale !== undefined && locale !== null && !isUserLocale(locale)) {
+    throw new UnprocessableEntityException({ code: ErrorCodes.INVALID_LOCALE, message: INVALID_LOCALE_MESSAGE });
+  }
+}
+
+/**
+ * Tells whether the request changes username, email or password.
+ * @param {UpdateAccountDto} dto - The account update payload.
+ * @returns {boolean} `true` when any credential field is present.
+ */
+function isCredentialChange(dto: UpdateAccountDto): boolean {
+  return dto.username !== undefined || dto.email !== undefined || dto.newPassword !== undefined;
 }
