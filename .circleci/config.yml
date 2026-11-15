@@ -31,6 +31,14 @@ workflows:
           requires: [release-circleci_ward-base, release-circleci_ward-base-arm64]
           filters: *all_tags
       - yarn_project:
+          name: backend_build
+          dir: backend
+          image: darthjee/circleci_ward-base:0.1.0
+          script: build
+          step_name: Build
+          requires: [release-circleci_ward-base, release-circleci_ward-base-arm64]
+          filters: *all_tags
+      - yarn_project:
           name: jasmine
           dir: frontend
           image: darthjee/circleci_node:0.2.1
@@ -56,6 +64,7 @@ workflows:
             - backend_tests
             - backend_integration
             - backend_checks
+            - backend_build
             - jasmine
             - frontend-checks
             - proxy_extension_tests
@@ -67,13 +76,14 @@ workflows:
             branches:
               ignore: /.*/
       - upload_proxy_files:
-          requires: [backend_tests, backend_integration, backend_checks, jasmine, frontend-checks, proxy_extension_tests]
+          requires: [backend_tests, backend_integration, backend_checks, backend_build, jasmine, frontend-checks, proxy_extension_tests]
           filters: *tags_only
       - upload_fe_files:
           requires:
             - backend_tests
             - backend_integration
             - backend_checks
+            - backend_build
             - jasmine
             - frontend-checks
             - proxy_extension_tests
