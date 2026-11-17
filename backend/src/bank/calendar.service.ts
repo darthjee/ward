@@ -7,7 +7,7 @@ import type { OwnerContext } from '../core/owner-context.js';
 import { assertCalendarRange, type CalendarQueryDto } from './dto/calendar-query.dto.js';
 import type { Account } from './entities/account.entity.js';
 import type { BillPayment } from './entities/bill-payment.entity.js';
-import type { Bill } from './entities/bill.entity.js';
+import type { ProviderBill } from './entities/provider-bill.entity.js';
 import { todayUtc } from './ledger-date.js';
 import { addDays, occurrencesBetween, pastOccurrences, type Occurrence } from './occurrence-generator.js';
 import {
@@ -39,7 +39,7 @@ type DerivedOccurrence = { source: BillSource; occurrence: Occurrence };
 /** What one Calendar read combines. */
 interface CalendarParts {
   derived: DerivedOccurrence[];
-  bills: Bill[];
+  bills: ProviderBill[];
   providers: Map<number, Account>;
   /** The derived payments' nominal `due_date` filter. */
   paymentDates: FindOperator<string>;

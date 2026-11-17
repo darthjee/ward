@@ -26,6 +26,8 @@ function stored(overrides: Partial<ProviderExpenseState> = {}): ProviderExpenseD
   });
 }
 
+// The recurring-bill repository `saveDetails` syncs through: no stored bill.
+const billsRepo = () => ({ findOne: jest.fn(async () => null), create: jest.fn((fields: object) => fields), save: jest.fn(async (row: unknown) => row) });
 const monthly = (): ProviderExpenseDetails => stored({ chargeFrequency: 'monthly', dueMonth: null });
 const pe = (fields: Partial<ProviderExpenseDetailsDto>): ProviderExpenseDetailsDto => fields as ProviderExpenseDetailsDto;
 
@@ -247,7 +249,7 @@ describe('ProviderExpenseAccountHandler', () => {
   describe('saveDetails', () => {
     it('upserts the row keyed by the account id', async () => {
       const save = jest.fn(async (row: unknown) => row);
-      const manager = { getRepository: jest.fn(() => ({ save })) };
+      const manager = { getRepository: jest.fn((entity: unknown) => (entity === ProviderExpenseDetails ? { save } : billsRepo())) };
 
       await handler.saveDetails(buildAccount({ id: 42 }), { ...defaultProviderExpenseState(), dueDay: 5 }, manager as never);
 
@@ -257,11 +259,53 @@ describe('ProviderExpenseAccountHandler', () => {
 
     it('saves the defaults when nothing was prepared', async () => {
       const save = jest.fn(async (row: unknown) => row);
-      const manager = { getRepository: () => ({ save }) };
+      const manager = { getRepository: (entity: unknown) => (entity === ProviderExpenseDetails ? { save } : billsRepo()) };
 
       await handler.saveDetails(buildAccount({ id: 42 }), undefined, manager as never);
 
       expect(save).toHaveBeenCalledWith({ ...defaultProviderExpenseState(), accountId: 42 });
+    });
+  });
+
+  describe('saveDetails and the recurring provider bill', () => {
+    const run = async (state: object, stored: object | null = null) => {
+      const bills = { ...billsRepo(), findOne: jest.fn(async () => stored) };
+      const manager = { getRepository: (entity: unknown) => (entity === ProviderExpenseDetails ? { save: jest.fn() } : bills) };
+      await handler.saveDetails(buildAccount({ id: 42, name: 'Vivo' }), { ...defaultProviderExpenseState(), ...state }, manager as never);
+      return bills;
+    };
+
+    it('locks and looks up the provider\'s recurring bill', async () => {
+      const bills = await run({ dueDay: 5 });
+
+      expect(bills.findOne).toHaveBeenCalledWith({ where: { providerAccountId: 42, kind: 'recurring' }, lock: { mode: 'pessimistic_write' } });
+    });
+
+    it('inserts a recurring bill with the copied fields when due_day is set and none exists', async () => {
+      const bills = await run({ dueDay: 5, expectedAmount: 100n, dueMonth: 3, chargeFrequency: 'yearly', billsFrom: '2026-01-01', payingAccountId: 9 });
+
+      expect(bills.save).toHaveBeenCalledWith(expect.objectContaining({
+        providerAccountId: 42, kind: 'recurring', description: 'Vivo', expectedAmount: 100n, chargeFrequency: 'yearly',
+        dueDay: 5, dueMonth: 3, billsFrom: '2026-01-01', showInCalendar: true, payingAccountId: 9,
+      }));
+    });
+
+    it('updates the stored bill (same id) when due_day is set', async () => {
+      const bills = await run({ dueDay: 7 }, { id: 3, providerAccountId: 42, kind: 'recurring', description: 'Old', showInCalendar: false });
+
+      expect(bills.save).toHaveBeenCalledWith(expect.objectContaining({ id: 3, description: 'Vivo', dueDay: 7, showInCalendar: true }));
+    });
+
+    it('hides the stored bill, keeping its schedule, when due_day is cleared', async () => {
+      const bills = await run({ dueDay: null }, { id: 3, providerAccountId: 42, kind: 'recurring', description: 'Old', dueDay: 10, dueMonth: 3, showInCalendar: true });
+
+      expect(bills.save).toHaveBeenCalledWith({ id: 3, providerAccountId: 42, kind: 'recurring', description: 'Vivo', dueDay: 10, dueMonth: 3, showInCalendar: false });
+    });
+
+    it('does nothing when due_day is null and there is no bill', async () => {
+      const bills = await run({ dueDay: null });
+
+      expect(bills.save).not.toHaveBeenCalled();
     });
   });
 

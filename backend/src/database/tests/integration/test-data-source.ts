@@ -9,9 +9,9 @@ import { RefreshToken } from '../../../auth/entities/refresh-token.entity.js';
 import { User } from '../../../auth/entities/user.entity.js';
 import { Account } from '../../../bank/entities/account.entity.js';
 import { BillPayment } from '../../../bank/entities/bill-payment.entity.js';
-import { Bill } from '../../../bank/entities/bill.entity.js';
 import { DebtDetails } from '../../../bank/entities/debt-details.entity.js';
 import { InvestmentDetails } from '../../../bank/entities/investment-details.entity.js';
+import { ProviderBill } from '../../../bank/entities/provider-bill.entity.js';
 import { ProviderExpenseDetails } from '../../../bank/entities/provider-expense-details.entity.js';
 import { Transaction } from '../../../bank/entities/transaction.entity.js';
 import { dataSourceOptions } from '../../data-source.js';
@@ -39,6 +39,7 @@ import { BankAddTransactionsSentToAccountantAt20261108120021 } from '../../migra
 import { BankAddScheduleFields20261108120022 } from '../../migrations/20261108120022-bank-add-schedule-fields.js';
 import { BankCreateBills20261108120023 } from '../../migrations/20261108120023-bank-create-bills.js';
 import { AuthAddUsersLocale20261113120024 } from '../../migrations/20261113120024-auth-add-users-locale.js';
+import { BankExpandProviderBills20261117120025 } from '../../migrations/20261117120025-bank-expand-provider-bills.js';
 
 type MigrationClass = new () => MigrationInterface;
 type MysqlOptions = MysqlConnectionOptions;
@@ -74,6 +75,7 @@ export const MIGRATIONS: ReadonlyArray<{ file: string; migration: MigrationClass
   { file: '20261108120022-bank-add-schedule-fields', migration: BankAddScheduleFields20261108120022 },
   { file: '20261108120023-bank-create-bills', migration: BankCreateBills20261108120023 },
   { file: '20261113120024-auth-add-users-locale', migration: AuthAddUsersLocale20261113120024 },
+  { file: '20261117120025-bank-expand-provider-bills', migration: BankExpandProviderBills20261117120025 },
 ];
 
 /** Every entity the app maps, so repositories resolve against the test database. */
@@ -81,7 +83,7 @@ export const ENTITIES = [
   Account,
   AccountEditLockout,
   AuthorizationRequest,
-  Bill,
+  ProviderBill,
   BillPayment,
   DebtDetails,
   InvestmentDetails,

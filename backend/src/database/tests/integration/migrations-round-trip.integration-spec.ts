@@ -53,9 +53,9 @@ describe('migrations round trip (MySQL)', () => {
     expect((await tableNames(ds)).filter((name) => name.startsWith('bank_'))).toEqual([
       'bank_accounts',
       'bank_bill_payments',
-      'bank_bills',
       'bank_debt_details',
       'bank_investment_details',
+      'bank_provider_bills',
       'bank_provider_expense_details',
       'bank_transactions',
     ]);

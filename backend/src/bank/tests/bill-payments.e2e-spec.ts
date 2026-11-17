@@ -123,6 +123,23 @@ describe('bill payments (e2e)', () => {
         expect(await calendarRow(orgId, loan.id)).toMatchObject({ status: 'paid' });
       });
 
+      it('stamps a provider payment with the provider\'s recurring bill, and a debt payment with none', async () => {
+        const vivo = await provider(orgId);
+        const loan = await debt(orgId);
+        const recurring = repos.bills.rows.find((row) => row.providerAccountId === vivo.id && row.kind === 'recurring') as { id: number };
+
+        await pay(orgId, vivo.id, '2026-02-05', { status: 'skipped' }).expect(201);
+        await pay(orgId, loan.id, '2026-02-10', { status: 'skipped' }).expect(201);
+        await pay(orgId, vivo.id, '2026-02-05', { status: 'skipped' }).expect(409);
+
+        const rows = repos.billPayments.rows;
+        expect(rows.find((row) => row.sourceAccountId === vivo.id)).toMatchObject({ billId: null, providerBillId: recurring.id });
+        expect(rows.find((row) => row.sourceAccountId === loan.id)).toMatchObject({ billId: null, providerBillId: null });
+        // Leave the shared calendar as found: no open or overdue occurrences of these accounts.
+        await repos.accounts.delete({ id: vivo.id });
+        await repos.accounts.delete({ id: loan.id });
+      });
+
       it('truncates a long description by code points, keeping the date', async () => {
         const checking = await regular(orgId);
         const loan = await debt(orgId, {}, { name: '😀'.repeat(240) + uniqueName('') });

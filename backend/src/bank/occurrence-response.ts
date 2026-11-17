@@ -3,7 +3,7 @@ import type { BillSource, OccurrenceKind } from './bill-schedule.js';
 import { formatAmount } from './currency.js';
 import type { Account } from './entities/account.entity.js';
 import type { BillPayment, BillPaymentStatus } from './entities/bill-payment.entity.js';
-import type { Bill } from './entities/bill.entity.js';
+import type { ProviderBill } from './entities/provider-bill.entity.js';
 import type { Occurrence } from './occurrence-generator.js';
 
 /** An occurrence's state: from its payment row, otherwise from its effective date. */
@@ -45,7 +45,7 @@ export interface OccurrenceInput {
   kind: OccurrenceKind;
   /** The source account (a one-off's provider). */
   account: Account;
-  bill: Bill | null;
+  bill: ProviderBill | null;
   nominal: string;
   effective: string;
   expected: bigint | null;
@@ -74,14 +74,14 @@ export function derivedInput(source: BillSource, occurrence: Occurrence, payment
 
 /**
  * One-off bills have no weekend shift: nominal and effective dates are both `dueDate`.
- * @param {Bill} bill - The one-off bill.
+ * @param {ProviderBill} bill - The one-off bill.
  * @param {Account} provider - Its provider-expense account.
  * @param {BillPayment | undefined} payment - Its payment row, if any.
  * @param {Map<number, AccountRef>} refs - Account refs (for the bill's paying account).
  * @returns {OccurrenceInput} The one-off occurrence's input.
  */
 export function billInput(
-  bill: Bill,
+  bill: ProviderBill,
   provider: Account,
   payment: BillPayment | undefined,
   refs: Map<number, AccountRef>,
@@ -90,9 +90,9 @@ export function billInput(
     kind: 'bill',
     account: provider,
     bill,
-    nominal: bill.dueDate,
-    effective: bill.dueDate,
-    expected: bill.amount,
+    nominal: bill.dueDate as string,
+    effective: bill.dueDate as string,
+    expected: bill.expectedAmount,
     defaultPayingAccount: refOf(bill.payingAccountId, refs),
     payment,
   };

@@ -14,7 +14,9 @@ const METHODS = [
   'query',
 ] as const;
 
-export type FakeQueryRunnerMocks = Record<(typeof METHODS)[number], jest.Mock> & { calls: string[] };
+export type FakeQueryRunnerMocks = Record<(typeof METHODS)[number] | 'hasTable' | 'hasColumn' | 'getTable', jest.Mock> & {
+  calls: string[];
+};
 
 export function fakeQueryRunner(): FakeQueryRunnerMocks {
   const calls: string[] = [];
@@ -24,6 +26,9 @@ export function fakeQueryRunner(): FakeQueryRunnerMocks {
       calls.push(method);
     });
   }
+  runner.hasTable = jest.fn(async () => true);
+  runner.hasColumn = jest.fn(async () => true);
+  runner.getTable = jest.fn(async () => undefined);
   return runner;
 }
 

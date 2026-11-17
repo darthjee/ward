@@ -16,6 +16,7 @@ import type { UpdateAccountDto } from '../dto/update-account.dto.js';
 import { Account } from '../entities/account.entity.js';
 import { DebtDetails } from '../entities/debt-details.entity.js';
 import { InvestmentDetails } from '../entities/investment-details.entity.js';
+import { ProviderBill } from '../entities/provider-bill.entity.js';
 import { ProviderExpenseDetails } from '../entities/provider-expense-details.entity.js';
 
 const NO_SCHEDULE_CHECK = { validate: async () => undefined } as never;
@@ -799,8 +800,9 @@ function setupProviderExpense(
   const accountSave = jest.fn(async (saved: Account) => ({ ...saved, id: saved.id ?? 99 }));
   const detailsSave = jest.fn(async (row: object) => row);
   const detailsFind = jest.fn(async () => details.map((row) => Object.assign(new ProviderExpenseDetails(), row)));
+  const billsRepo = { findOne: jest.fn(async () => null), create: jest.fn((fields: object) => fields), save: jest.fn(async (row: object) => row) };
   const repositoryFor = (entity: unknown) =>
-    entity === Account ? { save: accountSave } : { save: detailsSave, find: detailsFind };
+    entity === Account ? { save: accountSave } : entity === ProviderBill ? billsRepo : { save: detailsSave, find: detailsFind };
   const manager: { getRepository: jest.Mock; transaction: jest.Mock } = {
     getRepository: jest.fn(repositoryFor),
     transaction: jest.fn(async (work: (m: unknown) => Promise<unknown>) => work(manager)),

@@ -8,8 +8,8 @@ import { CalendarQuery } from '../../../bank/calendar.query.js';
 import { CalendarService } from '../../../bank/calendar.service.js';
 import { Account } from '../../../bank/entities/account.entity.js';
 import { BillPayment } from '../../../bank/entities/bill-payment.entity.js';
-import { Bill } from '../../../bank/entities/bill.entity.js';
 import { DebtDetails } from '../../../bank/entities/debt-details.entity.js';
+import { ProviderBill } from '../../../bank/entities/provider-bill.entity.js';
 import { ProviderExpenseDetails } from '../../../bank/entities/provider-expense-details.entity.js';
 
 const ALICE = { kind: 'user', userId: 1 } as const;
@@ -17,7 +17,7 @@ const ALICE = { kind: 'user', userId: 1 } as const;
 describe('bills calendar reads (MySQL)', () => {
   let ds: DataSource;
   let accounts: Repository<Account>;
-  let bills: Repository<Bill>;
+  let bills: Repository<ProviderBill>;
   let payments: Repository<BillPayment>;
   let query: CalendarQuery;
   let service: CalendarService;
@@ -39,7 +39,7 @@ describe('bills calendar reads (MySQL)', () => {
   beforeAll(async () => {
     ds = await createTestDataSource();
     accounts = ds.getRepository(Account);
-    bills = ds.getRepository(Bill);
+    bills = ds.getRepository(ProviderBill);
     payments = ds.getRepository(BillPayment);
     const registry = new AccountTypeRegistry([
       new RegularAccountHandler(),
@@ -90,8 +90,8 @@ describe('bills calendar reads (MySQL)', () => {
   it('filters bills and payments by date range with real operators', async () => {
     const provider = await insertAccount({ type: 'provider_expense' });
     await ds.getRepository(ProviderExpenseDetails).save({ accountId: provider.id, dueDay: 5, billsFrom: '2026-01-01' });
-    const inRange = await bills.save(bills.create({ providerAccountId: provider.id, payingAccountId: null, dueDate: '2026-01-20', amount: 100n, description: 'In', notes: null }));
-    await bills.save(bills.create({ providerAccountId: provider.id, payingAccountId: null, dueDate: '2026-02-20', amount: 100n, description: 'Out', notes: null }));
+    const inRange = await bills.save(bills.create({ providerAccountId: provider.id, payingAccountId: null, kind: 'one_off', dueDate: '2026-01-20', expectedAmount: 100n, description: 'In', notes: null }));
+    await bills.save(bills.create({ providerAccountId: provider.id, payingAccountId: null, kind: 'one_off', dueDate: '2026-02-20', expectedAmount: 100n, description: 'Out', notes: null }));
     const derived = await payments.save(payments.create({ sourceAccountId: provider.id, billId: null, dueDate: '2026-01-05', status: 'skipped', paidOn: null, amount: null, payingAccountId: null, paymentTransactionId: null, withdrawalTransactionId: null, chargeTransactionId: null }));
     const oneOff = await payments.save(payments.create({ sourceAccountId: provider.id, billId: inRange.id, dueDate: '2026-01-20', status: 'skipped', paidOn: null, amount: null, payingAccountId: null, paymentTransactionId: null, withdrawalTransactionId: null, chargeTransactionId: null }));
 

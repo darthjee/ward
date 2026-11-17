@@ -4,7 +4,7 @@ import { calendarTotals, overdueTotals } from '../calendar-totals.js';
 import { CalendarQuery } from '../calendar.query.js';
 import { CalendarService } from '../calendar.service.js';
 import { BillPayment } from '../entities/bill-payment.entity.js';
-import { Bill } from '../entities/bill.entity.js';
+import { ProviderBill } from '../entities/provider-bill.entity.js';
 import { billInput, buildOccurrence, compareOccurrences, derivedInput, type OccurrenceView } from '../occurrence-response.js';
 
 const TODAY = '2026-06-15';
@@ -33,12 +33,13 @@ const payment = (fields: Partial<BillPayment> = {}): BillPayment => Object.assig
   ...fields,
 });
 
-const bill = (fields: Partial<Bill> = {}): Bill => Object.assign(new Bill(), {
+const bill = (fields: Partial<ProviderBill> = {}): ProviderBill => Object.assign(new ProviderBill(), {
   id: 7,
   providerAccountId: 4,
   payingAccountId: null,
+  kind: 'one_off',
   dueDate: '2026-06-20',
-  amount: 1000n,
+  expectedAmount: 1000n,
   description: 'Repair',
   notes: null,
   ...fields,

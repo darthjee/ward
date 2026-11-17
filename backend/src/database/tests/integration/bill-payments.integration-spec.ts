@@ -4,7 +4,7 @@ import { BillPaymentWriter } from '../../../bank/bill-payment.writer.js';
 import { BillService } from '../../../bank/bill.service.js';
 import { Account } from '../../../bank/entities/account.entity.js';
 import { BillPayment } from '../../../bank/entities/bill-payment.entity.js';
-import { Bill } from '../../../bank/entities/bill.entity.js';
+import { ProviderBill } from '../../../bank/entities/provider-bill.entity.js';
 import { Transaction } from '../../../bank/entities/transaction.entity.js';
 import { PayingAccountResolver } from '../../../bank/paying-account.resolver.js';
 
@@ -17,7 +17,7 @@ describe('bill payment writes (MySQL)', () => {
   let accounts: Repository<Account>;
   let payments: Repository<BillPayment>;
   let transactions: Repository<Transaction>;
-  let bills: Repository<Bill>;
+  let bills: Repository<ProviderBill>;
   let writer: BillPaymentWriter;
 
   async function insertAccount(type: string): Promise<Account> {
@@ -38,7 +38,7 @@ describe('bill payment writes (MySQL)', () => {
     accounts = ds.getRepository(Account);
     payments = ds.getRepository(BillPayment);
     transactions = ds.getRepository(Transaction);
-    bills = ds.getRepository(Bill);
+    bills = ds.getRepository(ProviderBill);
     writer = new BillPaymentWriter(payments, new PayingAccountResolver(accounts));
   });
 
@@ -54,7 +54,7 @@ describe('bill payment writes (MySQL)', () => {
   it('writes the row and its transactions, and undo removes them', async () => {
     const provider = await insertAccount('provider_expense');
     const paying = await insertAccount('regular');
-    const target = { sourceAccountId: provider.id, billId: null, nominal: '2026-01-05', label: 'Fee', currency: 'BRL' };
+    const target = { sourceAccountId: provider.id, billId: null, providerBillId: null, nominal: '2026-01-05', label: 'Fee', currency: 'BRL' };
 
     const row = await writer.record(ALICE, target, { ...PAID, payingAccountId: paying.id });
 
@@ -86,7 +86,7 @@ describe('bill payment writes (MySQL)', () => {
 
     await expect(racingWriter.record(
       ALICE,
-      { sourceAccountId: provider.id, billId: null, nominal: '2026-01-05', label: 'Fee', currency: 'BRL' },
+      { sourceAccountId: provider.id, billId: null, providerBillId: null, nominal: '2026-01-05', label: 'Fee', currency: 'BRL' },
       { ...PAID, payingAccountId: paying.id },
     )).rejects.toMatchObject({ status: 409 });
 
@@ -95,19 +95,20 @@ describe('bill payment writes (MySQL)', () => {
   });
 
   describe('races past the pre-checks (row locks)', () => {
-    async function insertBill(providerId: number, payingId: number): Promise<Bill> {
+    async function insertBill(providerId: number, payingId: number): Promise<ProviderBill> {
       return bills.save(bills.create({
         providerAccountId: providerId,
         payingAccountId: payingId,
+        kind: 'one_off',
         dueDate: '2026-01-20',
-        amount: 1000n,
+        expectedAmount: 1000n,
         description: 'IPVA',
         notes: null,
       }));
     }
 
-    const oneOff = (bill: Bill) =>
-      ({ sourceAccountId: bill.providerAccountId, billId: bill.id, nominal: bill.dueDate, label: bill.description, currency: 'BRL' });
+    const oneOff = (bill: ProviderBill) =>
+      ({ sourceAccountId: bill.providerAccountId, billId: bill.id, providerBillId: null, nominal: bill.dueDate as string, label: bill.description, currency: 'BRL' });
 
     it('re-validates the paying account inside the transaction: archived meanwhile → 422, nothing written', async () => {
       const provider = await insertAccount('provider_expense');
@@ -116,7 +117,7 @@ describe('bill payment writes (MySQL)', () => {
 
       await expect(writer.record(
         ALICE,
-        { sourceAccountId: provider.id, billId: null, nominal: '2026-01-05', label: 'Fee', currency: 'BRL' },
+        { sourceAccountId: provider.id, billId: null, providerBillId: null, nominal: '2026-01-05', label: 'Fee', currency: 'BRL' },
         { ...PAID, payingAccountId: paying.id },
       )).rejects.toMatchObject({ status: 422 });
 
@@ -130,12 +131,12 @@ describe('bill payment writes (MySQL)', () => {
       const bill = await insertBill(provider.id, paying.id);
       const runner = ds.createQueryRunner();
       await runner.startTransaction();
-      await runner.manager.getRepository(Bill).findOne({ where: { id: bill.id }, lock: { mode: 'pessimistic_write' } });
+      await runner.manager.getRepository(ProviderBill).findOne({ where: { id: bill.id }, lock: { mode: 'pessimistic_write' } });
 
       const paid = writer.record(ALICE, oneOff(bill), { ...PAID, payingAccountId: paying.id });
       const outcome = paid.then(() => 'written', (error: { status?: number }) => error.status);
       await settle();
-      await runner.manager.getRepository(Bill).delete({ id: bill.id });
+      await runner.manager.getRepository(ProviderBill).delete({ id: bill.id });
       await runner.commitTransaction();
       await runner.release();
 
@@ -151,14 +152,14 @@ describe('bill payment writes (MySQL)', () => {
       const service = new BillService(bills, accounts, payments, new PayingAccountResolver(accounts));
       const runner = ds.createQueryRunner();
       await runner.startTransaction();
-      await runner.manager.getRepository(Bill).findOne({ where: { id: bill.id }, lock: { mode: 'pessimistic_write' } });
+      await runner.manager.getRepository(ProviderBill).findOne({ where: { id: bill.id }, lock: { mode: 'pessimistic_write' } });
 
       const outcome = service.delete(ALICE, bill.id).then(() => 'deleted', (error: { status?: number }) => error.status);
       await settle();
       await runner.manager.getRepository(BillPayment).save(runner.manager.getRepository(BillPayment).create({
         sourceAccountId: provider.id,
         billId: bill.id,
-        dueDate: bill.dueDate,
+        dueDate: bill.dueDate as string,
         status: 'paid',
         paidOn: '2026-01-12',
         amount: 1000n,

@@ -3,13 +3,13 @@ import { QueryFailedError } from 'typeorm';
 import { BillPaymentWriter, type PaymentTarget } from '../bill-payment.writer.js';
 import type { PayOccurrenceDto } from '../dto/pay-occurrence.dto.js';
 import { BillPayment } from '../entities/bill-payment.entity.js';
-import { Bill } from '../entities/bill.entity.js';
+import { ProviderBill } from '../entities/provider-bill.entity.js';
 import { Transaction } from '../entities/transaction.entity.js';
 import { paymentCommand, type PaymentCommand } from '../payment-body.js';
 import { paymentDescription } from '../payment-description.js';
 import { PERSONAL } from './account.test-support.js';
 
-const TARGET: PaymentTarget = { sourceAccountId: 3, billId: null, nominal: '2026-01-10', label: 'Loan', currency: 'BRL' };
+const TARGET: PaymentTarget = { sourceAccountId: 3, billId: null, providerBillId: null, nominal: '2026-01-10', label: 'Loan', currency: 'BRL' };
 const PAID: PaymentCommand = { status: 'paid', paidOn: '2026-01-12', amount: 1000n, payingAccountId: 9, recordCharge: true };
 
 // A fake transactional manager: writes are staged and only "committed" into `committed` when the
@@ -21,14 +21,14 @@ function fakeDatabase(failOn?: number, error: Error = new Error('write failed'))
   let writes = 0;
   let nextId = 100;
   const findOneBy = jest.fn(async () => null);
-  const findOne = jest.fn(async (_options?: unknown): Promise<Bill | null> => Object.assign(new Bill(), { id: 7 }));
+  const findOne = jest.fn(async (_options?: unknown): Promise<ProviderBill | null> => Object.assign(new ProviderBill(), { id: 7 }));
   const resolve = jest.fn(async () => ({}));
 
   const transaction = async <R>(work: (manager: unknown) => Promise<R>): Promise<R> => {
     const staged: typeof committed = [];
     const manager = {
       getRepository: (entity: unknown) => ({
-        findOne: (options: unknown) => (entity === Bill ? findOne(options) : Promise.reject(new Error('unexpected read'))),
+        findOne: (options: unknown) => (entity === ProviderBill ? findOne(options) : Promise.reject(new Error('unexpected read'))),
         create: (fields: Record<string, unknown>) => ({ ...fields }),
         save: async (row: Record<string, unknown>) => {
           writes += 1;
@@ -70,6 +70,14 @@ describe('BillPaymentWriter', () => {
     expect(committed.slice(0, 3).every(({ row: written }) =>
       written.date === '2026-01-12' && written.description === 'Loan — 2026-01-10' && written.sentToAccountantAt === null)).toBe(true);
     expect(row).toMatchObject({ status: 'paid', paymentTransactionId: 100, withdrawalTransactionId: 101, chargeTransactionId: 102 });
+  });
+
+  it('writes the target\'s provider bill id on the row', async () => {
+    const { writer } = fakeDatabase();
+
+    const row = await writer.record(PERSONAL, { ...TARGET, providerBillId: 12 }, { status: 'skipped' });
+
+    expect(row).toMatchObject({ billId: null, providerBillId: 12 });
   });
 
   it('records no charge without record_charge, and only the row for a skip', async () => {
@@ -130,7 +138,7 @@ describe('BillPaymentWriter', () => {
     const bill = { ...TARGET, billId: 7 };
     const ok = fakeDatabase();
     await ok.writer.record(PERSONAL, bill, PAID);
-    expect(ok.findOne).toHaveBeenCalledWith({ where: { id: 7, providerAccountId: 3 }, lock: { mode: 'pessimistic_write' } });
+    expect(ok.findOne).toHaveBeenCalledWith({ where: { id: 7, providerAccountId: 3, kind: 'one_off' }, lock: { mode: 'pessimistic_write' } });
 
     const gone = fakeDatabase();
     gone.findOne.mockResolvedValueOnce(null);

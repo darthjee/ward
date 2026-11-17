@@ -9,8 +9,8 @@ export type BillPaymentStatus = 'paid' | 'skipped';
  * `docs/agents/modules/bank/bills.md`, *Paying, skipping and undoing*). Owns table
  * `bank_bill_payments`. Keyed by the occurrence's **nominal** `dueDate`;
  * `billId` is set for one-offs only. It never stores an owner: it inherits it
- * through its source account. The generated `derived_due_date` column (the
- * derived-occurrence unique key) is deliberately not mapped, so TypeORM never
+ * through its source account. The generated `derived_due_date` and
+ * `provider_bill_due_date` columns (unique keys) are deliberately not mapped, so TypeORM never
  * writes to it.
  */
 @Entity('bank_bill_payments')
@@ -23,6 +23,10 @@ export class BillPayment {
 
   @Column({ name: 'bill_id', type: 'int', nullable: true })
     billId!: number | null;
+
+  /** The provider's recurring bill, set for provider derived payments only. */
+  @Column({ name: 'provider_bill_id', type: 'int', nullable: true })
+    providerBillId!: number | null;
 
   /** `YYYY-MM-DD`, the nominal due date. */
   @Column({ name: 'due_date', type: 'date' })

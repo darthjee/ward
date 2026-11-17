@@ -1,9 +1,9 @@
 import { QueryFailedError } from 'typeorm';
 import { Account } from '../../entities/account.entity.js';
 import { BillPayment } from '../../entities/bill-payment.entity.js';
-import { Bill } from '../../entities/bill.entity.js';
 import { DebtDetails } from '../../entities/debt-details.entity.js';
 import { InvestmentDetails } from '../../entities/investment-details.entity.js';
+import { ProviderBill } from '../../entities/provider-bill.entity.js';
 import { ProviderExpenseDetails } from '../../entities/provider-expense-details.entity.js';
 import { Transaction } from '../../entities/transaction.entity.js';
 
@@ -163,7 +163,7 @@ export type InMemoryProviderExpenseDetailsRepo = InMemoryDetailsRepo<ProviderExp
 export interface InMemoryBankRepos {
   accounts: InMemoryBankRepo<Account>;
   transactions: InMemoryBankRepo<Transaction>;
-  bills: InMemoryBankRepo<Bill>;
+  bills: InMemoryBankRepo<ProviderBill>;
   billPayments: InMemoryBankRepo<BillPayment>;
   debtDetails: InMemoryDebtDetailsRepo;
   investmentDetails: InMemoryInvestmentDetailsRepo;
@@ -186,17 +186,32 @@ function checkActiveName(account: Account, others: Account[]): void {
   }
 }
 
-// The two unique keys of `bank_bill_payments`: `(bill_id)` for one-offs, and
-// `(source_account_id, derived_due_date)` for derived occurrences (bill_id NULL).
+const unset = (value: number | null | undefined): boolean => value === null || value === undefined;
+
+// The three unique keys of `bank_bill_payments`: `(bill_id)` for one-offs,
+// `(provider_bill_id, provider_bill_due_date)` for provider-bill occurrences, and the narrowed
+// `(source_account_id, derived_due_date)` for debt occurrences (both ids NULL).
 function checkBillPaymentKeys(payment: BillPayment, others: BillPayment[]): void {
-  const clash = others.some((other) =>
-    payment.billId !== null && payment.billId !== undefined
-      ? other.billId === payment.billId
-      : (other.billId === null || other.billId === undefined) &&
-        other.sourceAccountId === payment.sourceAccountId &&
-        other.dueDate === payment.dueDate);
+  const sameDate = (other: BillPayment): boolean => other.dueDate === payment.dueDate;
+  const clash = others.some((other) => {
+    if (!unset(payment.billId)) {
+      return other.billId === payment.billId;
+    }
+    if (!unset(payment.providerBillId)) {
+      return other.providerBillId === payment.providerBillId && sameDate(other);
+    }
+    return unset(other.billId) && unset(other.providerBillId) && other.sourceAccountId === payment.sourceAccountId && sameDate(other);
+  });
 
   if (clash) {
+    throw mysqlError('ER_DUP_ENTRY');
+  }
+}
+
+// `(provider_account_id, recurring_description)`: recurring bills of a provider have distinct descriptions.
+function checkProviderBillKeys(bill: ProviderBill, others: ProviderBill[]): void {
+  if (bill.kind === 'recurring' && others.some((other) =>
+    other.kind === 'recurring' && other.providerAccountId === bill.providerAccountId && other.description === bill.description)) {
     throw mysqlError('ER_DUP_ENTRY');
   }
 }
@@ -213,7 +228,10 @@ export function createInMemoryBankRepos(): InMemoryBankRepos {
   const debtDetails = createInMemoryDetailsRepo(DebtDetails);
   const investmentDetails = createInMemoryDetailsRepo(InvestmentDetails);
   const providerExpenseDetails = createInMemoryDetailsRepo(ProviderExpenseDetails);
-  const bills = createInMemoryBankRepo(Bill);
+  const bills = createInMemoryBankRepo(ProviderBill, checkProviderBillKeys);
+  const createBill = bills.create;
+  // Like the column default: a bill is a one-off unless said otherwise.
+  bills.create = (fields: Partial<ProviderBill>): ProviderBill => createBill({ kind: 'one_off', ...fields });
   const billPayments = createInMemoryBankRepo(BillPayment, checkBillPaymentKeys);
   const deleteAccount = accounts.delete;
   const deleteBill = bills.delete;
@@ -222,11 +240,14 @@ export function createInMemoryBankRepos(): InMemoryBankRepos {
     rows.splice(0, rows.length, ...rows.filter(predicate));
   };
 
-  // `bank_bill_payments.bill_id` is ON DELETE CASCADE.
+  // `bank_bill_payments.bill_id` and `provider_bill_id` are ON DELETE CASCADE.
   bills.delete = async (where: Where) => {
     const doomed = new Set(bills.rows.filter((row) => matches(row, where)).map((row) => row.id));
     const result = await deleteBill(where);
-    keep(billPayments.rows, (row) => row.billId === null || row.billId === undefined || !doomed.has(row.billId));
+    keep(
+      billPayments.rows,
+      (row) => (unset(row.billId) || !doomed.has(row.billId as number)) && (unset(row.providerBillId) || !doomed.has(row.providerBillId as number)),
+    );
     return result;
   };
 

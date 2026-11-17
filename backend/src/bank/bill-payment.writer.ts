@@ -5,7 +5,7 @@ import { occurrenceAlreadyPaid } from './bill-conflicts.js';
 import type { OwnerContext } from '../core/owner-context.js';
 import { ownerNotFound } from '../core/parse-id.js';
 import { BillPayment } from './entities/bill-payment.entity.js';
-import { Bill } from './entities/bill.entity.js';
+import { ProviderBill } from './entities/provider-bill.entity.js';
 import { Transaction } from './entities/transaction.entity.js';
 import { isMysqlError, MYSQL_DUPLICATE_ENTRY } from './mysql-errors.js';
 import { PayingAccountResolver } from './paying-account.resolver.js';
@@ -18,6 +18,8 @@ export interface PaymentTarget {
   sourceAccountId: number;
   /** Set for one-off bills only. */
   billId: number | null;
+  /** The provider's recurring bill (derived provider payments); `null` for debts and one-offs. */
+  providerBillId: number | null;
   /** The nominal due date (the payment key of a derived occurrence). */
   nominal: string;
   /** The bill description, or the source account's name (for the transactions' description). */
@@ -120,8 +122,8 @@ export class BillPaymentWriter {
 
   async #recheck(manager: EntityManager, owner: OwnerContext, target: PaymentTarget, command: PaymentCommand): Promise<void> {
     if (target.billId !== null) {
-      const bill = await manager.getRepository(Bill).findOne({
-        where: { id: target.billId, providerAccountId: target.sourceAccountId },
+      const bill = await manager.getRepository(ProviderBill).findOne({
+        where: { id: target.billId, providerAccountId: target.sourceAccountId, kind: 'one_off' },
         lock: { mode: 'pessimistic_write' },
       });
 
@@ -140,6 +142,7 @@ export class BillPaymentWriter {
     const row = payments.create({
       sourceAccountId: target.sourceAccountId,
       billId: target.billId,
+      providerBillId: target.providerBillId,
       dueDate: target.nominal,
       status: command.status,
       paidOn: null,

@@ -14,13 +14,13 @@ import type { CreateBillDto } from './dto/create-bill.dto.js';
 import type { UpdateBillDto } from './dto/update-bill.dto.js';
 import { Account } from './entities/account.entity.js';
 import { BillPayment } from './entities/bill-payment.entity.js';
-import { Bill } from './entities/bill.entity.js';
+import { ProviderBill } from './entities/provider-bill.entity.js';
 import { buildPagination, LEDGER_PER_PAGE } from './pagination.js';
 import { PayingAccountResolver } from './paying-account.resolver.js';
 
 /** A one-off bill and its (owned, active) provider-expense account. */
 export interface OwnedBill {
-  bill: Bill;
+  bill: ProviderBill;
   provider: Account;
 }
 
@@ -49,19 +49,19 @@ export function parseBillAmount(value: string, currency: string): bigint {
  */
 @Injectable()
 export class BillService {
-  private readonly billRepository: Repository<Bill>;
+  private readonly billRepository: Repository<ProviderBill>;
   private readonly accountRepository: Repository<Account>;
   private readonly paymentRepository: Repository<BillPayment>;
   private readonly payingAccounts: PayingAccountResolver;
 
   /**
-   * @param {Repository<Bill>} billRepository - The bill repository.
+   * @param {Repository<ProviderBill>} billRepository - The bill repository.
    * @param {Repository<Account>} accountRepository - The account repository.
    * @param {Repository<BillPayment>} paymentRepository - The bill payment repository.
    * @param {PayingAccountResolver} payingAccounts - Resolves body paying accounts.
    */
   constructor(
-    @InjectRepository(Bill) billRepository: Repository<Bill>,
+    @InjectRepository(ProviderBill) billRepository: Repository<ProviderBill>,
     @InjectRepository(Account) accountRepository: Repository<Account>,
     @InjectRepository(BillPayment) paymentRepository: Repository<BillPayment>,
       payingAccounts: PayingAccountResolver,
@@ -89,7 +89,7 @@ export class BillService {
     }
 
     const [bills, total] = await this.billRepository.findAndCount({
-      where: { providerAccountId: In(ids) },
+      where: { providerAccountId: In(ids), kind: 'one_off' },
       order: { dueDate: 'DESC', id: 'DESC' },
       skip: (page - 1) * LEDGER_PER_PAGE,
       take: LEDGER_PER_PAGE,
@@ -119,9 +119,9 @@ export class BillService {
    * @throws {NotFoundException} The uniform 404 (unknown, foreign, other context, archived provider).
    */
   async findOwned(owner: OwnerContext, id: number, manager?: EntityManager): Promise<OwnedBill> {
-    const bills = manager ? manager.getRepository(Bill) : this.billRepository;
+    const bills = manager ? manager.getRepository(ProviderBill) : this.billRepository;
     const accounts = manager ? manager.getRepository(Account) : this.accountRepository;
-    const bill = await bills.findOneBy({ id });
+    const bill = await bills.findOneBy({ id, kind: 'one_off' });
     const provider = bill ? await accounts.findOneBy({ ...this.#providerWhere(owner), id: bill.providerAccountId }) : null;
 
     if (!bill || !provider) {
@@ -144,8 +144,9 @@ export class BillService {
     const bill = this.billRepository.create({
       providerAccountId: provider.id,
       payingAccountId: dto.paying_account_id,
+      kind: 'one_off',
       dueDate: dto.due_date,
-      amount: parseBillAmount(dto.amount, provider.currency),
+      expectedAmount: parseBillAmount(dto.amount, provider.currency),
       description: dto.description,
       notes: dto.notes ?? null,
     });
@@ -178,12 +179,12 @@ export class BillService {
       }
 
       await this.#applyPaying(owner, bill, dto.paying_account_id, provider.currency, moved, manager);
-      bill.amount = dto.amount === undefined
-        ? convertAmountInput('amount', bill.amount, stored.currency, provider.currency)
+      bill.expectedAmount = dto.amount === undefined
+        ? convertAmountInput('amount', bill.expectedAmount as bigint, stored.currency, provider.currency)
         : parseBillAmount(dto.amount, provider.currency);
       Object.assign(bill, { providerAccountId: provider.id }, definedFields(dto));
 
-      const result = await manager.getRepository(Bill).save(bill);
+      const result = await manager.getRepository(ProviderBill).save(bill);
       if (payment) {
         await manager.getRepository(BillPayment).save(Object.assign(payment, { sourceAccountId: provider.id, dueDate: bill.dueDate }));
       }
@@ -212,7 +213,7 @@ export class BillService {
       }
 
       await manager.getRepository(BillPayment).delete({ billId: id });
-      await manager.getRepository(Bill).delete({ id });
+      await manager.getRepository(ProviderBill).delete({ id });
     });
   }
 
@@ -235,8 +236,8 @@ export class BillService {
    * lock `BillPaymentWriter` takes to pay it, so a concurrent pay serializes
    * with the edit / delete), and its payment row under that lock.
    */
-  async #lockedBill(manager: EntityManager, id: number, providerAccountId: number): Promise<{ bill: Bill; payment: BillPayment | null }> {
-    const bill = await manager.getRepository(Bill).findOne({ where: { id, providerAccountId }, lock: { mode: 'pessimistic_write' } });
+  async #lockedBill(manager: EntityManager, id: number, providerAccountId: number): Promise<{ bill: ProviderBill; payment: BillPayment | null }> {
+    const bill = await manager.getRepository(ProviderBill).findOne({ where: { id, providerAccountId, kind: 'one_off' }, lock: { mode: 'pessimistic_write' } });
 
     if (!bill) {
       throw ownerNotFound();
@@ -247,7 +248,7 @@ export class BillService {
 
   async #applyPaying(
     owner: OwnerContext,
-    bill: Bill,
+    bill: ProviderBill,
     sent: number | null | undefined,
     currency: string,
     moved: boolean,
@@ -262,7 +263,7 @@ export class BillService {
     }
   }
 
-  async #present(bills: Bill[], providers: Map<number, Account>): Promise<BillResponse[]> {
+  async #present(bills: ProviderBill[], providers: Map<number, Account>): Promise<BillResponse[]> {
     const payments = bills.length === 0
       ? []
       : await this.paymentRepository.find({ where: { billId: In(bills.map(({ id }) => id)) } });
@@ -278,10 +279,10 @@ export class BillService {
 
 /**
  * @param {UpdateBillDto} dto - The validated body.
- * @returns {Partial<Bill>} The plain-copy fields that were sent.
+ * @returns {Partial<ProviderBill>} The plain-copy fields that were sent.
  */
-function definedFields(dto: UpdateBillDto): Partial<Bill> {
-  const fields: Partial<Bill> = { dueDate: dto.due_date, description: dto.description, notes: dto.notes };
+function definedFields(dto: UpdateBillDto): Partial<ProviderBill> {
+  const fields: Partial<ProviderBill> = { dueDate: dto.due_date, description: dto.description, notes: dto.notes };
 
   return Object.fromEntries(Object.entries(fields).filter(([, value]) => value !== undefined));
 }
