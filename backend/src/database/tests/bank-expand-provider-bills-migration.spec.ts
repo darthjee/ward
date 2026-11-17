@@ -24,7 +24,7 @@ describe('BankExpandProviderBills20261117120025', () => {
       const statements = sqls(runner);
       expect(statements.slice(0, 3).every((sql) => sql.startsWith('SELECT'))).toBe(true);
       expect(statements[3]).toBe('RENAME TABLE `bank_bills` TO `bank_provider_bills`');
-      expect(statements[4]).toContain('RENAME COLUMN `amount` TO `expected_amount`');
+      expect(statements[4]).toContain('CHANGE COLUMN `amount` `expected_amount`');
     });
 
     it('throws before any DDL on an offending pre-flight, listing only ids and dates', async () => {
@@ -74,10 +74,7 @@ describe('BankExpandProviderBills20261117120025', () => {
   describe('down', () => {
     it('reverts a full up in order', async () => {
       const runner = fakeQueryRunner();
-      runner.getTable.mockResolvedValue({
-        foreignKeys: [{ name: 'fk_bank_bill_payments_provider_bill_id' }],
-        indices: [{ name: 'idx_bank_bill_payments_provider_bill' }],
-      });
+      runner.query.mockImplementation(async (sql: string) => (sql.includes('information_schema') ? [{ 1: 1 }] : undefined));
 
       await migration.down(asQueryRunner(runner));
 

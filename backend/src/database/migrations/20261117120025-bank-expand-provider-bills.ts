@@ -35,8 +35,7 @@ export const ALTER_BILLS_SQL = `ALTER TABLE \`${BILLS}\`
   ADD COLUMN \`bills_from\` DATE NULL,
   ADD COLUMN \`show_in_calendar\` BOOLEAN NULL,
   MODIFY COLUMN \`due_date\` DATE NULL,
-  RENAME COLUMN \`amount\` TO \`expected_amount\`,
-  MODIFY COLUMN \`expected_amount\` BIGINT NULL`;
+  CHANGE COLUMN \`amount\` \`expected_amount\` BIGINT NULL`;
 
 const BILL_COLUMNS = `\`provider_account_id\`, \`paying_account_id\`, \`kind\`, \`description\`, \`expected_amount\`,
   \`charge_frequency\`, \`due_day\`, \`due_month\`, \`bills_from\`, \`show_in_calendar\`, \`created_at\`, \`updated_at\``;
@@ -133,8 +132,8 @@ export class BankExpandProviderBills20261117120025 implements MigrationInterface
     }
     if (await queryRunner.hasColumn(table, 'expected_amount')) {
       await queryRunner.query(
-        `ALTER TABLE \`${table}\` RENAME COLUMN \`expected_amount\` TO \`amount\`, ` +
-          'MODIFY COLUMN `amount` BIGINT NOT NULL, MODIFY COLUMN `due_date` DATE NOT NULL',
+        `ALTER TABLE \`${table}\` CHANGE COLUMN \`expected_amount\` \`amount\` BIGINT NOT NULL, ` +
+          'MODIFY COLUMN `due_date` DATE NOT NULL',
       );
     }
     if (table === BILLS) {
@@ -182,15 +181,23 @@ export class BankExpandProviderBills20261117120025 implements MigrationInterface
     }
   }
 
+  async #exists(queryRunner: QueryRunner, view: string, column: string, name: string): Promise<boolean> {
+    const rows = (await queryRunner.query(
+      `SELECT 1 FROM information_schema.\`${view}\` WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND \`${column}\` = ? LIMIT 1`,
+      [PAYMENTS, name],
+    )) as unknown[] | undefined;
+    return (rows ?? []).length > 0;
+  }
+
   async #dropProviderBillId(queryRunner: QueryRunner): Promise<void> {
     if (!(await queryRunner.hasColumn(PAYMENTS, 'provider_bill_id'))) {
       return;
     }
-    const table = await queryRunner.getTable(PAYMENTS);
-    if (table?.foreignKeys.some((fk) => fk.name === 'fk_bank_bill_payments_provider_bill_id')) {
+    // `getTable` would query `typeorm_metadata` because of the generated columns, so ask `information_schema`.
+    if (await this.#exists(queryRunner, 'TABLE_CONSTRAINTS', 'CONSTRAINT_NAME', 'fk_bank_bill_payments_provider_bill_id')) {
       await queryRunner.query(`ALTER TABLE \`${PAYMENTS}\` DROP FOREIGN KEY \`fk_bank_bill_payments_provider_bill_id\``);
     }
-    if (table?.indices.some((index) => index.name === 'idx_bank_bill_payments_provider_bill')) {
+    if (await this.#exists(queryRunner, 'STATISTICS', 'INDEX_NAME', 'idx_bank_bill_payments_provider_bill')) {
       await queryRunner.query(`ALTER TABLE \`${PAYMENTS}\` DROP INDEX \`idx_bank_bill_payments_provider_bill\``);
     }
     await queryRunner.query(`ALTER TABLE \`${PAYMENTS}\` DROP COLUMN \`provider_bill_id\``);
