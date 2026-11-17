@@ -53,7 +53,7 @@ Three fields on `bank_debt_details` and `bank_provider_expense_details` (migrati
 
 ## One-off bills
 
-`Bill` (`bank_bills`):
+`ProviderBill` with `kind = one_off` (table `bank_provider_bills`, renamed from `bank_bills`; the API field `amount` maps to column `expected_amount`). The legacy `bills.json` routes only see one-offs; a recurring bill id answers 404:
 
 | Field | Required | Notes |
 |---|---|---|
@@ -75,7 +75,7 @@ Three fields on `bank_debt_details` and `bank_provider_expense_details` (migrati
 - A bill whose provider is **archived** is hidden: it leaves the list and the Calendar, and
   `GET`, `PATCH` and `DELETE` on it answer 404. It comes back on unarchive. An archived
   provider in a bill body → 422 `ACCOUNT_NOT_FOUND`.
-- Index `bank_bills (provider_account_id, due_date)`.
+- Index on `bank_provider_bills (provider_account_id, due_date)`.
 
 ## Recurrence
 

@@ -11,7 +11,10 @@ This file supersedes the epic's original single-migration outline.
 
 ## Expand migration (#121)
 
-One transaction, in this order:
+The migration is **not atomic** (MySQL DDL implicitly commits), so it runs three read-only
+pre-flight checks first (duplicate provider payments, duplicate backfill descriptions, orphan
+payments) and aborts, with ids and dates only in the error, before any DDL. `down` checks each step
+before acting, so it tolerates a partially applied `up`. Order:
 
 1. `RENAME TABLE bank_bills TO bank_provider_bills` (preserves ids and the
    `bank_bill_payments.bill_id` FK).
@@ -23,7 +26,8 @@ One transaction, in this order:
 5. For every `bank_provider_expense_details` row with `due_day IS NOT NULL`, insert one
    `recurring` bill: `description` = the account's `name`; `expected_amount`, `charge_frequency`,
    `due_day`, `due_month`, `bills_from`, `show_in_calendar` and `paying_account_id` copied.
-   Providers without `due_day` get no row. The unique key cannot be violated (one backfilled
+   Providers without `due_day` get no row, **except** those with past payments: they get a
+   hidden recurring bill (`show_in_calendar = false`) so their payments can be repointed. The unique key cannot be violated (one backfilled
    bill per provider; existing one-offs are exempt).
 6. Add `bank_bill_payments.provider_bill_id` (nullable, indexed, FK `ON DELETE CASCADE`).
    Repoint rows with `bill_id IS NULL` whose source is a `provider_expense` account to that
@@ -41,7 +45,11 @@ The provider schedule columns are **kept**. `bills.json` keeps working (implicit
 - **Write-through (from #121).** A provider-expense create / `PATCH` touching schedule fields
   writes to the provider's single `recurring` bill, creating it when `due_day` is first set, so
   the backfill never goes stale before reads move in #123.
-- **Only while ≤ 1 recurring bill.** Once a second recurring bill exists (possible from #122), a
+- **Cleared schedule.** Clearing `due_day` hides the bill (`show_in_calendar = false`); it is
+  never deleted. The write-through also syncs the bill `description` to the account name.
+- **New provider payments (from #121)** get `provider_bill_id` set to the provider's single
+  recurring bill; lookup and pre-checks still go by `(source_account_id, due_date, bill_id IS NULL)`.
+- **Only while ≤ 1 recurring bill.** The `409 PROVIDER_HAS_MULTIPLE_BILLS` lands in #122, not #121. Once a second recurring bill exists (possible from #122), a
   provider-expense `PATCH` sending any schedule field → `409 PROVIDER_HAS_MULTIPLE_BILLS`; the
   schedule is edited per bill. Non-schedule fields (`name`, `for_accountant`,
   `provider_tax_id`, …) are unaffected.
@@ -95,7 +103,8 @@ deploy.
   `backend/src/database/tests/bank-*-migration.spec.ts` — a provider with `due_day` yields
   exactly one recurring bill with copied fields; one without yields none; past payments are
   repointed with `bill_id NULL`; each of the three keys rejects a duplicate; duplicate one-off
-  descriptions migrate unchanged; `down` round-trip. Plus `integration/bank-schema.integration-spec.ts`
+  descriptions migrate unchanged; hidden bills for unscheduled providers with payments; pre-flight
+  rejection leaves the schema unchanged; full and partial `down`. Plus `integration/bank-schema.integration-spec.ts`
   and `migrations-round-trip.integration-spec.ts` extensions, and write-through specs (create and
   PATCH, first `due_day` creates the bill).
 - [#122](https://github.com/darthjee/ward/issues/122) /

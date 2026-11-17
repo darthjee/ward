@@ -149,6 +149,10 @@ library on the 512 MB free tier.
 
 ## Charges and bills
 
+Provider-expense create/PATCH writes the schedule through to the provider's single recurring
+`ProviderBill` (`bank_provider_bills`; `expectedAmount` ↔ `expected_amount`); clearing `dueDay`
+hides that bill instead of deleting it.
+
 Recurring charges become derived Calendar occurrences, and one-off bills always hang off a
 provider-expense account (see [bills.md](bills.md)). Paying a provider bill records a payment
 plus an optional charge ("Also record the charge"); that charge feeds the hand-off like any

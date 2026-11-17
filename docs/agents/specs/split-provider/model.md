@@ -27,6 +27,9 @@ Table `bank_provider_bills`, **renamed** from `bank_bills` (`RENAME TABLE`, so i
 | `due_date` | date | yes | One-off group (made nullable by the expand migration). |
 | `created_at`, `updated_at` | datetime | no | |
 
+> Recurring bills backfilled for unscheduled providers with past payments are **hidden**
+> (`show_in_calendar = false`) until a schedule is set.
+
 ## `kind`
 
 - `recurring` bills produce derived occurrences through `occurrence-generator.ts`, reused as-is
