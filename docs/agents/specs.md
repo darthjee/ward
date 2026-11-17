@@ -63,7 +63,9 @@ this file changes.
 
 ## Active specs
 
-None.
+| Feature | Spec | Epic |
+|---|---|---|
+| Split provider: a provider holds N recurring / one-off provider bills | [specs/split-provider/](specs/split-provider/README.md) | [#119](https://github.com/darthjee/ward/issues/119) |
 
 ## Completed specs
 
