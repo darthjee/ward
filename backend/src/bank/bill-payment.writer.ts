@@ -121,7 +121,7 @@ export class BillPaymentWriter {
   async #recheck(manager: EntityManager, owner: OwnerContext, target: PaymentTarget, command: PaymentCommand): Promise<void> {
     if (target.billId !== null) {
       const bill = await manager.getRepository(ProviderBill).findOne({
-        where: { id: target.billId, providerAccountId: target.sourceAccountId },
+        where: { id: target.billId, providerAccountId: target.sourceAccountId, kind: 'one_off' },
         lock: { mode: 'pessimistic_write' },
       });
 

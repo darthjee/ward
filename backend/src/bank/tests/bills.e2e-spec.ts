@@ -323,6 +323,86 @@ describe('one-off bills (e2e)', () => {
       });
     });
 
+    describe('recurring provider bills stay out of the one-off contract', () => {
+      const seedRecurring = async () => {
+        const fee = await provider(orgId);
+        const recurring = await repos.bills.save(Object.assign(repos.bills.create({}), {
+          providerAccountId: fee.id,
+          payingAccountId: null,
+          kind: 'recurring',
+          description: fee.name,
+          expectedAmount: 20000n,
+          dueDate: null,
+          dueDay: 5,
+          notes: null,
+        }));
+        const payment = await repos.billPayments.save(Object.assign(new BillPayment(), {
+          sourceAccountId: fee.id,
+          billId: null,
+          providerBillId: recurring.id,
+          dueDate: '2026-03-05',
+          status: 'skipped',
+          paidOn: null,
+          amount: null,
+          payingAccountId: null,
+          paymentTransactionId: null,
+          withdrawalTransactionId: null,
+          chargeTransactionId: null,
+        }));
+        return { fee, recurring, payment };
+      };
+
+      it('lists one-offs only, with the amount in the body', async () => {
+        const { fee, bill } = await createBill(orgId);
+        await repos.bills.save(Object.assign(repos.bills.create({}), {
+          providerAccountId: fee.id,
+          payingAccountId: null,
+          kind: 'recurring',
+          description: 'Rent',
+          expectedAmount: 100n,
+          dueDay: 5,
+          dueDate: null,
+          notes: null,
+        }));
+
+        const response = await send(app, 'get', `${base(orgId)}/bills.json?provider_account_id=${fee.id}`, ALICE).expect(200);
+
+        expect(response.body.bills.map((row: Body) => [row.id, row.amount])).toEqual([[bill.id, '150.50']]);
+      });
+
+      it.each([['kind', 'recurring'], ['due_day', 5], ['charge_frequency', 'monthly'], ['due_month', 3], ['bills_from', '2026-01-01'], ['show_in_calendar', false]])(
+        'rejects %s on POST and PATCH with 400',
+        async (field, value) => {
+          const { body } = await setup(orgId);
+          const { bill } = await createBill(orgId);
+
+          await post(orgId, { ...body, [field]: value }).expect(400);
+          await send(app, 'patch', billPath(orgId, bill.id), ALICE, { [field]: value }).expect(400);
+        },
+      );
+
+      it('answers the uniform 404 on GET, PATCH and DELETE of a recurring id, keeping it and its payments', async () => {
+        const { recurring, payment } = await seedRecurring();
+        const unknown = await send(app, 'get', billPath(orgId, 999999), ALICE).expect(404);
+
+        for (const method of ['get', 'delete'] as const) {
+          expect(withoutTimestamp(await send(app, method, billPath(orgId, recurring.id), ALICE).expect(404))).toEqual(withoutTimestamp(unknown));
+        }
+        const patched = await send(app, 'patch', billPath(orgId, recurring.id), ALICE, { description: 'x' }).expect(404);
+        expect(withoutTimestamp(patched)).toEqual(withoutTimestamp(unknown));
+        expect(repos.bills.rows.some((row) => row.id === recurring.id)).toBe(true);
+        expect(repos.billPayments.rows.some((row) => row.id === payment.id)).toBe(true);
+      });
+
+      it('answers 404 when paying or undoing a recurring id through the one-off payment route', async () => {
+        const { recurring } = await seedRecurring();
+        const path = `${base(orgId)}/bills/${recurring.id}/payment.json`;
+
+        await send(app, 'post', path, ALICE, { status: 'skipped' }).expect(404);
+        await send(app, 'delete', path, ALICE).expect(404);
+      });
+    });
+
     describe('races past the pre-checks (payment read under the bill row lock)', () => {
       it('answers 409 on delete when a payment is recorded meanwhile, keeping the bill and the payment', async () => {
         const { fee, bill } = await createBill(orgId);

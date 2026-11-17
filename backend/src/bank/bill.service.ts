@@ -89,7 +89,7 @@ export class BillService {
     }
 
     const [bills, total] = await this.billRepository.findAndCount({
-      where: { providerAccountId: In(ids) },
+      where: { providerAccountId: In(ids), kind: 'one_off' },
       order: { dueDate: 'DESC', id: 'DESC' },
       skip: (page - 1) * LEDGER_PER_PAGE,
       take: LEDGER_PER_PAGE,
@@ -121,7 +121,7 @@ export class BillService {
   async findOwned(owner: OwnerContext, id: number, manager?: EntityManager): Promise<OwnedBill> {
     const bills = manager ? manager.getRepository(ProviderBill) : this.billRepository;
     const accounts = manager ? manager.getRepository(Account) : this.accountRepository;
-    const bill = await bills.findOneBy({ id });
+    const bill = await bills.findOneBy({ id, kind: 'one_off' });
     const provider = bill ? await accounts.findOneBy({ ...this.#providerWhere(owner), id: bill.providerAccountId }) : null;
 
     if (!bill || !provider) {
@@ -237,7 +237,7 @@ export class BillService {
    * with the edit / delete), and its payment row under that lock.
    */
   async #lockedBill(manager: EntityManager, id: number, providerAccountId: number): Promise<{ bill: ProviderBill; payment: BillPayment | null }> {
-    const bill = await manager.getRepository(ProviderBill).findOne({ where: { id, providerAccountId }, lock: { mode: 'pessimistic_write' } });
+    const bill = await manager.getRepository(ProviderBill).findOne({ where: { id, providerAccountId, kind: 'one_off' }, lock: { mode: 'pessimistic_write' } });
 
     if (!bill) {
       throw ownerNotFound();

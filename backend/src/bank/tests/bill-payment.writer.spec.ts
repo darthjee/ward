@@ -130,7 +130,7 @@ describe('BillPaymentWriter', () => {
     const bill = { ...TARGET, billId: 7 };
     const ok = fakeDatabase();
     await ok.writer.record(PERSONAL, bill, PAID);
-    expect(ok.findOne).toHaveBeenCalledWith({ where: { id: 7, providerAccountId: 3 }, lock: { mode: 'pessimistic_write' } });
+    expect(ok.findOne).toHaveBeenCalledWith({ where: { id: 7, providerAccountId: 3, kind: 'one_off' }, lock: { mode: 'pessimistic_write' } });
 
     const gone = fakeDatabase();
     gone.findOne.mockResolvedValueOnce(null);

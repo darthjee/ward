@@ -77,7 +77,7 @@ export class CalendarQuery {
       return [];
     }
 
-    return this.billRepository.find({ where: { providerAccountId: In(providerIds), dueDate } });
+    return this.billRepository.find({ where: { providerAccountId: In(providerIds), kind: 'one_off', dueDate } });
   }
 
   /**
