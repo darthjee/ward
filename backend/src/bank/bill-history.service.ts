@@ -6,7 +6,7 @@ import type { BillSource } from './bill-schedule.js';
 import { BillSourceResolver } from './bill-source.resolver.js';
 import type { OwnerContext } from '../core/owner-context.js';
 import { BillPayment } from './entities/bill-payment.entity.js';
-import { Bill } from './entities/bill.entity.js';
+import { ProviderBill } from './entities/provider-bill.entity.js';
 import { isNominalOccurrence } from './occurrence-generator.js';
 import { serializePayment, type PaymentResponse } from './occurrence-response.js';
 import { buildPagination, LEDGER_PER_PAGE, type Pagination } from './pagination.js';
@@ -38,17 +38,17 @@ export interface BillHistoryResponse {
 @Injectable()
 export class BillHistoryService {
   private readonly paymentRepository: Repository<BillPayment>;
-  private readonly billRepository: Repository<Bill>;
+  private readonly billRepository: Repository<ProviderBill>;
   private readonly sources: BillSourceResolver;
 
   /**
    * @param {Repository<BillPayment>} paymentRepository - The bill payment repository.
-   * @param {Repository<Bill>} billRepository - The one-off bill repository.
+   * @param {Repository<ProviderBill>} billRepository - The one-off bill repository.
    * @param {BillSourceResolver} sources - Resolves path bill sources.
    */
   constructor(
     @InjectRepository(BillPayment) paymentRepository: Repository<BillPayment>,
-    @InjectRepository(Bill) billRepository: Repository<Bill>,
+    @InjectRepository(ProviderBill) billRepository: Repository<ProviderBill>,
       sources: BillSourceResolver,
   ) {
     this.paymentRepository = paymentRepository;

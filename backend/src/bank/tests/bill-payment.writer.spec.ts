@@ -3,7 +3,7 @@ import { QueryFailedError } from 'typeorm';
 import { BillPaymentWriter, type PaymentTarget } from '../bill-payment.writer.js';
 import type { PayOccurrenceDto } from '../dto/pay-occurrence.dto.js';
 import { BillPayment } from '../entities/bill-payment.entity.js';
-import { Bill } from '../entities/bill.entity.js';
+import { ProviderBill } from '../entities/provider-bill.entity.js';
 import { Transaction } from '../entities/transaction.entity.js';
 import { paymentCommand, type PaymentCommand } from '../payment-body.js';
 import { paymentDescription } from '../payment-description.js';
@@ -21,14 +21,14 @@ function fakeDatabase(failOn?: number, error: Error = new Error('write failed'))
   let writes = 0;
   let nextId = 100;
   const findOneBy = jest.fn(async () => null);
-  const findOne = jest.fn(async (_options?: unknown): Promise<Bill | null> => Object.assign(new Bill(), { id: 7 }));
+  const findOne = jest.fn(async (_options?: unknown): Promise<ProviderBill | null> => Object.assign(new ProviderBill(), { id: 7 }));
   const resolve = jest.fn(async () => ({}));
 
   const transaction = async <R>(work: (manager: unknown) => Promise<R>): Promise<R> => {
     const staged: typeof committed = [];
     const manager = {
       getRepository: (entity: unknown) => ({
-        findOne: (options: unknown) => (entity === Bill ? findOne(options) : Promise.reject(new Error('unexpected read'))),
+        findOne: (options: unknown) => (entity === ProviderBill ? findOne(options) : Promise.reject(new Error('unexpected read'))),
         create: (fields: Record<string, unknown>) => ({ ...fields }),
         save: async (row: Record<string, unknown>) => {
           writes += 1;

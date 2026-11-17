@@ -9,7 +9,7 @@ import { RefreshToken } from '../../../auth/entities/refresh-token.entity.js';
 import { User } from '../../../auth/entities/user.entity.js';
 import { Account } from '../../../bank/entities/account.entity.js';
 import { BillPayment } from '../../../bank/entities/bill-payment.entity.js';
-import { Bill } from '../../../bank/entities/bill.entity.js';
+import { ProviderBill } from '../../../bank/entities/provider-bill.entity.js';
 import { DebtDetails } from '../../../bank/entities/debt-details.entity.js';
 import { InvestmentDetails } from '../../../bank/entities/investment-details.entity.js';
 import { ProviderExpenseDetails } from '../../../bank/entities/provider-expense-details.entity.js';
@@ -81,7 +81,7 @@ export const ENTITIES = [
   Account,
   AccountEditLockout,
   AuthorizationRequest,
-  Bill,
+  ProviderBill,
   BillPayment,
   DebtDetails,
   InvestmentDetails,

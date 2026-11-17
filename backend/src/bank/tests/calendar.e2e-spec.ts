@@ -14,7 +14,7 @@ import {
 import type { InMemoryBankRepos } from './support/in-memory-bank-repos.js';
 import { ownerKeysIn } from './support/owner-matrix.js';
 import { BillPayment } from '../entities/bill-payment.entity.js';
-import { Bill } from '../entities/bill.entity.js';
+import { ProviderBill } from '../entities/provider-bill.entity.js';
 import { todayUtc } from '../ledger-date.js';
 import { addDays } from '../occurrence-generator.js';
 
@@ -45,8 +45,8 @@ describe('calendar (e2e)', () => {
   const calendar = (orgId: number | null, query = JANUARY, user = ALICE) =>
     send(app, 'get', `${base(orgId)}/calendar.json?${query}`, user);
   const overdue = (orgId: number | null, user = ALICE) => send(app, 'get', `${base(orgId)}/calendar/overdue.json`, user);
-  const addBill = (fields: Partial<Bill>) =>
-    repos.bills.save(Object.assign(new Bill(), { payingAccountId: null, amount: 5000n, description: 'Tax', notes: null, ...fields }));
+  const addBill = (fields: Partial<ProviderBill>) =>
+    repos.bills.save(Object.assign(new ProviderBill(), { payingAccountId: null, kind: 'one_off', expectedAmount: 5000n, description: 'Tax', notes: null, ...fields }));
   const addPayment = (fields: Partial<BillPayment>) =>
     repos.billPayments.save(Object.assign(new BillPayment(), {
       billId: null,
@@ -240,10 +240,10 @@ describe('calendar (e2e)', () => {
         const billsFrom = addDays(today, -70);
         const loan = await debt(orgId, { due_day: 1, bills_from: billsFrom });
         const fee = await provider(orgId, { due_day: null });
-        await addBill({ providerAccountId: fee.id, dueDate: addDays(today, -1), amount: 1234n });
+        await addBill({ providerAccountId: fee.id, dueDate: addDays(today, -1), expectedAmount: 1234n });
         await addBill({ providerAccountId: fee.id, dueDate: today });
         const paidBill = await addBill({ providerAccountId: fee.id, dueDate: addDays(today, -3) });
-        await addPayment({ sourceAccountId: fee.id, billId: paidBill.id, dueDate: paidBill.dueDate });
+        await addPayment({ sourceAccountId: fee.id, billId: paidBill.id, dueDate: paidBill.dueDate as string });
 
         const response = await overdue(orgId).expect(200);
         const rows = response.body.occurrences as Body[];

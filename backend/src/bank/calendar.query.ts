@@ -8,7 +8,7 @@ import { BILL_SOURCE_TYPES, billSourceOf, PROVIDER_TYPE, type BillSource } from 
 import type { OwnerContext } from '../core/owner-context.js';
 import { Account } from './entities/account.entity.js';
 import { BillPayment } from './entities/bill-payment.entity.js';
-import { Bill } from './entities/bill.entity.js';
+import { ProviderBill } from './entities/provider-bill.entity.js';
 
 /** The owner's active bill sources. */
 export interface CalendarSources {
@@ -28,19 +28,19 @@ export interface CalendarSources {
 @Injectable()
 export class CalendarQuery {
   private readonly accountRepository: Repository<Account>;
-  private readonly billRepository: Repository<Bill>;
+  private readonly billRepository: Repository<ProviderBill>;
   private readonly paymentRepository: Repository<BillPayment>;
   private readonly registry: AccountTypeRegistry;
 
   /**
    * @param {Repository<Account>} accountRepository - The account repository.
-   * @param {Repository<Bill>} billRepository - The one-off bill repository.
+   * @param {Repository<ProviderBill>} billRepository - The one-off bill repository.
    * @param {Repository<BillPayment>} paymentRepository - The bill payment repository.
    * @param {AccountTypeRegistry} registry - Loads the accounts' details.
    */
   constructor(
     @InjectRepository(Account) accountRepository: Repository<Account>,
-    @InjectRepository(Bill) billRepository: Repository<Bill>,
+    @InjectRepository(ProviderBill) billRepository: Repository<ProviderBill>,
     @InjectRepository(BillPayment) paymentRepository: Repository<BillPayment>,
       registry: AccountTypeRegistry,
   ) {
@@ -70,9 +70,9 @@ export class CalendarQuery {
   /**
    * @param {number[]} providerIds - The owner's active provider accounts.
    * @param {FindOperator<string>} dueDate - The `due_date` filter.
-   * @returns {Promise<Bill[]>} Their one-off bills due in the range.
+   * @returns {Promise<ProviderBill[]>} Their one-off bills due in the range.
    */
-  async bills(providerIds: number[], dueDate: FindOperator<string>): Promise<Bill[]> {
+  async bills(providerIds: number[], dueDate: FindOperator<string>): Promise<ProviderBill[]> {
     if (providerIds.length === 0) {
       return [];
     }

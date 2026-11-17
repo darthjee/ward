@@ -8,7 +8,7 @@ import { CalendarQuery } from '../../../bank/calendar.query.js';
 import { CalendarService } from '../../../bank/calendar.service.js';
 import { Account } from '../../../bank/entities/account.entity.js';
 import { BillPayment } from '../../../bank/entities/bill-payment.entity.js';
-import { Bill } from '../../../bank/entities/bill.entity.js';
+import { ProviderBill } from '../../../bank/entities/provider-bill.entity.js';
 import { DebtDetails } from '../../../bank/entities/debt-details.entity.js';
 import { ProviderExpenseDetails } from '../../../bank/entities/provider-expense-details.entity.js';
 
@@ -17,7 +17,7 @@ const ALICE = { kind: 'user', userId: 1 } as const;
 describe('bills calendar reads (MySQL)', () => {
   let ds: DataSource;
   let accounts: Repository<Account>;
-  let bills: Repository<Bill>;
+  let bills: Repository<ProviderBill>;
   let payments: Repository<BillPayment>;
   let query: CalendarQuery;
   let service: CalendarService;
@@ -39,7 +39,7 @@ describe('bills calendar reads (MySQL)', () => {
   beforeAll(async () => {
     ds = await createTestDataSource();
     accounts = ds.getRepository(Account);
-    bills = ds.getRepository(Bill);
+    bills = ds.getRepository(ProviderBill);
     payments = ds.getRepository(BillPayment);
     const registry = new AccountTypeRegistry([
       new RegularAccountHandler(),

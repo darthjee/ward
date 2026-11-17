@@ -5,7 +5,7 @@ import { occurrenceAlreadyPaid } from './bill-conflicts.js';
 import type { OwnerContext } from '../core/owner-context.js';
 import { ownerNotFound } from '../core/parse-id.js';
 import { BillPayment } from './entities/bill-payment.entity.js';
-import { Bill } from './entities/bill.entity.js';
+import { ProviderBill } from './entities/provider-bill.entity.js';
 import { Transaction } from './entities/transaction.entity.js';
 import { isMysqlError, MYSQL_DUPLICATE_ENTRY } from './mysql-errors.js';
 import { PayingAccountResolver } from './paying-account.resolver.js';
@@ -120,7 +120,7 @@ export class BillPaymentWriter {
 
   async #recheck(manager: EntityManager, owner: OwnerContext, target: PaymentTarget, command: PaymentCommand): Promise<void> {
     if (target.billId !== null) {
-      const bill = await manager.getRepository(Bill).findOne({
+      const bill = await manager.getRepository(ProviderBill).findOne({
         where: { id: target.billId, providerAccountId: target.sourceAccountId },
         lock: { mode: 'pessimistic_write' },
       });

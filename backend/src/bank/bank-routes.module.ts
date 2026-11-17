@@ -9,7 +9,7 @@ import { BillsController } from './bills.controller.js';
 import { CalendarController } from './calendar.controller.js';
 import { Account } from './entities/account.entity.js';
 import { BillPayment } from './entities/bill-payment.entity.js';
-import { Bill } from './entities/bill.entity.js';
+import { ProviderBill } from './entities/provider-bill.entity.js';
 import { DebtDetails } from './entities/debt-details.entity.js';
 import { InvestmentDetails } from './entities/investment-details.entity.js';
 import { ProviderExpenseDetails } from './entities/provider-expense-details.entity.js';
@@ -36,7 +36,7 @@ import { LazyModuleLoaderService } from '../core/lazy-module-loader.service.js';
 @Module({
   imports: [TypeOrmModule.forFeature([
     Account,
-    Bill,
+    ProviderBill,
     BillPayment,
     DebtDetails,
     InvestmentDetails,

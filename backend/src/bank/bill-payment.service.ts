@@ -101,7 +101,7 @@ export class BillPaymentService {
    */
   async payBill(owner: OwnerContext, id: number, dto: PayOccurrenceDto): Promise<OccurrenceResponse> {
     const { bill, provider } = await this.bills.findOwned(owner, id);
-    const target = { sourceAccountId: provider.id, billId: bill.id, nominal: bill.dueDate, label: bill.description, currency: provider.currency };
+    const target = { sourceAccountId: provider.id, billId: bill.id, nominal: bill.dueDate as string, label: bill.description, currency: provider.currency };
     const payment = await this.#record(owner, target, dto, 'bill');
     const refs = await accountRefsById([bill.payingAccountId, payment.payingAccountId], this.accountRepository.manager);
 
@@ -135,7 +135,7 @@ export class BillPaymentService {
   async undoBill(owner: OwnerContext, id: number): Promise<void> {
     const { bill, provider } = await this.bills.findOwned(owner, id);
 
-    await this.#undo(provider, await this.writer.find({ sourceAccountId: provider.id, billId: bill.id, nominal: bill.dueDate }));
+    await this.#undo(provider, await this.writer.find({ sourceAccountId: provider.id, billId: bill.id, nominal: bill.dueDate as string }));
   }
 
   async #record(

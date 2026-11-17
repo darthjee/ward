@@ -14,7 +14,7 @@ import { OwnerContextGuard } from '../../../core/owner-context.guard.js';
 import { BankRoutesModule } from '../../bank-routes.module.js';
 import { Account } from '../../entities/account.entity.js';
 import { BillPayment } from '../../entities/bill-payment.entity.js';
-import { Bill } from '../../entities/bill.entity.js';
+import { ProviderBill } from '../../entities/provider-bill.entity.js';
 import { DebtDetails } from '../../entities/debt-details.entity.js';
 import { InvestmentDetails } from '../../entities/investment-details.entity.js';
 import { ProviderExpenseDetails } from '../../entities/provider-expense-details.entity.js';
@@ -69,7 +69,7 @@ function fakeDataSource(repos: InMemoryBankRepos) {
   const repositoryFor = (entity: unknown): unknown => {
     if (entity === Account) return { ...repos.accounts, manager };
     if (entity === Transaction) return { ...repos.transactions, manager };
-    if (entity === Bill) return { ...repos.bills, manager };
+    if (entity === ProviderBill) return { ...repos.bills, manager };
     if (entity === BillPayment) return { ...repos.billPayments, manager };
     if (entity === DebtDetails) return repos.debtDetails;
     if (entity === InvestmentDetails) return repos.investmentDetails;
