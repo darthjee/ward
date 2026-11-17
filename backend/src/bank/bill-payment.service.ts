@@ -11,6 +11,7 @@ import type { OwnerContext } from '../core/owner-context.js';
 import { ownerNotFound } from '../core/parse-id.js';
 import type { PayOccurrenceDto } from './dto/pay-occurrence.dto.js';
 import { Account } from './entities/account.entity.js';
+import { ProviderBill } from './entities/provider-bill.entity.js';
 import type { BillPayment } from './entities/bill-payment.entity.js';
 import { isIsoDate, todayUtc } from './ledger-date.js';
 import { isNominalOccurrence, shiftWeekend } from './occurrence-generator.js';
@@ -84,7 +85,14 @@ export class BillPaymentService {
     }
 
     const { account } = source;
-    const target = { sourceAccountId: account.id, billId: null, nominal: dueDate, label: account.name, currency: account.currency };
+    const target = {
+      sourceAccountId: account.id,
+      billId: null,
+      providerBillId: await this.#recurringBillId(source.kind, account.id),
+      nominal: dueDate,
+      label: account.name,
+      currency: account.currency,
+    };
     const payment = await this.#record(owner, target, dto, source.kind);
 
     return this.#respond(derivedInput(source, { nominal: dueDate, effective: shiftWeekend(dueDate) }, payment));
@@ -101,7 +109,7 @@ export class BillPaymentService {
    */
   async payBill(owner: OwnerContext, id: number, dto: PayOccurrenceDto): Promise<OccurrenceResponse> {
     const { bill, provider } = await this.bills.findOwned(owner, id);
-    const target = { sourceAccountId: provider.id, billId: bill.id, nominal: bill.dueDate as string, label: bill.description, currency: provider.currency };
+    const target = { sourceAccountId: provider.id, billId: bill.id, providerBillId: null, nominal: bill.dueDate as string, label: bill.description, currency: provider.currency };
     const payment = await this.#record(owner, target, dto, 'bill');
     const refs = await accountRefsById([bill.payingAccountId, payment.payingAccountId], this.accountRepository.manager);
 
@@ -136,6 +144,21 @@ export class BillPaymentService {
     const { bill, provider } = await this.bills.findOwned(owner, id);
 
     await this.#undo(provider, await this.writer.find({ sourceAccountId: provider.id, billId: bill.id, nominal: bill.dueDate as string }));
+  }
+
+  /**
+   * The provider's recurring bill, stamped on its new derived payments so each row sits under
+   * exactly one unique key. Debt sources have none. A provider without a recurring bill cannot
+   * have derived occurrences (no schedule), so `null` is only a defensive fallback.
+   */
+  async #recurringBillId(kind: OccurrenceInput['kind'], providerAccountId: number): Promise<number | null> {
+    if (kind !== 'provider') {
+      return null;
+    }
+
+    const bill = await this.accountRepository.manager.getRepository(ProviderBill).findOneBy({ providerAccountId, kind: 'recurring' });
+
+    return bill?.id ?? null;
   }
 
   async #record(

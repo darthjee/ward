@@ -9,7 +9,7 @@ import { paymentCommand, type PaymentCommand } from '../payment-body.js';
 import { paymentDescription } from '../payment-description.js';
 import { PERSONAL } from './account.test-support.js';
 
-const TARGET: PaymentTarget = { sourceAccountId: 3, billId: null, nominal: '2026-01-10', label: 'Loan', currency: 'BRL' };
+const TARGET: PaymentTarget = { sourceAccountId: 3, billId: null, providerBillId: null, nominal: '2026-01-10', label: 'Loan', currency: 'BRL' };
 const PAID: PaymentCommand = { status: 'paid', paidOn: '2026-01-12', amount: 1000n, payingAccountId: 9, recordCharge: true };
 
 // A fake transactional manager: writes are staged and only "committed" into `committed` when the
@@ -70,6 +70,14 @@ describe('BillPaymentWriter', () => {
     expect(committed.slice(0, 3).every(({ row: written }) =>
       written.date === '2026-01-12' && written.description === 'Loan — 2026-01-10' && written.sentToAccountantAt === null)).toBe(true);
     expect(row).toMatchObject({ status: 'paid', paymentTransactionId: 100, withdrawalTransactionId: 101, chargeTransactionId: 102 });
+  });
+
+  it('writes the target\'s provider bill id on the row', async () => {
+    const { writer } = fakeDatabase();
+
+    const row = await writer.record(PERSONAL, { ...TARGET, providerBillId: 12 }, { status: 'skipped' });
+
+    expect(row).toMatchObject({ billId: null, providerBillId: 12 });
   });
 
   it('records no charge without record_charge, and only the row for a skip', async () => {

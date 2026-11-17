@@ -54,7 +54,7 @@ describe('bill payment writes (MySQL)', () => {
   it('writes the row and its transactions, and undo removes them', async () => {
     const provider = await insertAccount('provider_expense');
     const paying = await insertAccount('regular');
-    const target = { sourceAccountId: provider.id, billId: null, nominal: '2026-01-05', label: 'Fee', currency: 'BRL' };
+    const target = { sourceAccountId: provider.id, billId: null, providerBillId: null, nominal: '2026-01-05', label: 'Fee', currency: 'BRL' };
 
     const row = await writer.record(ALICE, target, { ...PAID, payingAccountId: paying.id });
 
@@ -86,7 +86,7 @@ describe('bill payment writes (MySQL)', () => {
 
     await expect(racingWriter.record(
       ALICE,
-      { sourceAccountId: provider.id, billId: null, nominal: '2026-01-05', label: 'Fee', currency: 'BRL' },
+      { sourceAccountId: provider.id, billId: null, providerBillId: null, nominal: '2026-01-05', label: 'Fee', currency: 'BRL' },
       { ...PAID, payingAccountId: paying.id },
     )).rejects.toMatchObject({ status: 409 });
 
@@ -99,15 +99,16 @@ describe('bill payment writes (MySQL)', () => {
       return bills.save(bills.create({
         providerAccountId: providerId,
         payingAccountId: payingId,
+        kind: 'one_off',
         dueDate: '2026-01-20',
-        amount: 1000n,
+        expectedAmount: 1000n,
         description: 'IPVA',
         notes: null,
       }));
     }
 
     const oneOff = (bill: ProviderBill) =>
-      ({ sourceAccountId: bill.providerAccountId, billId: bill.id, nominal: bill.dueDate, label: bill.description, currency: 'BRL' });
+      ({ sourceAccountId: bill.providerAccountId, billId: bill.id, providerBillId: null, nominal: bill.dueDate as string, label: bill.description, currency: 'BRL' });
 
     it('re-validates the paying account inside the transaction: archived meanwhile → 422, nothing written', async () => {
       const provider = await insertAccount('provider_expense');
@@ -116,7 +117,7 @@ describe('bill payment writes (MySQL)', () => {
 
       await expect(writer.record(
         ALICE,
-        { sourceAccountId: provider.id, billId: null, nominal: '2026-01-05', label: 'Fee', currency: 'BRL' },
+        { sourceAccountId: provider.id, billId: null, providerBillId: null, nominal: '2026-01-05', label: 'Fee', currency: 'BRL' },
         { ...PAID, payingAccountId: paying.id },
       )).rejects.toMatchObject({ status: 422 });
 
@@ -158,7 +159,7 @@ describe('bill payment writes (MySQL)', () => {
       await runner.manager.getRepository(BillPayment).save(runner.manager.getRepository(BillPayment).create({
         sourceAccountId: provider.id,
         billId: bill.id,
-        dueDate: bill.dueDate,
+        dueDate: bill.dueDate as string,
         status: 'paid',
         paidOn: '2026-01-12',
         amount: 1000n,

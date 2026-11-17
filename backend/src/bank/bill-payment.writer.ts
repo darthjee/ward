@@ -18,6 +18,8 @@ export interface PaymentTarget {
   sourceAccountId: number;
   /** Set for one-off bills only. */
   billId: number | null;
+  /** The provider's recurring bill (derived provider payments); `null` for debts and one-offs. */
+  providerBillId: number | null;
   /** The nominal due date (the payment key of a derived occurrence). */
   nominal: string;
   /** The bill description, or the source account's name (for the transactions' description). */
@@ -140,6 +142,7 @@ export class BillPaymentWriter {
     const row = payments.create({
       sourceAccountId: target.sourceAccountId,
       billId: target.billId,
+      providerBillId: target.providerBillId,
       dueDate: target.nominal,
       status: command.status,
       paidOn: null,
