@@ -14,9 +14,7 @@ const METHODS = [
   'query',
 ] as const;
 
-const STATE_METHODS = ['hasTable', 'hasColumn', 'getTable'] as const;
-
-export type FakeQueryRunnerMocks = Record<(typeof METHODS)[number] | (typeof STATE_METHODS)[number], jest.Mock> & {
+export type FakeQueryRunnerMocks = Record<(typeof METHODS)[number] | 'hasTable' | 'hasColumn' | 'getTable', jest.Mock> & {
   calls: string[];
 };
 

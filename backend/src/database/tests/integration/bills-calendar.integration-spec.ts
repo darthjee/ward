@@ -8,8 +8,8 @@ import { CalendarQuery } from '../../../bank/calendar.query.js';
 import { CalendarService } from '../../../bank/calendar.service.js';
 import { Account } from '../../../bank/entities/account.entity.js';
 import { BillPayment } from '../../../bank/entities/bill-payment.entity.js';
-import { ProviderBill } from '../../../bank/entities/provider-bill.entity.js';
 import { DebtDetails } from '../../../bank/entities/debt-details.entity.js';
+import { ProviderBill } from '../../../bank/entities/provider-bill.entity.js';
 import { ProviderExpenseDetails } from '../../../bank/entities/provider-expense-details.entity.js';
 
 const ALICE = { kind: 'user', userId: 1 } as const;

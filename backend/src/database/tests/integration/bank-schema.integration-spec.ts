@@ -1,7 +1,7 @@
 import type { DataSource } from 'typeorm';
 import { columnInfo, indexNames, tableNames } from './schema-inspection.js';
-import { ALTER_BILLS_SQL, BankExpandProviderBills20261117120025 } from '../../migrations/20261117120025-bank-expand-provider-bills.js';
 import { createTestDataSource, resetDatabase, runMigrationsUpTo } from './test-data-source.js';
+import { ALTER_BILLS_SQL, BankExpandProviderBills20261117120025 } from '../../migrations/20261117120025-bank-expand-provider-bills.js';
 
 const ACCOUNTS = 'bank_accounts';
 const TRANSACTIONS = 'bank_transactions';
