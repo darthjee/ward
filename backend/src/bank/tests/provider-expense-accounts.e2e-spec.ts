@@ -11,6 +11,7 @@ import {
   send,
   withoutTimestamp,
 } from './support/build-bank-test-app.js';
+import { BillPayment } from '../entities/bill-payment.entity.js';
 import type { InMemoryBankRepos } from './support/in-memory-bank-repos.js';
 import { AccountBalancesQuery } from './support/in-memory-ledger.query.js';
 import { NOT_FOUND_CASES, ownerKeysIn, type OwnerFixtures } from './support/owner-matrix.js';
@@ -106,6 +107,76 @@ describe('provider-expense accounts (e2e)', () => {
 
   describe.each(CONTEXTS)('in the %s context', (_context, orgId) => {
     const prefix = base(orgId);
+
+    describe('recurring provider bill write-through', () => {
+      const recurringOf = (id: number) => repos.bills.rows.filter((row) => row.providerAccountId === id && row.kind === 'recurring');
+
+      it('creates one recurring bill with the copied fields on create with due_day, and none without it', async () => {
+        const scheduled = await createProvider(orgId, { provider_expense: FULL_PROVIDER_EXPENSE });
+        const unscheduled = await createProvider(orgId);
+
+        expect(recurringOf(scheduled.id)).toEqual([
+          expect.objectContaining({
+            description: scheduled.name,
+            expectedAmount: 20000n,
+            chargeFrequency: 'yearly',
+            dueDay: 10,
+            dueMonth: 3,
+            billsFrom: '2026-01-01',
+            showInCalendar: true,
+            payingAccountId: null,
+            dueDate: null,
+          }),
+        ]);
+        expect(recurringOf(unscheduled.id)).toEqual([]);
+      });
+
+      it('creates the bill when a PATCH first sets due_day, then updates the same bill', async () => {
+        const created = await createProvider(orgId);
+
+        await patch(orgId, created.id, { provider_expense: { due_day: 5 } }).expect(200);
+        const [first] = recurringOf(created.id);
+        await patch(orgId, created.id, { provider_expense: { due_day: 6, expected_amount: '10.00' } }).expect(200);
+
+        expect(recurringOf(created.id)).toEqual([expect.objectContaining({ id: first.id, dueDay: 6, expectedAmount: 1000n })]);
+      });
+
+      it('hides the bill (kept, last due_day, payments intact) when due_day is cleared, and reuses it when set again', async () => {
+        const created = await createProvider(orgId, { provider_expense: FULL_PROVIDER_EXPENSE });
+        const [bill] = recurringOf(created.id);
+        const payment = await repos.billPayments.save(Object.assign(new BillPayment(), {
+          sourceAccountId: created.id,
+          billId: null,
+          providerBillId: bill.id,
+          dueDate: '2026-03-10',
+          status: 'skipped',
+          paidOn: null,
+          amount: null,
+          payingAccountId: null,
+          paymentTransactionId: null,
+          withdrawalTransactionId: null,
+          chargeTransactionId: null,
+        }));
+
+        const cleared = await patch(orgId, created.id, { provider_expense: { due_day: null, due_month: null, charge_frequency: 'monthly' } }).expect(200);
+        expect(cleared.body.provider_expense).toMatchObject({ due_day: null });
+        expect(recurringOf(created.id)).toEqual([expect.objectContaining({ id: bill.id, dueDay: 10, showInCalendar: false })]);
+        expect(repos.billPayments.rows.some((row) => row.id === payment.id)).toBe(true);
+
+        await patch(orgId, created.id, { provider_expense: { due_day: 12, show_in_calendar: true } }).expect(200);
+        expect(recurringOf(created.id)).toEqual([expect.objectContaining({ id: bill.id, dueDay: 12, showInCalendar: true })]);
+      });
+
+      it('keeps the description equal to the name when the provider is renamed, leaving the response unchanged', async () => {
+        const created = await createProvider(orgId, { provider_expense: FULL_PROVIDER_EXPENSE });
+        const renamed = uniqueName('Renamed');
+
+        const response = await patch(orgId, created.id, { name: renamed }).expect(200);
+
+        expect(recurringOf(created.id)).toEqual([expect.objectContaining({ description: renamed })]);
+        expect(response.body.provider_expense).toEqual(FULL_PROVIDER_EXPENSE_RESPONSE);
+      });
+    });
 
     describe('create', () => {
       it('creates a provider account without an object, with a defaults details row', async () => {

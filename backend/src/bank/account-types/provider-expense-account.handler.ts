@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { In, type EntityManager } from 'typeorm';
 import type { AccountTypeContext, AccountTypeHandler } from './account-type-handler.js';
+import { syncProviderBill } from './provider-bill-write-through.js';
 import type { WithPayingAccount } from './schedule-fields.js';
 import { withPayingAccounts } from '../account-refs.js';
 import {
@@ -85,7 +86,7 @@ export class ProviderExpenseAccountHandler implements AccountTypeHandler {
   }
 
   /**
-   * Inserts or updates the account's details row.
+   * Inserts or updates the account's details row, then syncs its recurring provider bill.
    * @param {Account} account - The saved account.
    * @param {unknown} prepared - The {@link ProviderExpenseState} returned by the validate step.
    * @param {EntityManager} manager - The transactional entity manager.
@@ -95,6 +96,7 @@ export class ProviderExpenseAccountHandler implements AccountTypeHandler {
     const state = providerExpenseStateOf(prepared as ProviderExpenseState | undefined);
 
     await manager.getRepository(ProviderExpenseDetails).save({ ...state, accountId: account.id });
+    await syncProviderBill(account, state, manager);
   }
 
   /**

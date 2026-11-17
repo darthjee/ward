@@ -126,15 +126,7 @@ describe('bill payments (e2e)', () => {
       it('stamps a provider payment with the provider\'s recurring bill, and a debt payment with none', async () => {
         const vivo = await provider(orgId);
         const loan = await debt(orgId);
-        const recurring = await repos.bills.save(Object.assign(repos.bills.create({}), {
-          providerAccountId: vivo.id,
-          payingAccountId: null,
-          kind: 'recurring',
-          description: vivo.name,
-          expectedAmount: 20000n,
-          dueDate: null,
-          notes: null,
-        }));
+        const recurring = repos.bills.rows.find((row) => row.providerAccountId === vivo.id && row.kind === 'recurring') as { id: number };
 
         await pay(orgId, vivo.id, '2026-02-05', { status: 'skipped' }).expect(201);
         await pay(orgId, loan.id, '2026-02-10', { status: 'skipped' }).expect(201);
