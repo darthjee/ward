@@ -223,6 +223,31 @@ describe('provider-bills (e2e)', () => {
         expect(cleared.body).toMatchObject({ expected_amount: null, notes: null });
       });
 
+      it('locks the provider row before the bill row on every recurring update, and only the bill for a one-off', async () => {
+        const fee = await provider(orgId);
+        const rec = (await post(orgId, fee.id, recurring('Rent')).expect(201)).body;
+        const single = (await post(orgId, fee.id, oneOff('Fine')).expect(201)).body;
+        const log: string[] = [];
+        const accountFind = repos.accounts.findOne;
+        const billFind = repos.bills.findOne;
+
+        repos.accounts.findOne = (async (options: Parameters<typeof accountFind>[0]) => {
+          if (options.lock) log.push('provider');
+          return accountFind(options);
+        }) as typeof accountFind;
+        repos.bills.findOne = (async (options: Parameters<typeof billFind>[0]) => {
+          if (options.lock) log.push('bill');
+          return billFind(options);
+        }) as typeof billFind;
+
+        await send(app, 'patch', billPath(orgId, rec.id), ALICE, { notes: 'x' }).expect(200);
+        expect(log).toEqual(['provider', 'bill']);
+
+        log.length = 0;
+        await send(app, 'patch', billPath(orgId, single.id), ALICE, { notes: 'x' }).expect(200);
+        expect(log).toEqual(['bill']);
+      });
+
       it('validates the merged state with 400', async () => {
         const fee = await provider(orgId);
         const rec = (await post(orgId, fee.id, recurring('Rent')).expect(201)).body;

@@ -10,7 +10,7 @@ import { BillPayment } from './entities/bill-payment.entity.js';
 import { ProviderBill } from './entities/provider-bill.entity.js';
 import { todayUtc } from './ledger-date.js';
 import { PayingAccountResolver } from './paying-account.resolver.js';
-import { assertRecurringRoom, listProviderBills } from './provider-bill-checks.js';
+import { assertRecurringRoom, listProviderBills, lockProvider } from './provider-bill-checks.js';
 import {
   mapProviderBillNameClash,
   providerBillKindLocked,
@@ -20,7 +20,7 @@ import {
 } from './provider-bill-conflicts.js';
 import { defaultProviderBillFields, mergeProviderBillFields, providerBillFieldsOf } from './provider-bill-fields.js';
 import { serializeProviderBill, type ProviderBillListResponse, type ProviderBillResponse } from './provider-bill-response.js';
-import { ProviderBillResolver } from './provider-bill.resolver.js';
+import { ProviderBillResolver, type ResolvedProviderBill } from './provider-bill.resolver.js';
 
 /**
  * Provider bills of both kinds (lazy `BankModule`, see
@@ -121,7 +121,7 @@ export class ProviderBillService {
    */
   async update(owner: OwnerContext, id: number, dto: UpdateProviderBillDto): Promise<ProviderBillResponse> {
     return this.billRepository.manager.transaction(async (manager) => {
-      const { bill, provider: stored } = await this.resolver.resolve(owner, id, manager);
+      const { bill, provider: stored } = await this.#resolveForUpdate(owner, id, manager);
 
       if (dto.kind !== undefined && dto.kind !== bill.kind) {
         throw providerBillKindLocked();
@@ -164,6 +164,21 @@ export class ProviderBillService {
 
       await manager.getRepository(ProviderBill).delete({ id });
     });
+  }
+
+  /**
+   * Resolves a bill for writing with the provider-first lock order (as the
+   * provider write-through): ownership on an unlocked read, the provider row
+   * locked for a recurring bill, then the bill re-read under its own lock.
+   */
+  async #resolveForUpdate(owner: OwnerContext, id: number, manager: EntityManager): Promise<ResolvedProviderBill> {
+    const peeked = await this.resolver.peek(owner, id, manager);
+
+    if (peeked.bill.kind === 'recurring') {
+      await lockProvider(manager, peeked.provider.id);
+    }
+
+    return this.resolver.resolve(owner, id, manager);
   }
 
   /**

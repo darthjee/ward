@@ -48,18 +48,44 @@ export class ProviderBillResolver {
 
   /**
    * Loads a bill of any kind and its provider (owned, `provider_expense`, not archived).
+   * The ownership check always runs on an unlocked read; only an owned bill is then
+   * re-read with `FOR UPDATE` (when a manager is given), so a caller can never lock
+   * another tenant's row.
    * @param {OwnerContext} owner - The resolved owner.
    * @param {number} id - The bill id.
-   * @param {EntityManager} [manager] - A transactional manager: the bill row is then locked `FOR UPDATE`.
+   * @param {EntityManager} [manager] - A transactional manager: the owned bill row is then locked `FOR UPDATE`.
    * @returns {Promise<ResolvedProviderBill>} The bill and its provider.
    * @throws {NotFoundException} The uniform 404.
    */
   async resolve(owner: OwnerContext, id: number, manager?: EntityManager): Promise<ResolvedProviderBill> {
+    const resolved = await this.peek(owner, id, manager);
+
+    if (!manager) {
+      return resolved;
+    }
+
+    const bill = await manager.getRepository(ProviderBill).findOne({ where: { id, providerAccountId: resolved.provider.id }, lock: { mode: 'pessimistic_write' } });
+
+    if (!bill) {
+      throw ownerNotFound();
+    }
+
+    return { bill, provider: resolved.provider };
+  }
+
+  /**
+   * Like {@link resolve} but never locks: lets a writer take the provider lock
+   * before the bill lock (the lock order of the provider write-through).
+   * @param {OwnerContext} owner - The resolved owner.
+   * @param {number} id - The bill id.
+   * @param {EntityManager} [manager] - A transactional manager to read through.
+   * @returns {Promise<ResolvedProviderBill>} The bill and its provider.
+   * @throws {NotFoundException} The uniform 404.
+   */
+  async peek(owner: OwnerContext, id: number, manager?: EntityManager): Promise<ResolvedProviderBill> {
     const bills = manager ? manager.getRepository(ProviderBill) : this.billRepository;
     const accounts = manager ? manager.getRepository(Account) : this.accountRepository;
-    const bill = manager
-      ? await bills.findOne({ where: { id }, lock: { mode: 'pessimistic_write' } })
-      : await bills.findOneBy({ id });
+    const bill = await bills.findOneBy({ id });
     const provider = bill
       ? await accounts.findOneBy({ ...accountOwnerWhere(owner), id: bill.providerAccountId, type: PROVIDER_TYPE, archivedAt: IsNull() })
       : null;

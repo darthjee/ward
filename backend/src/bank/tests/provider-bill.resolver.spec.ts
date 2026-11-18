@@ -28,6 +28,24 @@ describe('ProviderBillResolver', () => {
       await expect(resolver.resolve(PERSONAL, recurring.id)).resolves.toMatchObject({ bill: { kind: 'recurring' } });
     });
 
+    it('locks only an owned bill, after the ownership check, when inside a transaction', async () => {
+      const foreign = await addAccount({ type: 'provider_expense', userId: 99 });
+      const foreignBill = await addBill(foreign.id);
+      const manager = { getRepository: (entity: unknown) => (entity === repos.bills.create({}).constructor ? repos.bills : repos.accounts) } as never;
+
+      await expect(resolver.resolve(PERSONAL, foreignBill.id, manager)).rejects.toEqual(ownerNotFound());
+      expect(repos.bills.locks).toEqual([]);
+    });
+
+    it('peeks without ever locking', async () => {
+      const provider = await addAccount({ type: 'provider_expense' });
+      const bill = await addBill(provider.id);
+      const manager = { getRepository: (entity: unknown) => (entity === repos.bills.create({}).constructor ? repos.bills : repos.accounts) } as never;
+
+      await expect(resolver.peek(PERSONAL, bill.id, manager)).resolves.toMatchObject({ bill: { id: bill.id } });
+      expect(repos.bills.locks).toEqual([]);
+    });
+
     it('locks the bill when inside a transaction', async () => {
       const provider = await addAccount({ type: 'provider_expense' });
       const bill = await addBill(provider.id);
