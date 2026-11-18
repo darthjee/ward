@@ -86,6 +86,7 @@ describe('one-off bills (e2e)', () => {
 
         expect(bill).toEqual({
           id: expect.any(Number),
+          kind: 'one_off',
           provider_account: { id: fee.id, name: fee.name },
           paying_account: { id: paying.id, name: paying.name },
           due_date: '2026-03-10',
@@ -245,19 +246,73 @@ describe('one-off bills (e2e)', () => {
         expect(response.body).toMatchObject({ due_date: '2026-04-01', amount: '99.99', description: 'Renamed', notes: null, paying_account: null });
       });
 
-      it('re-checks the paying account currency when the provider changes', async () => {
-        const { bill } = await createBill(orgId);
+      it('answers 422 currency mismatch when the target provider has another currency, never rescaling', async () => {
+        const { bill, paying } = await createBill(orgId);
         const usdProvider = await provider(orgId, { currency: 'USD' });
+        const usdPaying = await regular(orgId, { currency: 'USD' });
 
         const response = await send(app, 'patch', billPath(orgId, bill.id), ALICE, { provider_account_id: usdProvider.id }).expect(422);
-
-        expect(withoutTimestamp(response)).toEqual(CURRENCY_MISMATCH);
-        const usdPaying = await regular(orgId, { currency: 'USD' });
-        const moved = await send(app, 'patch', billPath(orgId, bill.id), ALICE, {
+        const withPaying = await send(app, 'patch', billPath(orgId, bill.id), ALICE, {
           provider_account_id: usdProvider.id,
           paying_account_id: usdPaying.id,
-        }).expect(200);
-        expect(moved.body).toMatchObject({ provider_account: { id: usdProvider.id }, currency: 'USD', amount: '150.50' });
+        }).expect(422);
+
+        expect(withoutTimestamp(response)).toEqual(CURRENCY_MISMATCH);
+        expect(withoutTimestamp(withPaying)).toEqual(CURRENCY_MISMATCH);
+        const shown = await send(app, 'get', billPath(orgId, bill.id), ALICE).expect(200);
+        expect(shown.body).toMatchObject({ currency: 'BRL', amount: '150.50', paying_account: { id: paying.id } });
+      });
+
+      it('moves a bill to another provider of the same currency and re-checks the paying account', async () => {
+        const { bill } = await createBill(orgId);
+        const other = await provider(orgId);
+
+        const moved = await send(app, 'patch', billPath(orgId, bill.id), ALICE, { provider_account_id: other.id }).expect(200);
+
+        expect(moved.body).toMatchObject({ provider_account: { id: other.id }, currency: 'BRL', amount: '150.50' });
+      });
+
+      it('answers 409 ACCOUNT_ARCHIVED when the target provider is archived', async () => {
+        const { bill } = await createBill(orgId);
+        const archived = await provider(orgId);
+        await send(app, 'post', `${base(orgId)}/accounts/${archived.id}/archive.json`, ALICE).expect(200);
+
+        const response = await send(app, 'patch', billPath(orgId, bill.id), ALICE, { provider_account_id: archived.id }).expect(409);
+
+        expect(response.body.error.code).toBe('ACCOUNT_ARCHIVED');
+      });
+
+      it('lists and serves only one-offs, answers 404 for a recurring id and 400 for a recurring field', async () => {
+        const { fee, bill } = await createBill(orgId);
+        const recurring = (await send(app, 'post', `${base(orgId)}/accounts/${fee.id}/provider-bills.json`, ALICE, {
+          kind: 'recurring', description: 'Rent', due_day: 5,
+        }).expect(201)).body;
+
+        const listed = await send(app, 'get', `${base(orgId)}/bills.json?provider_account_id=${fee.id}`, ALICE).expect(200);
+
+        expect(listed.body.bills.map((row: Body) => row.id)).toEqual([bill.id]);
+        expect(listed.body.bills[0].kind).toBe('one_off');
+        await send(app, 'get', billPath(orgId, recurring.id), ALICE).expect(404);
+        await send(app, 'patch', billPath(orgId, recurring.id), ALICE, { description: 'x' }).expect(404);
+        await send(app, 'delete', billPath(orgId, recurring.id), ALICE).expect(404);
+        for (const field of [{ kind: 'recurring' }, { charge_frequency: 'monthly' }, { due_day: 3 }, { due_month: 3 }, { bills_from: '2026-01-01' }, { show_in_calendar: true }]) {
+          const { body } = await setup(orgId);
+          await post(orgId, { ...body, ...field }).expect(400);
+        }
+      });
+
+      it('stores kind one_off, and shares one-offs with provider-bills in both directions', async () => {
+        const { fee, bill } = await createBill(orgId);
+        const viaProviderBills = (await send(app, 'post', `${base(orgId)}/accounts/${fee.id}/provider-bills.json`, ALICE, {
+          kind: 'one_off', description: 'Fine', due_date: '2026-05-05', expected_amount: '7.00',
+        }).expect(201)).body;
+
+        const seenHere = await send(app, 'get', billPath(orgId, viaProviderBills.id), ALICE).expect(200);
+        const seenThere = await send(app, 'get', `${base(orgId)}/provider-bills/${bill.id}.json`, ALICE).expect(200);
+
+        expect(repos.bills.rows.find((row) => row.id === bill.id)?.kind).toBe('one_off');
+        expect(seenHere.body).toMatchObject({ amount: '7.00', due_date: '2026-05-05' });
+        expect(seenThere.body).toMatchObject({ kind: 'one_off', expected_amount: '150.50', due_date: '2026-03-10' });
       });
 
       it('answers 422 for a foreign provider or paying account, and 409 when a paid bill changes provider', async () => {
