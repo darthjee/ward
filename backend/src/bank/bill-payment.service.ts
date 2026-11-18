@@ -126,8 +126,9 @@ export class BillPaymentService {
    * @throws {ConflictException} 409 on an archived account (checks 5–6).
    */
   async undoOccurrence(owner: OwnerContext, accountId: number, dueDate: string): Promise<void> {
-    const { account } = await this.sources.resolve(owner, accountId);
-    const payment = isIsoDate(dueDate) ? await this.writer.find({ sourceAccountId: account.id, billId: null, nominal: dueDate }) : null;
+    const { account, kind } = await this.sources.resolve(owner, accountId);
+    const providerBillId = await this.#recurringBillId(kind, account.id);
+    const payment = isIsoDate(dueDate) ? await this.writer.find({ sourceAccountId: account.id, billId: null, providerBillId, nominal: dueDate }) : null;
 
     await this.#undo(account, payment);
   }
@@ -143,7 +144,7 @@ export class BillPaymentService {
   async undoBill(owner: OwnerContext, id: number): Promise<void> {
     const { bill, provider } = await this.bills.findOwned(owner, id);
 
-    await this.#undo(provider, await this.writer.find({ sourceAccountId: provider.id, billId: bill.id, nominal: bill.dueDate as string }));
+    await this.#undo(provider, await this.writer.find({ sourceAccountId: provider.id, billId: bill.id, providerBillId: null, nominal: bill.dueDate as string }));
   }
 
   /**
