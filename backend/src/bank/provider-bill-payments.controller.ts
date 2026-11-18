@@ -1,5 +1,6 @@
-import { Delete, HttpCode, HttpStatus, Param, Post } from '@nestjs/common';
+import { Delete, Get, HttpCode, HttpStatus, Param, Post, Query } from '@nestjs/common';
 import { BankModuleLoader } from './bank-module.loader.js';
+import type { BillHistoryResponse } from './bill-history.service.js';
 import { CacheClass } from '../core/cache-class.js';
 import { CachePolicy } from '../core/cache-policy.decorator.js';
 import { CurrentOwner } from '../core/current-owner.decorator.js';
@@ -9,12 +10,14 @@ import { parseId } from '../core/parse-id.js';
 import { StrictBody } from '../core/strict-validation.pipe.js';
 import { PayOccurrenceDto } from './dto/pay-occurrence.dto.js';
 import type { OccurrenceResponse } from './occurrence-response.js';
+import { parsePage } from './pagination.js';
 
 /**
- * Pay / skip / undo routes of one provider bill's occurrences (both kinds),
+ * History and pay / skip / undo routes of one provider bill's occurrences (both kinds),
  * mounted under `bank/…` and `orgs/:orgId/bank/…`. Thin: parses the id
  * (malformed → uniform 404), loads the lazy `BankModule` and delegates to its
- * `ProviderBillPaymentService`. Every write is `never` cached. Bodies only
+ * `ProviderBillPaymentService` / `BillHistoryService`. The history GET is
+ * `user-scoped`, every write `never` cached. Bodies only
  * through `@StrictBody()`, never logged.
  */
 @OwnerScopedController('bank')
@@ -26,6 +29,26 @@ export class ProviderBillPaymentsController {
    */
   constructor(loader: BankModuleLoader) {
     this.loader = loader;
+  }
+
+  /**
+   * `GET <base>/provider-bills/:id/bill-payments.json?page=N`.
+   * @param {OwnerContext} owner - The resolved owner.
+   * @param {string} rawId - The raw `:id`.
+   * @param {unknown} rawPage - The raw `page` query value.
+   * @returns {Promise<BillHistoryResponse>} `{ payments, pagination }`.
+   */
+  @Get('provider-bills/:id/bill-payments.json')
+  async history(
+    @CurrentOwner() owner: OwnerContext,
+      @Param('id') rawId: string,
+      @Query('page') rawPage: unknown,
+  ): Promise<BillHistoryResponse> {
+    const id = parseId(rawId);
+    const page = parsePage(rawPage);
+    const { billHistory } = await this.loader.services();
+
+    return billHistory.historyForBill(owner, id, page);
   }
 
   /**

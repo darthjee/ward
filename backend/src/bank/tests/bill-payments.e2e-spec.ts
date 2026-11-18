@@ -622,6 +622,7 @@ describe('bill payments (e2e)', () => {
           paying_account: { id: checking.id, name: checking.name },
           due_date: '2026-01-10',
           bill: null,
+          source_bill: null,
           off_schedule: true,
         }]);
         expect(await calendarRow(orgId, loan.id)).toMatchObject({ nominal_date: '2026-01-15', payment: null });
@@ -651,6 +652,57 @@ describe('bill payments (e2e)', () => {
         expect(response.headers['x-skip-cache']).toBeUndefined();
         expect(response.headers['cache-control']).toBe('private, no-store');
         expect(ownerKeysIn(response.body)).toEqual([]);
+      });
+
+      it('lists one provider bill\'s history per bill, flags only that bill\'s drift, and survives an archived provider', async () => {
+        const checking = await regular(orgId);
+        const fee = await provider(orgId);
+        const [first] = recurringOf(fee.id);
+        const second = await addRecurring(orgId, fee.id, { due_day: 15 });
+        const path = (id: number | string, query = '') => `${base(orgId)}/provider-bills/${id}/bill-payments.json${query}`;
+        await payBill(orgId, first.id, '2026-01-05', paid(checking.id)).expect(201);
+        await payBill(orgId, second.id, '2026-01-15', { status: 'skipped' }).expect(201);
+        await send(app, 'patch', `${base(orgId)}/provider-bills/${first.id}.json`, ALICE, { due_day: 6 }).expect(200);
+
+        const firstRows = (await send(app, 'get', path(first.id), ALICE).expect(200)).body;
+        const secondRows = (await send(app, 'get', path(second.id), ALICE).expect(200)).body;
+        const wide = (await history(fee.id).expect(200)).body.payments as Body[];
+
+        expect(firstRows.payments).toHaveLength(1);
+        expect(firstRows.payments[0]).toMatchObject({ due_date: '2026-01-05', off_schedule: true, bill: null, source_bill: { id: first.id } });
+        expect(secondRows.payments).toHaveLength(1);
+        expect(secondRows.payments[0]).toMatchObject({ off_schedule: false, source_bill: { id: second.id } });
+        expect(wide.map((row) => [(row.source_bill as Body).id, row.off_schedule]).sort()).toEqual([[first.id, true], [second.id, false]].sort());
+        expect(ownerKeysIn(firstRows)).toEqual([]);
+        expect(JSON.stringify(firstRows)).not.toContain('notes');
+
+        await archive(orgId, fee.id);
+        expect((await send(app, 'get', path(first.id), ALICE).expect(200)).body.payments).toHaveLength(1);
+        await unarchive(orgId, fee.id);
+        await undoBill(orgId, first.id, '2026-01-05').expect(204);
+        await undoBill(orgId, second.id, '2026-01-15').expect(204);
+        await repos.accounts.delete({ id: fee.id });
+      });
+
+      it('lists a one-off bill\'s history, and answers the uniform 404 for foreign, debt and bad ids and 400 for a bad page', async () => {
+        const checking = await regular(orgId);
+        const fee = await provider(orgId, { due_day: null });
+        const bill = await createBill(orgId, fee.id, checking.id);
+        const loan = await debt(orgId);
+        const path = (id: number | string, query = '') => `${base(orgId)}/provider-bills/${id}/bill-payments.json${query}`;
+        await payBill(orgId, bill.id, '2026-01-20', { status: 'skipped' }).expect(201);
+
+        const rows = (await send(app, 'get', path(bill.id), ALICE).expect(200)).body.payments;
+        expect(rows).toHaveLength(1);
+        expect(rows[0]).toMatchObject({ bill: { id: bill.id }, source_bill: { id: bill.id }, off_schedule: false });
+        for (const id of [loan.id, 999999, 'abc']) {
+          expect((await send(app, 'get', path(id), ALICE).expect(404)).body).toEqual(NOT_FOUND_BODY);
+        }
+        expect((await send(app, 'get', path(bill.id), BOB).expect(404)).body).toEqual(NOT_FOUND_BODY);
+        await send(app, 'get', path(bill.id, '?page=0'), ALICE).expect(400);
+        await undoBill(orgId, bill.id, '2026-01-20').expect(204);
+        await repos.accounts.delete({ id: fee.id });
+        await repos.accounts.delete({ id: loan.id });
       });
 
       it('paginates 50 per page and answers 400 for an invalid page', async () => {
@@ -723,7 +775,7 @@ describe('bill payments (e2e)', () => {
       ['a global admin who is not a member', ADMIN, true, ALICE_ORG, 'aliceOrg'],
     ];
 
-    it.each(CASES)('answers the uniform 404 on all seven routes for %s', async (_label, user, admin, orgId, key) => {
+    it.each(CASES)('answers the uniform 404 on all eight routes for %s', async (_label, user, admin, orgId, key) => {
       const ids = owned[key] ?? { debt: 999999, bill: 999999 };
       const responses = [
         await send(app, 'post', occurrencePath(orgId, ids.debt, '2026-01-10'), user, { status: 'skipped' }, admin),
@@ -733,6 +785,7 @@ describe('bill payments (e2e)', () => {
         await send(app, 'get', `${base(orgId)}/accounts/${ids.debt}/bill-payments.json`, user, undefined, admin),
         await send(app, 'post', perBillPath(orgId, ids.bill, '2026-01-20'), user, { status: 'skipped' }, admin),
         await send(app, 'delete', perBillPath(orgId, ids.bill, '2026-01-20'), user, undefined, admin),
+        await send(app, 'get', `${base(orgId)}/provider-bills/${ids.bill}/bill-payments.json`, user, undefined, admin),
       ];
 
       for (const response of responses) {
