@@ -1,6 +1,7 @@
 import type { EntityManager } from 'typeorm';
 import { IsNull } from 'typeorm';
-import { ownerWhere, type OwnerContext } from '../../core/owner-context.js';
+import type { OwnerContext } from '../../core/owner-context.js';
+import { accountOwnerWhere } from '../account-fields.js';
 import { convertAmountInput } from '../amount-input.js';
 import { accountNotFoundInBody, currencyMismatch } from '../body-reference-errors.js';
 import { Account } from '../entities/account.entity.js';
@@ -29,7 +30,7 @@ function ownerOf(account: Account): OwnerContext {
  */
 async function assertPayingAccountCurrency(provider: Account, payingAccountId: number, manager: EntityManager): Promise<void> {
   const paying = await manager.getRepository(Account).findOneBy({
-    ...ownerWhere(ownerOf(provider)),
+    ...accountOwnerWhere(ownerOf(provider)),
     id: payingAccountId,
     type: PAYING_ACCOUNT_TYPE,
     archivedAt: IsNull(),
