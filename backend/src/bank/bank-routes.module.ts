@@ -14,6 +14,7 @@ import { InvestmentDetails } from './entities/investment-details.entity.js';
 import { ProviderBill } from './entities/provider-bill.entity.js';
 import { ProviderExpenseDetails } from './entities/provider-expense-details.entity.js';
 import { Transaction } from './entities/transaction.entity.js';
+import { ProviderBillsController } from './provider-bills.controller.js';
 import { SettingsController } from './settings.controller.js';
 import { TransactionsController } from './transactions.controller.js';
 import { LazyModuleLoaderService } from '../core/lazy-module-loader.service.js';
@@ -50,6 +51,7 @@ import { LazyModuleLoaderService } from '../core/lazy-module-loader.service.js';
     AccountantController,
     BillsController,
     BillPaymentsController,
+    ProviderBillsController,
     CalendarController,
   ],
   providers: [LazyModuleLoaderService, BankModuleLoader],
