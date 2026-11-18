@@ -1,8 +1,8 @@
 import type { AccountRef } from './account-refs.js';
 import type { WithPayingAccount } from './account-types/schedule-fields.js';
 import type { Account } from './entities/account.entity.js';
-import type { ProviderBill } from './entities/provider-bill.entity.js';
 import type { DebtDetails } from './entities/debt-details.entity.js';
+import type { ProviderBill } from './entities/provider-bill.entity.js';
 import type { ProviderExpenseDetails } from './entities/provider-expense-details.entity.js';
 import type { BillSchedule } from './occurrence-generator.js';
 import { providerBillSchedule } from './provider-bill.schedule.js';

@@ -102,6 +102,7 @@ describe('bill payments (e2e)', () => {
           kind: 'debt',
           source_account: { id: loan.id, name: loan.name, type: 'debt' },
           bill: null,
+          source_bill: null,
           nominal_date: '2026-01-10',
           effective_date: '2026-01-12',
           expected_amount: '500.00',

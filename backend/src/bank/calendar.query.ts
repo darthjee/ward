@@ -4,7 +4,7 @@ import { In, IsNull, type FindOperator, type FindOptionsWhere, type Repository }
 import { accountOwnerWhere } from './account-fields.js';
 import { accountRefsById, type AccountRef } from './account-refs.js';
 import { AccountTypeRegistry } from './account-types/account-type.registry.js';
-import { BILL_SOURCE_TYPES, billSourceOf, PROVIDER_TYPE, type BillSource } from './bill-schedule.js';
+import { BILL_SOURCE_TYPES, billSourceOf, billSourceOfProviderBill, DEBT_TYPE, PROVIDER_TYPE, type BillSource } from './bill-schedule.js';
 import type { OwnerContext } from '../core/owner-context.js';
 import { Account } from './entities/account.entity.js';
 import { BillPayment } from './entities/bill-payment.entity.js';
@@ -58,12 +58,15 @@ export class CalendarQuery {
     const accounts = await this.accountRepository.find({
       where: { ...accountOwnerWhere(owner), type: In(BILL_SOURCE_TYPES), archivedAt: IsNull() },
     });
-    const details = await this.registry.loadDetails(accounts, this.accountRepository.manager);
-    const sources = accounts.map((account) => billSourceOf(account, details.get(account.id)));
+    const debts = accounts.filter(({ type }) => type === DEBT_TYPE);
+    const details = await this.registry.loadDetails(debts, this.accountRepository.manager);
+    const debtSources = debts.map((account) => billSourceOf(account, details.get(account.id)));
+    const providers = new Map(accounts.filter(({ type }) => type === PROVIDER_TYPE).map((account) => [account.id, account]));
 
     return {
-      scheduled: sources.filter(({ schedule }) => schedule.dueDay !== null && schedule.showInCalendar),
-      providers: new Map(accounts.filter(({ type }) => type === PROVIDER_TYPE).map((account) => [account.id, account])),
+      scheduled: [...debtSources, ...await this.#providerSources(providers)]
+        .filter(({ schedule }) => schedule.dueDay !== null && schedule.showInCalendar),
+      providers,
     };
   }
 
@@ -81,16 +84,21 @@ export class CalendarQuery {
   }
 
   /**
-   * @param {number[]} sourceIds - Scheduled accounts whose derived payments to read.
+   * @param {number[]} sourceIds - Scheduled debt accounts whose derived payments to read.
+   * @param {number[]} recurringIds - Recurring provider bills whose derived payments to read.
    * @param {number[]} billIds - One-off bills whose payment to read.
    * @param {FindOperator<string>} dueDate - The derived payments' nominal `due_date` filter.
    * @returns {Promise<BillPayment[]>} The payment rows.
    */
-  async payments(sourceIds: number[], billIds: number[], dueDate: FindOperator<string>): Promise<BillPayment[]> {
+  async payments(sourceIds: number[], recurringIds: number[], billIds: number[], dueDate: FindOperator<string>): Promise<BillPayment[]> {
     const where: Array<FindOptionsWhere<BillPayment>> = [];
 
     if (sourceIds.length > 0) {
-      where.push({ sourceAccountId: In(sourceIds), billId: IsNull(), dueDate });
+      where.push({ sourceAccountId: In(sourceIds), billId: IsNull(), providerBillId: IsNull(), dueDate });
+    }
+
+    if (recurringIds.length > 0) {
+      where.push({ providerBillId: In(recurringIds), billId: IsNull(), dueDate });
     }
 
     if (billIds.length > 0) {
@@ -106,5 +114,20 @@ export class CalendarQuery {
    */
   async refs(ids: Array<number | null>): Promise<Map<number, AccountRef>> {
     return accountRefsById(ids, this.accountRepository.manager);
+  }
+
+  async #providerSources(providers: Map<number, Account>): Promise<BillSource[]> {
+    if (providers.size === 0) {
+      return [];
+    }
+
+    const bills = await this.billRepository.find({ where: { providerAccountId: In([...providers.keys()]), kind: 'recurring' } });
+    const refs = await accountRefsById(bills.map(({ payingAccountId }) => payingAccountId), this.accountRepository.manager);
+
+    return bills.map((bill) => billSourceOfProviderBill(
+      bill,
+      providers.get(bill.providerAccountId) as Account,
+      bill.payingAccountId === null ? null : refs.get(bill.payingAccountId) ?? null,
+    ));
   }
 }

@@ -47,6 +47,10 @@ describe('calendar (e2e)', () => {
   const overdue = (orgId: number | null, user = ALICE) => send(app, 'get', `${base(orgId)}/calendar/overdue.json`, user);
   const addBill = (fields: Partial<ProviderBill>) =>
     repos.bills.save(Object.assign(new ProviderBill(), { payingAccountId: null, kind: 'one_off', expectedAmount: 5000n, description: 'Tax', notes: null, ...fields }));
+  const recurringOf = async (providerId: number) =>
+    (await repos.bills.find({ where: { providerAccountId: providerId, kind: 'recurring' } }))[0] as ProviderBill;
+  const addProviderPayment = async (providerId: number, fields: Partial<BillPayment>) =>
+    addPayment({ sourceAccountId: providerId, providerBillId: (await recurringOf(providerId)).id, ...fields });
   const addPayment = (fields: Partial<BillPayment>) =>
     repos.billPayments.save(Object.assign(new BillPayment(), {
       billId: null,
@@ -90,6 +94,7 @@ describe('calendar (e2e)', () => {
             kind: 'provider',
             source_account: { id: fee.id, name: fee.name, type: 'provider_expense' },
             bill: null,
+            source_bill: { id: (await recurringOf(fee.id)).id, description: expect.any(String) },
             nominal_date: '2026-01-05',
             effective_date: '2026-01-05',
             expected_amount: '200.00',
@@ -102,6 +107,7 @@ describe('calendar (e2e)', () => {
             kind: 'debt',
             source_account: { id: loan.id, name: loan.name, type: 'debt' },
             bill: null,
+            source_bill: null,
             nominal_date: '2026-01-10',
             effective_date: '2026-01-12',
             expected_amount: '500.00',
@@ -152,7 +158,7 @@ describe('calendar (e2e)', () => {
         const loan = await debt(orgId);
         const fee = await provider(orgId);
         await addPayment({ sourceAccountId: loan.id, dueDate: '2026-01-10', payingAccountId: paying.id });
-        await addPayment({ sourceAccountId: fee.id, dueDate: '2026-01-05', status: 'skipped', paidOn: null, amount: null });
+        await addProviderPayment(fee.id, { dueDate: '2026-01-05', status: 'skipped', paidOn: null, amount: null });
         await addPayment({ sourceAccountId: loan.id, dueDate: '2026-01-11' });
 
         const response = await calendar(orgId).expect(200);
@@ -174,7 +180,7 @@ describe('calendar (e2e)', () => {
         await provider(orgId, { expected_amount: null, due_day: 20 });
         await provider(orgId, { expected_amount: '10.00', due_day: 15 }, { currency: 'USD' });
         await addPayment({ sourceAccountId: loan.id, dueDate: '2026-01-10', amount: 49000n });
-        await addPayment({ sourceAccountId: fee.id, dueDate: '2026-01-05', status: 'skipped', paidOn: null, amount: null });
+        await addProviderPayment(fee.id, { dueDate: '2026-01-05', status: 'skipped', paidOn: null, amount: null });
 
         const response = await calendar(orgId).expect(200);
 
@@ -231,6 +237,23 @@ describe('calendar (e2e)', () => {
         expect(response.headers['x-cache-allow']).toBe('true');
         expect(response.headers['x-skip-cache']).toBeUndefined();
         expect(response.headers['cache-control']).toBe('private, no-store');
+      });
+    });
+
+    describe('provider with two recurring bills', () => {
+      it('lists each bill as its own series, matches payments per bill and lists overdue per bill', async () => {
+        const fee = await provider(orgId);
+        const second = await send(app, 'post', `${base(orgId)}/accounts/${fee.id}/provider-bills.json`, ALICE, {
+          kind: 'recurring', description: 'Second plan', due_day: 5, bills_from: '2026-01-01',
+        }).expect(201);
+        const first = await recurringOf(fee.id);
+        await addPayment({ sourceAccountId: fee.id, providerBillId: first.id, dueDate: '2026-01-05' });
+
+        const january = (await calendar(orgId).expect(200)).body.occurrences as Body[];
+        const late = (await overdue(orgId).expect(200)).body.occurrences as Body[];
+
+        expect(january.map((row) => [(row.source_bill as Body).id, row.status])).toEqual([[first.id, 'paid'], [second.body.id, 'overdue']]);
+        expect(late.filter((row) => row.nominal_date === '2026-01-05').map((row) => (row.source_bill as Body).id)).toEqual([second.body.id]);
       });
     });
 
