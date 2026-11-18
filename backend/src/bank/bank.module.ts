@@ -28,6 +28,7 @@ import { ProviderExpenseDetails } from './entities/provider-expense-details.enti
 import { Transaction } from './entities/transaction.entity.js';
 import { LedgerQuery } from './ledger.query.js';
 import { PayingAccountResolver } from './paying-account.resolver.js';
+import { ProviderBillResolver } from './provider-bill.resolver.js';
 import { TransactionService } from './transaction.service.js';
 
 // Re-exported so the resident `BankModuleLoader` reaches the service classes
@@ -75,6 +76,7 @@ export { TransactionService } from './transaction.service.js';
     AccountTypeRegistry,
     AccountBalancesQuery,
     PayingAccountResolver,
+    ProviderBillResolver,
     AccountScheduleValidator,
     AccountService,
     AccountantChargesQuery,
@@ -96,6 +98,7 @@ export { TransactionService } from './transaction.service.js';
     BillPaymentService,
     BillService,
     CalendarService,
+    ProviderBillResolver,
     TransactionService,
   ],
 })
