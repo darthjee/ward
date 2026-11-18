@@ -174,7 +174,7 @@ export class AccountService {
     const stored = (await this.registry.loadDetails([account], this.accountRepository.manager)).get(account.id);
     const nested = nestedObject(dto, handler.type);
     const { currency } = account;
-    const prepared = handler.validateUpdate(nested, stored, { currency, previousCurrency });
+    const prepared = handler.validateUpdate(nested, stored, { currency, previousCurrency, previousName: account.name });
     await this.schedule.validate(owner, { nested, prepared, currency, currencyChanged: currency !== previousCurrency });
 
     copyEditableFields(account, dto);
