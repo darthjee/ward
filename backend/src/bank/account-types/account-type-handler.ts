@@ -17,6 +17,8 @@ export interface AccountTypeContext {
   currency: string;
   /** The stored currency before the request; stored amounts are rescaled when it differs. */
   previousCurrency?: string;
+  /** The stored name before the request (PATCH only). */
+  previousName?: string;
 }
 
 /**

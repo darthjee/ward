@@ -3,10 +3,11 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { In, IsNull, type EntityManager, type Repository } from 'typeorm';
 import { accountOwnerWhere } from './account-fields.js';
 import { accountRefsById } from './account-refs.js';
-import { convertAmountInput, parseAmountInput } from './amount-input.js';
+import { parseAmountInput } from './amount-input.js';
 import { billPaid } from './bill-conflicts.js';
 import { serializeBill, type BillListResponse, type BillResponse } from './bill-response.js';
 import { PROVIDER_TYPE } from './bill-schedule.js';
+import { applyPayingAccount, assertMoveTarget, ONE_OFF } from './bill-shared.js';
 import { accountNotFoundInBody } from './body-reference-errors.js';
 import type { OwnerContext } from '../core/owner-context.js';
 import { ownerNotFound } from '../core/parse-id.js';
@@ -89,7 +90,7 @@ export class BillService {
     }
 
     const [bills, total] = await this.billRepository.findAndCount({
-      where: { providerAccountId: In(ids), kind: 'one_off' },
+      where: { providerAccountId: In(ids), kind: ONE_OFF },
       order: { dueDate: 'DESC', id: 'DESC' },
       skip: (page - 1) * LEDGER_PER_PAGE,
       take: LEDGER_PER_PAGE,
@@ -121,7 +122,7 @@ export class BillService {
   async findOwned(owner: OwnerContext, id: number, manager?: EntityManager): Promise<OwnedBill> {
     const bills = manager ? manager.getRepository(ProviderBill) : this.billRepository;
     const accounts = manager ? manager.getRepository(Account) : this.accountRepository;
-    const bill = await bills.findOneBy({ id, kind: 'one_off' });
+    const bill = await bills.findOneBy({ id, kind: ONE_OFF });
     const provider = bill ? await accounts.findOneBy({ ...this.#providerWhere(owner), id: bill.providerAccountId }) : null;
 
     if (!bill || !provider) {
@@ -144,7 +145,7 @@ export class BillService {
     const bill = this.billRepository.create({
       providerAccountId: provider.id,
       payingAccountId: dto.paying_account_id,
-      kind: 'one_off',
+      kind: ONE_OFF,
       dueDate: dto.due_date,
       expectedAmount: parseBillAmount(dto.amount, provider.currency),
       description: dto.description,
@@ -155,10 +156,10 @@ export class BillService {
   }
 
   /**
-   * Edits a bill. Changing the provider re-checks the paying account's
-   * currency and rescales a stored amount into the new currency; a paid bill
-   * cannot change provider (409). Its payment row follows the new provider /
-   * due date.
+   * Edits a bill. Changing the provider needs an unarchived target (409), of
+   * the same currency (422, the amount is never rescaled), re-checks the
+   * paying account against it, and a paid bill cannot change provider (409).
+   * Its payment row follows the new provider / due date.
    * @param {OwnerContext} owner - The resolved owner.
    * @param {number} id - The bill id.
    * @param {UpdateBillDto} dto - The validated body.
@@ -170,7 +171,7 @@ export class BillService {
   async update(owner: OwnerContext, id: number, dto: UpdateBillDto): Promise<BillResponse> {
     const { provider: stored } = await this.findOwned(owner, id);
     const moved = dto.provider_account_id !== undefined && dto.provider_account_id !== stored.id;
-    const provider = moved ? await this.#bodyProvider(owner, dto.provider_account_id as number) : stored;
+    const provider = moved ? await this.#moveTarget(owner, dto.provider_account_id as number, stored) : stored;
     const saved = await this.billRepository.manager.transaction(async (manager) => {
       const { bill, payment } = await this.#lockedBill(manager, id, stored.id);
 
@@ -178,10 +179,11 @@ export class BillService {
         throw billPaid();
       }
 
-      await this.#applyPaying(owner, bill, dto.paying_account_id, provider.currency, moved, manager);
-      bill.expectedAmount = dto.amount === undefined
-        ? convertAmountInput('amount', bill.expectedAmount as bigint, stored.currency, provider.currency)
-        : parseBillAmount(dto.amount, provider.currency);
+      await applyPayingAccount(this.payingAccounts, owner, bill, dto.paying_account_id, provider.currency, moved, manager);
+      if (dto.amount !== undefined) {
+        bill.expectedAmount = parseBillAmount(dto.amount, provider.currency);
+      }
+
       Object.assign(bill, { providerAccountId: provider.id }, definedFields(dto));
 
       const result = await manager.getRepository(ProviderBill).save(bill);
@@ -231,36 +233,32 @@ export class BillService {
     return provider;
   }
 
+  /** The move target: any owned provider (an unknown one answers the generic 422), then the shared move rules. */
+  async #moveTarget(owner: OwnerContext, id: number, stored: Account): Promise<Account> {
+    const target = await this.accountRepository.findOneBy({ ...accountOwnerWhere(owner), type: PROVIDER_TYPE, id });
+
+    if (!target) {
+      throw accountNotFoundInBody();
+    }
+
+    assertMoveTarget(stored, target);
+
+    return target;
+  }
+
   /**
    * Re-reads the bill inside the write's transaction, locked `FOR UPDATE` (the
    * lock `BillPaymentWriter` takes to pay it, so a concurrent pay serializes
    * with the edit / delete), and its payment row under that lock.
    */
   async #lockedBill(manager: EntityManager, id: number, providerAccountId: number): Promise<{ bill: ProviderBill; payment: BillPayment | null }> {
-    const bill = await manager.getRepository(ProviderBill).findOne({ where: { id, providerAccountId, kind: 'one_off' }, lock: { mode: 'pessimistic_write' } });
+    const bill = await manager.getRepository(ProviderBill).findOne({ where: { id, providerAccountId, kind: ONE_OFF }, lock: { mode: 'pessimistic_write' } });
 
     if (!bill) {
       throw ownerNotFound();
     }
 
     return { bill, payment: await manager.getRepository(BillPayment).findOneBy({ billId: id }) };
-  }
-
-  async #applyPaying(
-    owner: OwnerContext,
-    bill: ProviderBill,
-    sent: number | null | undefined,
-    currency: string,
-    moved: boolean,
-    manager: EntityManager,
-  ): Promise<void> {
-    if (sent !== undefined) {
-      bill.payingAccountId = sent;
-    }
-
-    if (bill.payingAccountId !== null && (sent !== undefined || moved)) {
-      await this.payingAccounts.resolve(owner, bill.payingAccountId, currency, manager);
-    }
   }
 
   async #present(bills: ProviderBill[], providers: Map<number, Account>): Promise<BillResponse[]> {

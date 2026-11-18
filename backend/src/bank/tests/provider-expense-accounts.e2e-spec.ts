@@ -176,6 +176,107 @@ describe('provider-expense accounts (e2e)', () => {
         expect(recurringOf(created.id)).toEqual([expect.objectContaining({ description: renamed })]);
         expect(response.body.provider_expense).toEqual(FULL_PROVIDER_EXPENSE_RESPONSE);
       });
+
+      const snapshot = (rows: object[]): string => JSON.stringify(rows, (_key, value) => (typeof value === 'bigint' ? value.toString() : value));
+      const billsPath = (id: number) => `${prefix}/accounts/${id}/provider-bills.json`;
+      const addRecurring = (id: number, description: string) =>
+        send(app, 'post', billsPath(id), ALICE, { kind: 'recurring', description, due_day: 15 }).expect(201);
+
+      it('does not write through on a PATCH without schedule field or rename, leaving /provider-bills edits alone', async () => {
+        const created = await createProvider(orgId, { provider_expense: FULL_PROVIDER_EXPENSE });
+        const [bill] = recurringOf(created.id);
+        await send(app, 'patch', `${prefix}/provider-bills/${bill.id}.json`, ALICE, { description: 'Custom', due_day: 20 }).expect(200);
+
+        await patch(orgId, created.id, { notes: 'n', provider_expense: { for_accountant: true, provider_tax_id: '1' } }).expect(200);
+
+        expect(recurringOf(created.id)).toEqual([expect.objectContaining({ id: bill.id, description: 'Custom', dueDay: 20 })]);
+      });
+
+      it('lets a schedule-only PATCH keep a description edited through /provider-bills, and a rename overwrite it', async () => {
+        const created = await createProvider(orgId, { provider_expense: FULL_PROVIDER_EXPENSE });
+        const [bill] = recurringOf(created.id);
+        await send(app, 'patch', `${prefix}/provider-bills/${bill.id}.json`, ALICE, { description: 'Custom' }).expect(200);
+
+        await patch(orgId, created.id, { provider_expense: { due_day: 11 } }).expect(200);
+        expect(recurringOf(created.id)).toEqual([expect.objectContaining({ description: 'Custom', dueDay: 11 })]);
+
+        const renamed = uniqueName('Renamed');
+        await patch(orgId, created.id, { name: renamed }).expect(200);
+        expect(recurringOf(created.id)).toEqual([expect.objectContaining({ description: renamed, dueDay: 11 })]);
+      });
+
+      it('re-creates a deleted only bill when due_day is set, but not on a name-only PATCH', async () => {
+        const created = await createProvider(orgId, { provider_expense: FULL_PROVIDER_EXPENSE });
+        const [bill] = recurringOf(created.id);
+        await send(app, 'delete', `${prefix}/provider-bills/${bill.id}.json`, ALICE).expect(204);
+
+        await patch(orgId, created.id, { name: uniqueName('Renamed') }).expect(200);
+        expect(recurringOf(created.id)).toEqual([]);
+
+        await patch(orgId, created.id, { provider_expense: { due_day: 12 } }).expect(200);
+        expect(recurringOf(created.id)).toEqual([expect.objectContaining({ dueDay: 12 })]);
+      });
+
+      it('answers 409 PROVIDER_HAS_MULTIPLE_BILLS for a schedule field with two recurring bills, writing nothing', async () => {
+        const created = await createProvider(orgId, { provider_expense: FULL_PROVIDER_EXPENSE });
+        await addRecurring(created.id, 'Second');
+        const before = snapshot(recurringOf(created.id));
+
+        for (const field of [
+          { expected_amount: '1.00' }, { charge_frequency: 'monthly', due_month: null }, { due_day: 3 }, { due_month: 4 },
+          { bills_from: '2026-02-01' }, { show_in_calendar: false }, { paying_account_id: null },
+        ]) {
+          const response = await patch(orgId, created.id, { provider_expense: field }).expect(409);
+          expect(response.body.error.code).toBe('PROVIDER_HAS_MULTIPLE_BILLS');
+        }
+        expect(snapshot(recurringOf(created.id))).toBe(before);
+        expect(detailsOf(created.id)).toMatchObject({ dueDay: 10 });
+      });
+
+      it('lets non-schedule fields through with several recurring bills, touching none of the bills', async () => {
+        const created = await createProvider(orgId, { provider_expense: FULL_PROVIDER_EXPENSE });
+        await addRecurring(created.id, 'Second');
+        const before = snapshot(recurringOf(created.id));
+
+        await patch(orgId, created.id, { name: uniqueName('Renamed'), notes: 'n' }).expect(200);
+        await patch(orgId, created.id, { provider_expense: { for_accountant: true, provider_tax_id: '9' } }).expect(200);
+
+        expect(snapshot(recurringOf(created.id))).toBe(before);
+      });
+
+      const addOneOff = (id: number, amount: string) =>
+        send(app, 'post', billsPath(id), ALICE, { kind: 'one_off', description: 'Fine', due_date: '2026-05-05', expected_amount: amount }).expect(201);
+      const amountsOf = (id: number) => repos.bills.rows.filter((row) => row.providerAccountId === id).map((row) => row.expectedAmount);
+
+      it('rescales every bill (both kinds) on a currency change', async () => {
+        const created = await createProvider(orgId, { provider_expense: { ...FULL_PROVIDER_EXPENSE, expected_amount: '200.00' } });
+        await addOneOff(created.id, '50.00');
+
+        await patch(orgId, created.id, { currency: 'JPY' }).expect(200);
+
+        expect(amountsOf(created.id).sort()).toEqual([200n, 50n].sort());
+        expect(detailsOf(created.id)?.expectedAmount).toBe(200n);
+      });
+
+      it('rejects an unrepresentable bill amount with 400 (the transaction rolls the rest back)', async () => {
+        const created = await createProvider(orgId, { provider_expense: { ...FULL_PROVIDER_EXPENSE, expected_amount: '200.00' } });
+        await addOneOff(created.id, '12.50');
+
+        await patch(orgId, created.id, { currency: 'JPY' }).expect(400);
+
+        expect(amountsOf(created.id)).toContain(1250n);
+      });
+
+      it('answers 422 when a bill\'s paying account does not fit the new currency', async () => {
+        const created = await createProvider(orgId, { provider_expense: FULL_PROVIDER_EXPENSE });
+        const paying = await createAccount(app, ALICE, orgId, { name: uniqueName('Checking') });
+        const [bill] = recurringOf(created.id);
+        await send(app, 'patch', `${prefix}/provider-bills/${bill.id}.json`, ALICE, { paying_account_id: paying.id, expected_amount: '300.00' }).expect(200);
+
+        const response = await patch(orgId, created.id, { currency: 'USD' }).expect(422);
+
+        expect(response.body.error.code).toBe('CURRENCY_MISMATCH');
+      });
     });
 
     describe('create', () => {

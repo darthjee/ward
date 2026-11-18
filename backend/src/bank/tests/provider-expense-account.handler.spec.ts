@@ -3,6 +3,7 @@ import { buildAccount } from './account.test-support.js';
 import { ProviderExpenseAccountHandler } from '../account-types/provider-expense-account.handler.js';
 import { defaultProviderExpenseState, type ProviderExpenseState } from '../account-types/provider-expense-details.js';
 import type { ProviderExpenseDetailsDto } from '../dto/provider-expense-details.dto.js';
+import { Account } from '../entities/account.entity.js';
 import { ProviderExpenseDetails } from '../entities/provider-expense-details.entity.js';
 import { todayUtc } from '../ledger-date.js';
 
@@ -27,7 +28,7 @@ function stored(overrides: Partial<ProviderExpenseState> = {}): ProviderExpenseD
 }
 
 // The recurring-bill repository `saveDetails` syncs through: no stored bill.
-const billsRepo = () => ({ findOne: jest.fn(async () => null), create: jest.fn((fields: object) => fields), save: jest.fn(async (row: unknown) => row) });
+const billsRepo = () => ({ find: jest.fn(async () => []), findOne: jest.fn(async () => null), create: jest.fn((fields: object) => fields), save: jest.fn(async (row: unknown) => row) });
 const monthly = (): ProviderExpenseDetails => stored({ chargeFrequency: 'monthly', dueMonth: null });
 const pe = (fields: Partial<ProviderExpenseDetailsDto>): ProviderExpenseDetailsDto => fields as ProviderExpenseDetailsDto;
 
@@ -268,21 +269,32 @@ describe('ProviderExpenseAccountHandler', () => {
   });
 
   describe('saveDetails and the recurring provider bill', () => {
-    const run = async (state: object, stored: object | null = null) => {
-      const bills = { ...billsRepo(), findOne: jest.fn(async () => stored) };
-      const manager = { getRepository: (entity: unknown) => (entity === ProviderExpenseDetails ? { save: jest.fn() } : bills) };
-      await handler.saveDetails(buildAccount({ id: 42, name: 'Vivo' }), { ...defaultProviderExpenseState(), ...state }, manager as never);
-      return bills;
+    const bill = (fields: object = {}) => ({ id: 3, providerAccountId: 42, kind: 'recurring', description: 'Old', dueDay: 10, dueMonth: 3, showInCalendar: true, ...fields });
+    // Prepares like the validate step does (so the write-through knows what was sent), then overrides the state.
+    const prepare = (nested: object | undefined, state: object = {}, context: object = {}) => {
+      const prepared = handler.validateUpdate(nested, stored(), { currency: 'BRL', previousCurrency: 'BRL', ...context });
+
+      return Object.assign(prepared as object, state);
+    };
+    const run = async (prepared: object, bills: object[] = [], account = buildAccount({ id: 42, name: 'Vivo' })) => {
+      const billRepo = { ...billsRepo(), find: jest.fn(async () => bills) };
+      const accountRepo = { findOne: jest.fn(async () => account), findOneBy: jest.fn(async () => null) };
+      const details = { save: jest.fn() };
+      const manager = { getRepository: (entity: unknown) => (entity === ProviderExpenseDetails ? details : entity === Account ? accountRepo : billRepo) };
+      await handler.saveDetails(account, prepared, manager as never);
+
+      return { bills: billRepo, accounts: accountRepo, details };
     };
 
-    it('locks and looks up the provider\'s recurring bill', async () => {
-      const bills = await run({ dueDay: 5 });
+    it('locks the provider and loads its recurring bills when a schedule field is sent', async () => {
+      const { bills, accounts } = await run(prepare(pe({ due_day: 5 }), { dueDay: 5 }));
 
-      expect(bills.findOne).toHaveBeenCalledWith({ where: { providerAccountId: 42, kind: 'recurring' }, lock: { mode: 'pessimistic_write' } });
+      expect(accounts.findOne).toHaveBeenCalledWith({ where: { id: 42 }, lock: { mode: 'pessimistic_write' } });
+      expect(bills.find).toHaveBeenCalledWith({ where: { providerAccountId: 42, kind: 'recurring' }, lock: { mode: 'pessimistic_write' } });
     });
 
-    it('inserts a recurring bill with the copied fields when due_day is set and none exists', async () => {
-      const bills = await run({ dueDay: 5, expectedAmount: 100n, dueMonth: 3, chargeFrequency: 'yearly', billsFrom: '2026-01-01', payingAccountId: 9 });
+    it('inserts a recurring bill named after the account when due_day is set and none exists', async () => {
+      const { bills } = await run(prepare(pe({ due_day: 5 }), { dueDay: 5, expectedAmount: 100n, dueMonth: 3, chargeFrequency: 'yearly', billsFrom: '2026-01-01', payingAccountId: 9 }));
 
       expect(bills.save).toHaveBeenCalledWith(expect.objectContaining({
         providerAccountId: 42, kind: 'recurring', description: 'Vivo', expectedAmount: 100n, chargeFrequency: 'yearly',
@@ -290,22 +302,67 @@ describe('ProviderExpenseAccountHandler', () => {
       }));
     });
 
-    it('updates the stored bill (same id) when due_day is set', async () => {
-      const bills = await run({ dueDay: 7 }, { id: 3, providerAccountId: 42, kind: 'recurring', description: 'Old', showInCalendar: false });
+    it('updates the only bill (same id) keeping its description', async () => {
+      const { bills } = await run(prepare(pe({ due_day: 7 }), { dueDay: 7 }), [bill({ showInCalendar: false })]);
 
-      expect(bills.save).toHaveBeenCalledWith(expect.objectContaining({ id: 3, description: 'Vivo', dueDay: 7, showInCalendar: true }));
+      expect(bills.save).toHaveBeenCalledWith(expect.objectContaining({ id: 3, description: 'Old', dueDay: 7, showInCalendar: true }));
     });
 
-    it('hides the stored bill, keeping its schedule, when due_day is cleared', async () => {
-      const bills = await run({ dueDay: null }, { id: 3, providerAccountId: 42, kind: 'recurring', description: 'Old', dueDay: 10, dueMonth: 3, showInCalendar: true });
+    it('hides the only bill, keeping its schedule and description, when due_day is cleared', async () => {
+      const { bills } = await run(prepare(pe({ due_day: null }), { dueDay: null }), [bill()]);
 
-      expect(bills.save).toHaveBeenCalledWith({ id: 3, providerAccountId: 42, kind: 'recurring', description: 'Vivo', dueDay: 10, dueMonth: 3, showInCalendar: false });
+      expect(bills.save).toHaveBeenCalledWith({ ...bill(), showInCalendar: false });
     });
 
     it('does nothing when due_day is null and there is no bill', async () => {
-      const bills = await run({ dueDay: null });
+      const { bills } = await run(prepare(pe({ due_day: null }), { dueDay: null }));
 
       expect(bills.save).not.toHaveBeenCalled();
+    });
+
+    it('does not touch the bills (nor lock) when no schedule field is sent and nothing was renamed', async () => {
+      const { bills, accounts } = await run(prepare(pe({ for_accountant: false }), {}, { previousName: 'Vivo' }), [bill()]);
+
+      expect(bills.save).not.toHaveBeenCalled();
+      expect(bills.find).not.toHaveBeenCalled();
+      expect(accounts.findOne).not.toHaveBeenCalled();
+    });
+
+    it('renames the only recurring bill after the account when the name changed', async () => {
+      const { bills } = await run(prepare(undefined, {}, { previousName: 'Old name' }), [bill()]);
+
+      expect(bills.save).toHaveBeenCalledWith({ ...bill(), description: 'Vivo' });
+    });
+
+    it('does not rename with zero or several recurring bills', async () => {
+      const none = await run(prepare(undefined, {}, { previousName: 'Old name' }));
+      const several = await run(prepare(undefined, {}, { previousName: 'Old name' }), [bill(), bill({ id: 4 })]);
+
+      expect(none.bills.save).not.toHaveBeenCalled();
+      expect(several.bills.save).not.toHaveBeenCalled();
+    });
+
+    it('answers 409 PROVIDER_HAS_MULTIPLE_BILLS before writing when a schedule field meets several bills', async () => {
+      const prepared = prepare(pe({ due_day: 5 }), { dueDay: 5 });
+      const billRepo = { ...billsRepo(), find: jest.fn(async () => [bill(), bill({ id: 4 })]) };
+      const details = { save: jest.fn() };
+      const manager = { getRepository: (entity: unknown) => (entity === ProviderExpenseDetails ? details : entity === Account ? { findOne: jest.fn() } : billRepo) };
+
+      await expect(handler.saveDetails(buildAccount({ id: 42 }), prepared, manager as never)).rejects.toMatchObject({ response: { code: 'PROVIDER_HAS_MULTIPLE_BILLS' } });
+      expect(details.save).not.toHaveBeenCalled();
+    });
+
+    it('rescales every bill on a currency change and re-checks their paying accounts', async () => {
+      const prepared = prepare(undefined, {}, { previousCurrency: 'BRL', currency: 'USD' });
+      const rows = [bill({ expectedAmount: 1250n, payingAccountId: 5, kind: 'recurring' }), bill({ id: 4, kind: 'one_off', expectedAmount: 700n, payingAccountId: null })];
+      const billRepo = { ...billsRepo(), find: jest.fn(async () => rows) };
+      const paying = { findOneBy: jest.fn(async () => buildAccount({ id: 5, currency: 'USD' })), findOne: jest.fn() };
+      const manager = { getRepository: (entity: unknown) => (entity === ProviderExpenseDetails ? { save: jest.fn() } : entity === Account ? paying : billRepo) };
+
+      await handler.saveDetails(buildAccount({ id: 42, currency: 'USD' }), prepared, manager as never);
+
+      expect(paying.findOneBy).toHaveBeenCalledWith(expect.objectContaining({ id: 5, type: 'regular' }));
+      expect(billRepo.save).toHaveBeenCalledTimes(2);
     });
   });
 

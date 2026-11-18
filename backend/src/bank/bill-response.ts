@@ -9,6 +9,7 @@ import type { Pagination } from './pagination.js';
 /** The public view of a one-off bill (snake_case; never an owner field). */
 export interface BillResponse {
   id: number;
+  kind: 'one_off';
   provider_account: AccountRef;
   paying_account: AccountRef | null;
   due_date: string;
@@ -42,6 +43,7 @@ export function serializeBill(
 ): BillResponse {
   return {
     id: bill.id,
+    kind: 'one_off',
     provider_account: { id: provider.id, name: provider.name },
     paying_account: bill.payingAccountId === null ? null : refs.get(bill.payingAccountId) ?? null,
     due_date: bill.dueDate as string,

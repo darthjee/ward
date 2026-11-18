@@ -6,6 +6,7 @@ import { InvestmentDetails } from '../../entities/investment-details.entity.js';
 import { ProviderBill } from '../../entities/provider-bill.entity.js';
 import { ProviderExpenseDetails } from '../../entities/provider-expense-details.entity.js';
 import { Transaction } from '../../entities/transaction.entity.js';
+import { sameDescription } from '../../provider-bill-conflicts.js';
 
 // In-memory stand-ins for the `bank_accounts` / `bank_transactions` / `bank_debt_details` /
 // `bank_investment_details` / `bank_provider_expense_details` repositories, used by the bank e2e harness (no DB in `backend_tests`). They mimic the DB rules
@@ -211,7 +212,7 @@ function checkBillPaymentKeys(payment: BillPayment, others: BillPayment[]): void
 // `(provider_account_id, recurring_description)`: recurring bills of a provider have distinct descriptions.
 function checkProviderBillKeys(bill: ProviderBill, others: ProviderBill[]): void {
   if (bill.kind === 'recurring' && others.some((other) =>
-    other.kind === 'recurring' && other.providerAccountId === bill.providerAccountId && other.description === bill.description)) {
+    other.kind === 'recurring' && other.providerAccountId === bill.providerAccountId && sameDescription(other.description, bill.description))) {
     throw mysqlError('ER_DUP_ENTRY');
   }
 }

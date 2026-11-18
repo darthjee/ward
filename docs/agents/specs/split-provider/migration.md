@@ -42,11 +42,15 @@ The provider schedule columns are **kept**. `bills.json` keeps working (implicit
 
 ## Transition rules (#121 – #124)
 
-- **Write-through (from #121).** A provider-expense create / `PATCH` touching schedule fields
-  writes to the provider's single `recurring` bill, creating it when `due_day` is first set, so
-  the backfill never goes stale before reads move in #123.
+- **Write-through (from #121, gated in #122).** A provider-expense create / `PATCH` writes to
+  the provider's single `recurring` bill, creating it when `due_day` is first set, so the
+  backfill never goes stale before reads move in #123. From #122 it runs **only when the request
+  sends a schedule field** (`expected_amount`, `charge_frequency`, `due_day`, `due_month`,
+  `bills_from`, `show_in_calendar`, `paying_account_id`) **and the provider has at most one
+  recurring bill**. A name-only `PATCH` never re-creates a deleted recurring bill.
 - **Cleared schedule.** Clearing `due_day` hides the bill (`show_in_calendar = false`); it is
-  never deleted. The write-through also syncs the bill `description` to the account name.
+  never deleted. The write-through syncs the bill `description` to the account name only when the
+  `PATCH` actually changes `name`, and only while the provider has exactly one recurring bill.
 - **New provider payments (from #121)** get `provider_bill_id` set to the provider's single
   recurring bill; lookup and pre-checks still go by `(source_account_id, due_date, bill_id IS NULL)`.
 - **Only while ≤ 1 recurring bill.** The `409 PROVIDER_HAS_MULTIPLE_BILLS` lands in #122, not #121. Once a second recurring bill exists (possible from #122), a

@@ -172,3 +172,9 @@ other. A provider exposes `expectedAmount`, `chargeFrequency`, `dueDay`, `dueMon
 - The **mark timestamp** is truncated to whole seconds, as stored by the `DATETIME` column, so
   the reply matches what is read back later.
 - The **CSV** uses CRLF line endings (the spec didn't say).
+
+## Transition rule (#122)
+
+With two or more recurring bills, a provider-expense `PATCH` sending a schedule field answers
+`409 PROVIDER_HAS_MULTIPLE_BILLS`; the schedule write-through only runs when a schedule field is
+sent and at most one recurring bill exists. A currency change rescales every bill.
