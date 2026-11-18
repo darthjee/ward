@@ -92,14 +92,18 @@ describe('bills calendar reads (MySQL)', () => {
     await ds.getRepository(ProviderExpenseDetails).save({ accountId: provider.id, dueDay: 5, billsFrom: '2026-01-01' });
     const inRange = await bills.save(bills.create({ providerAccountId: provider.id, payingAccountId: null, kind: 'one_off', dueDate: '2026-01-20', expectedAmount: 100n, description: 'In', notes: null }));
     await bills.save(bills.create({ providerAccountId: provider.id, payingAccountId: null, kind: 'one_off', dueDate: '2026-02-20', expectedAmount: 100n, description: 'Out', notes: null }));
-    const derived = await payments.save(payments.create({ sourceAccountId: provider.id, billId: null, dueDate: '2026-01-05', status: 'skipped', paidOn: null, amount: null, payingAccountId: null, paymentTransactionId: null, withdrawalTransactionId: null, chargeTransactionId: null }));
+    const recurring = await bills.save(bills.create({
+      providerAccountId: provider.id, payingAccountId: null, kind: 'recurring', dueDate: null, expectedAmount: 100n, description: 'Plan', notes: null,
+      chargeFrequency: 'monthly', dueDay: 5, billsFrom: '2026-01-01', showInCalendar: true,
+    }));
+    const derived = await payments.save(payments.create({ sourceAccountId: provider.id, billId: null, providerBillId: recurring.id, dueDate: '2026-01-05', status: 'skipped', paidOn: null, amount: null, payingAccountId: null, paymentTransactionId: null, withdrawalTransactionId: null, chargeTransactionId: null }));
     const oneOff = await payments.save(payments.create({ sourceAccountId: provider.id, billId: inRange.id, dueDate: '2026-01-20', status: 'skipped', paidOn: null, amount: null, payingAccountId: null, paymentTransactionId: null, withdrawalTransactionId: null, chargeTransactionId: null }));
 
     expect((await query.bills([provider.id], Between('2026-01-01', '2026-01-31'))).map(({ id }) => id)).toEqual([inRange.id]);
     expect((await query.bills([provider.id], LessThan('2026-02-01'))).map(({ id }) => id)).toEqual([inRange.id]);
-    expect((await query.payments([provider.id], [inRange.id], Between('2026-01-01', '2026-01-31'))).map(({ id }) => id).sort())
+    expect((await query.payments([], [recurring.id], [inRange.id], Between('2026-01-01', '2026-01-31'))).map(({ id }) => id).sort())
       .toEqual([derived.id, oneOff.id].sort());
-    expect((await query.payments([provider.id], [], Between('2026-02-01', '2026-02-28')))).toEqual([]);
+    expect((await query.payments([], [recurring.id], [], Between('2026-02-01', '2026-02-28')))).toEqual([]);
 
     const calendar = await service.calendar(ALICE, { from: '2026-01-01', to: '2026-01-31' });
     expect(calendar.occurrences.map(({ kind, status, nominal_date: nominal }) => [kind, status, nominal])).toEqual([
