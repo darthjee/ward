@@ -273,3 +273,11 @@ On top of the [ownership contract](../bank.md#bank-ownership-contract):
   schedule ([#56](https://github.com/darthjee/ward/issues/56)).
 - The other details decided in #56 (the virtual generated column, undo codes, envelopes,
   totals, pagination, description truncation, the `paid_on` limit) are recorded above.
+
+## Provider bills API (#122)
+
+`GET/POST /accounts/:accountId/provider-bills.json` and `GET/PATCH/DELETE /provider-bills/:id.json`
+(both `/bank` and `/orgs/:orgId/bank`) manage recurring and one-off provider bills. Error codes:
+`PROVIDER_BILL_KIND_LOCKED`, `PROVIDER_BILL_PROVIDER_LOCKED`, `PROVIDER_BILL_NAME_TAKEN`,
+`PROVIDER_BILL_PAID`, `PROVIDER_BILL_LIMIT`. `bills.json` stays one-off only and now returns
+`kind: 'one_off'`. See `specs/split-provider/api/provider-bills.md`.

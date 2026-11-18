@@ -33,7 +33,9 @@ Response: `id`, `provider_account_id`, `kind`, `description`, `paying_account_id
 `expected_amount`, `notes`, the recurring group (`charge_frequency`, `due_day`, `due_month`,
 `bills_from`, `show_in_calendar`), `due_date`, `created_at`, `updated_at`. Never an owner or
 organization id. Request bodies follow the validation matrix; whitelisted fields only.
-`expected_amount` is in minor units of the provider's currency.
+`expected_amount` is a decimal string on the wire, stored in minor units of the provider's
+currency. A provider currency change (only before any transaction) rescales every bill's
+`expected_amount` and re-checks every bill's `paying_account_id`.
 
 ## Error codes
 
@@ -58,6 +60,10 @@ the added `kind`. **Decision (revises the epic's "renamed `expected_amount`")**:
 keeps `amount` in requests and responses (mapped to the `expected_amount` column), so the shipped
 frontend keeps working untouched; the `provider-bills` routes use `expected_amount` only.
 `bills.json` stays a compatibility projection until the frontend (#124) no longer uses it.
+**Intended correctness fix (#122):** `PATCH bills/:id.json` moving a one-off follows the shared
+move rules: a target with a different currency → `422 CURRENCY_MISMATCH` (no rescale), an
+archived target → `409 ACCOUNT_ARCHIVED`. `bills.json` keeps `BILL_PAID` and its
+`422 ACCOUNT_NOT_FOUND` for unknown or foreign targets.
 Two write paths (`bills.json`,
 `provider-bills.json`) converge on the same entity.
 

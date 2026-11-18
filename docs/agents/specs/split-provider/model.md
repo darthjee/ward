@@ -65,7 +65,7 @@ requires an explicit amount (unchanged from today's provider schedule).
 ## Description uniqueness
 
 `description` is unique **per provider among `recurring` bills only**, case-insensitive and
-accent-sensitive (the column collation does the folding), mirroring the account-name rule.
+accent-insensitive (`utf8mb4_0900_ai_ci` does the folding, so `"Água"` = `"agua"`), mirroring the account-name rule.
 Violation: `409 PROVIDER_BILL_NAME_TAKEN`. One-off descriptions may repeat, and a one-off may
 share a description with a recurring bill; existing duplicate one-offs migrate unchanged.
 

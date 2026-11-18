@@ -451,3 +451,9 @@ schedule pattern (`due_day`, `due_month`, frequency, `bills_from`; archived and
 | Method | Route | Success | Errors | Cache class |
 |---|---|---|---|---|
 | GET | `<base>/settings.json` | `200 { "default_currency": "BRL" }` from `BANK_DEFAULT_CURRENCY` (same value under both prefixes) | `404` non-member `:orgId` | `user-scoped` |
+
+## Provider bills (#122)
+
+`GET/POST /accounts/:accountId/provider-bills.json`, `GET/PATCH/DELETE /provider-bills/:id.json`
+on both bases. GETs are `user-scoped` (`X-Cache-Allow`); writes are `never` (`X-Skip-Cache`) and
+invalidate the owner. Details: `specs/split-provider/api/provider-bills.md`.
