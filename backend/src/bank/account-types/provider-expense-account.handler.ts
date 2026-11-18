@@ -20,7 +20,7 @@ import type { Account } from '../entities/account.entity.js';
 import { ProviderBill } from '../entities/provider-bill.entity.js';
 import { ProviderExpenseDetails } from '../entities/provider-expense-details.entity.js';
 import { todayUtc } from '../ledger-date.js';
-import { lockProvider } from '../provider-bill-checks.js';
+import { lockedRecurringBills, lockProvider } from '../provider-bill-checks.js';
 import { providerHasMultipleBills } from '../provider-bill-conflicts.js';
 
 /** The nested fields that make a request a schedule edit (the write-through only runs for these). */
@@ -172,7 +172,7 @@ export class ProviderExpenseAccountHandler implements AccountTypeHandler {
 
     await lockProvider(manager, account.id);
 
-    return manager.getRepository(ProviderBill).find({ where: { providerAccountId: account.id, kind: 'recurring' } });
+    return lockedRecurringBills(manager, account.id);
   }
 
   #remember(prepared: ProviderExpenseState, nested: unknown, context: AccountTypeContext): ProviderExpenseState {

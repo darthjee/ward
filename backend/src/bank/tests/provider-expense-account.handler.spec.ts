@@ -290,7 +290,7 @@ describe('ProviderExpenseAccountHandler', () => {
       const { bills, accounts } = await run(prepare(pe({ due_day: 5 }), { dueDay: 5 }));
 
       expect(accounts.findOne).toHaveBeenCalledWith({ where: { id: 42 }, lock: { mode: 'pessimistic_write' } });
-      expect(bills.find).toHaveBeenCalledWith({ where: { providerAccountId: 42, kind: 'recurring' } });
+      expect(bills.find).toHaveBeenCalledWith({ where: { providerAccountId: 42, kind: 'recurring' }, lock: { mode: 'pessimistic_write' } });
     });
 
     it('inserts a recurring bill named after the account when due_day is set and none exists', async () => {

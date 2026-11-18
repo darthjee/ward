@@ -20,6 +20,21 @@ export async function lockProvider(manager: EntityManager, providerAccountId: nu
 }
 
 /**
+ * Loads the provider's recurring bills with a locking read. Under REPEATABLE READ a plain read
+ * would use the snapshot opened by the transaction's first read and miss a concurrent commit
+ * that the provider lock just waited for; a locking read always sees the latest committed rows.
+ * @param {EntityManager} manager - The transactional manager.
+ * @param {number} providerAccountId - The provider account id.
+ * @returns {Promise<ProviderBill[]>} The provider's recurring bills.
+ */
+export function lockedRecurringBills(manager: EntityManager, providerAccountId: number): Promise<ProviderBill[]> {
+  return manager.getRepository(ProviderBill).find({
+    where: { providerAccountId, kind: 'recurring' },
+    lock: { mode: 'pessimistic_write' },
+  });
+}
+
+/**
  * Checks a recurring bill's description against the provider's other recurring
  * bills and, for a new bill, the 50-bill cap. Locks the provider row first.
  * @param {EntityManager} manager - The transactional manager.
@@ -36,8 +51,7 @@ export async function assertRecurringRoom(
   excludeId?: number,
 ): Promise<void> {
   await lockProvider(manager, providerAccountId);
-  const others = (await manager.getRepository(ProviderBill).find({ where: { providerAccountId, kind: 'recurring' } }))
-    .filter(({ id }) => id !== excludeId);
+  const others = (await lockedRecurringBills(manager, providerAccountId)).filter(({ id }) => id !== excludeId);
 
   if (excludeId === undefined && others.length >= PROVIDER_BILL_RECURRING_LIMIT) {
     throw providerBillLimit();
