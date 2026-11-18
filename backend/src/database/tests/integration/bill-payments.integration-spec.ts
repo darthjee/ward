@@ -7,6 +7,8 @@ import { BillPayment } from '../../../bank/entities/bill-payment.entity.js';
 import { ProviderBill } from '../../../bank/entities/provider-bill.entity.js';
 import { Transaction } from '../../../bank/entities/transaction.entity.js';
 import { PayingAccountResolver } from '../../../bank/paying-account.resolver.js';
+import { ProviderBillResolver } from '../../../bank/provider-bill.resolver.js';
+import { ProviderBillService } from '../../../bank/provider-bill.service.js';
 
 const PAID = { status: 'paid', paidOn: '2026-01-12', amount: 1000n, payingAccountId: 0, recordCharge: true } as const;
 const ALICE = { kind: 'user', userId: 1 } as const;
@@ -174,6 +176,81 @@ describe('bill payment writes (MySQL)', () => {
       expect(await outcome).toBe(409);
       expect(await bills.count()).toBe(1);
       expect(await payments.count()).toBe(1);
+    });
+
+    describe('recurring provider bills', () => {
+      async function insertRecurring(providerId: number, description: string): Promise<ProviderBill> {
+        return bills.save(bills.create({
+          providerAccountId: providerId,
+          payingAccountId: null,
+          kind: 'recurring',
+          dueDate: null,
+          expectedAmount: 1000n,
+          description,
+          notes: null,
+          chargeFrequency: 'monthly',
+          dueDay: 5,
+          billsFrom: '2026-01-01',
+          showInCalendar: true,
+        }));
+      }
+
+      const recurring = (bill: ProviderBill) =>
+        ({ sourceAccountId: bill.providerAccountId, billId: null, providerBillId: bill.id, nominal: '2026-01-05', label: bill.description, currency: 'BRL' });
+
+      it('waits on a recurring bill locked by a concurrent delete, then answers 404', async () => {
+        const provider = await insertAccount('provider_expense');
+        const paying = await insertAccount('regular');
+        const bill = await insertRecurring(provider.id, 'Plan');
+        const runner = ds.createQueryRunner();
+        await runner.startTransaction();
+        await runner.manager.getRepository(ProviderBill).findOne({ where: { id: bill.id }, lock: { mode: 'pessimistic_write' } });
+
+        const outcome = writer.record(ALICE, recurring(bill), { ...PAID, payingAccountId: paying.id })
+          .then(() => 'written', (error: { status?: number }) => error.status);
+        await settle();
+        await runner.manager.getRepository(ProviderBill).delete({ id: bill.id });
+        await runner.commitTransaction();
+        await runner.release();
+
+        expect(await outcome).toBe(404);
+        expect(await payments.count()).toBe(0);
+      });
+
+      it('never deadlocks a bill PATCH against a pay of the same bill', async () => {
+        const service = new ProviderBillService(bills, new ProviderBillResolver(bills, accounts), new PayingAccountResolver(accounts));
+        const paying = await insertAccount('regular');
+
+        for (let round = 0; round < 5; round += 1) {
+          const provider = await insertAccount('provider_expense');
+          const bill = await insertRecurring(provider.id, 'Plan');
+          const results = await Promise.allSettled([
+            writer.record(ALICE, recurring(bill), { ...PAID, payingAccountId: paying.id }),
+            service.update(ALICE, bill.id, { due_day: 6 } as never),
+          ]);
+
+          results.forEach((result) => {
+            if (result.status === 'rejected') {
+              expect((result.reason as { status?: number }).status).toBeGreaterThanOrEqual(400);
+            }
+          });
+          expect(results.filter(({ status }) => status === 'fulfilled').length).toBeGreaterThanOrEqual(1);
+        }
+      });
+
+      it('pays two bills of one provider concurrently, each under its own row', async () => {
+        const provider = await insertAccount('provider_expense');
+        const paying = await insertAccount('regular');
+        const first = await insertRecurring(provider.id, 'Plan A');
+        const second = await insertRecurring(provider.id, 'Plan B');
+
+        const results = await Promise.all([first, second].map((bill) =>
+          writer.record(ALICE, recurring(bill), { ...PAID, payingAccountId: paying.id })));
+
+        expect(results.map(({ providerBillId }) => providerBillId).sort()).toEqual([first.id, second.id].sort());
+        expect(await payments.count()).toBe(2);
+        expect(await transactions.count()).toBe(6);
+      });
     });
   });
 });

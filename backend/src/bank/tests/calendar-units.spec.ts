@@ -25,6 +25,7 @@ const payment = (fields: Partial<BillPayment> = {}): BillPayment => Object.assig
   id: 1,
   sourceAccountId: 3,
   billId: null,
+  providerBillId: null,
   dueDate: '2026-06-10',
   status: 'paid',
   paidOn: '2026-06-10',
@@ -111,6 +112,7 @@ describe('buildOccurrence', () => {
       kind: 'bill',
       source_account: { id: 4, name: 'Fee', type: 'provider_expense' },
       bill: { id: 7, description: 'Repair' },
+      source_bill: { id: 7, description: 'Repair' },
       nominal_date: '2026-06-20',
       effective_date: '2026-06-20',
       expected_amount: '10.00',
@@ -129,8 +131,20 @@ describe('buildOccurrence', () => {
 });
 
 describe('compareOccurrences', () => {
-  const entry = (effective: string, kind: string, sourceId: number, billId: number | null) =>
-    ({ response: { effective_date: effective, kind, source_account: { id: sourceId }, bill: billId === null ? null : { id: billId } } }) as unknown as OccurrenceView;
+  const entry = (effective: string, kind: string, sourceId: number, billId: number | null, sourceBillId: number | null = null) =>
+    ({ response: {
+      effective_date: effective,
+      kind,
+      source_account: { id: sourceId },
+      bill: billId === null ? null : { id: billId },
+      source_bill: sourceBillId === null ? null : { id: sourceBillId },
+    } }) as unknown as OccurrenceView;
+
+  it('breaks ties between two bills of one provider by source bill id', () => {
+    const rows = [entry('2026-01-12', 'provider', 4, null, 22), entry('2026-01-12', 'provider', 4, null, 21)];
+
+    expect(rows.sort(compareOccurrences).map(({ response }) => response.source_bill?.id)).toEqual([21, 22]);
+  });
 
   it('sorts by effective date, then kind, source account id and bill id', () => {
     const rows = [
@@ -175,7 +189,12 @@ describe('calendar totals', () => {
 describe('CalendarQuery', () => {
   const setup = () => {
     const accountFind = jest.fn(async () => [debtAccount, providerAccount, buildAccount({ id: 5, type: 'debt' })]);
-    const billFind = jest.fn(async () => []);
+    const billFind = jest.fn(async () => [
+      bill({ id: 21, providerAccountId: 4, kind: 'recurring', dueDate: null, chargeFrequency: 'monthly', dueDay: 5, billsFrom: '2026-01-01', showInCalendar: true }),
+      bill({ id: 22, providerAccountId: 4, kind: 'recurring', dueDate: null, chargeFrequency: 'monthly', dueDay: 6, billsFrom: '2026-01-01', showInCalendar: true }),
+      bill({ id: 23, providerAccountId: 4, kind: 'recurring', dueDate: null, chargeFrequency: 'monthly', dueDay: null, billsFrom: '2026-01-01', showInCalendar: true }),
+      bill({ id: 24, providerAccountId: 4, kind: 'recurring', dueDate: null, chargeFrequency: 'monthly', dueDay: 7, billsFrom: '2026-01-01', showInCalendar: false }),
+    ]);
     const paymentFind = jest.fn(async () => []);
     const manager = { getRepository: jest.fn(() => ({ find: jest.fn(async () => []) })) };
     const registry = {
@@ -194,13 +213,22 @@ describe('CalendarQuery', () => {
     return { query, accountFind, billFind, paymentFind };
   };
 
+  it('builds one provider source per active recurring bill, plus the debts', async () => {
+    const { query, billFind } = setup();
+
+    const { scheduled } = await query.sources(PERSONAL);
+
+    expect(billFind).toHaveBeenCalledTimes(1);
+    expect(scheduled.map(({ account, bill }) => [account.id, bill?.id ?? null])).toEqual([[3, null], [4, 21], [4, 22]]);
+  });
+
   it('keeps only scheduled, shown sources and lists the active providers', async () => {
     const { query, accountFind } = setup();
 
     const { scheduled, providers } = await query.sources(PERSONAL);
 
     expect(accountFind).toHaveBeenCalledWith({ where: expect.objectContaining({ userId: 7, archivedAt: expect.anything() }) });
-    expect(scheduled.map(({ account }) => account.id)).toEqual([3]);
+    expect(scheduled.map(({ account }) => account.id)).toEqual([3, 4, 4]);
     expect([...providers.keys()]).toEqual([4]);
   });
 
@@ -208,7 +236,8 @@ describe('CalendarQuery', () => {
     const { query, billFind, paymentFind } = setup();
 
     await expect(query.bills([], {} as never)).resolves.toEqual([]);
-    await expect(query.payments([], [], {} as never)).resolves.toEqual([]);
+    billFind.mockClear();
+    await expect(query.payments([], [], [], {} as never)).resolves.toEqual([]);
     expect(billFind).not.toHaveBeenCalled();
     expect(paymentFind).not.toHaveBeenCalled();
   });
@@ -216,19 +245,85 @@ describe('CalendarQuery', () => {
   it('reads derived and one-off payments in one query', async () => {
     const { query, paymentFind } = setup();
 
-    await query.payments([3], [7], 'dates' as never);
+    await query.payments([3], [11], [7], 'dates' as never);
 
     expect(paymentFind).toHaveBeenCalledTimes(1);
     expect(paymentFind).toHaveBeenCalledWith({
       where: [
-        expect.objectContaining({ dueDate: 'dates' }),
+        expect.objectContaining({ dueDate: 'dates', providerBillId: expect.anything() }),
+        expect.objectContaining({ providerBillId: expect.anything(), dueDate: 'dates' }),
         expect.objectContaining({ billId: expect.anything() }),
       ],
     });
   });
 });
 
+describe('source_bill', () => {
+  const recurring = bill({ id: 21, kind: 'recurring', dueDate: null, description: 'Plan', notes: 'secret' });
+  const providerSource = { ...billSourceOf(providerAccount, { chargeFrequency: 'monthly', dueDay: 5, billsFrom: '2026-01-01' }), bill: recurring };
+  const refs = new Map();
+
+  it('names the recurring bill, the one-off bill, and is null for debts', () => {
+    const nominal = { nominal: '2026-06-05', effective: '2026-06-05' };
+
+    expect(buildOccurrence(derivedInput(providerSource, nominal, undefined), refs, TODAY).response.source_bill).toEqual({ id: 21, description: 'Plan' });
+    expect(buildOccurrence(billInput(bill(), providerAccount, undefined, refs), refs, TODAY).response.source_bill).toEqual({ id: 7, description: 'Repair' });
+    expect(buildOccurrence(derivedInput(debtSource, nominal, undefined), refs, TODAY).response.source_bill).toBeNull();
+    expect(JSON.stringify(buildOccurrence(derivedInput(providerSource, nominal, undefined), refs, TODAY).response)).not.toContain('secret');
+  });
+});
+
 describe('CalendarService', () => {
+  const provSource = (id: number) => ({
+    ...billSourceOf(providerAccount, { chargeFrequency: 'monthly', dueDay: 5, billsFrom: '2026-01-01' }),
+    bill: bill({ id, kind: 'recurring', dueDate: null, description: `Bill ${id}` }),
+  });
+
+  it('keeps two bills of one provider distinct and matches payments per bill; ignores orphans', async () => {
+    const query = {
+      sources: jest.fn(async () => ({ scheduled: [provSource(21), provSource(22)], providers: new Map([[4, providerAccount]]) })),
+      bills: jest.fn(async () => []),
+      payments: jest.fn(async () => [
+        payment({ id: 1, sourceAccountId: 4, providerBillId: 21, dueDate: '2026-06-05' }),
+        payment({ id: 2, sourceAccountId: 4, providerBillId: null, dueDate: '2026-06-05' }),
+      ]),
+      refs: jest.fn(async () => new Map()),
+    };
+    const service = new CalendarService(query as never);
+
+    const { occurrences } = await service.calendar(PERSONAL, { from: '2026-06-01', to: '2026-06-30' });
+
+    expect(occurrences.map(({ source_bill: sourceBill, status }) => [sourceBill?.id, status === 'paid'])).toEqual([[21, true], [22, false]]);
+    expect(query.payments).toHaveBeenCalledWith([], [21, 22], [], expect.anything());
+  });
+
+  it('answers 400 over the 1000 occurrence cap', async () => {
+    const query = {
+      sources: jest.fn(async () => ({ scheduled: Array.from({ length: 100 }, (_, index) => provSource(index + 1)), providers: new Map([[4, providerAccount]]) })),
+      bills: jest.fn(async () => []),
+      payments: jest.fn(async () => []),
+      refs: jest.fn(async () => new Map()),
+    };
+    const service = new CalendarService(query as never);
+
+    await expect(service.calendar(PERSONAL, { from: '2026-01-01', to: '2026-12-31' })).rejects.toMatchObject({ status: 400 });
+    expect(query.payments).not.toHaveBeenCalled();
+  });
+
+  it('cuts overdue to the cap', async () => {
+    const query = {
+      sources: jest.fn(async () => ({ scheduled: Array.from({ length: 150 }, (_, index) => provSource(index + 1)), providers: new Map() })),
+      bills: jest.fn(async () => []),
+      payments: jest.fn(async () => []),
+      refs: jest.fn(async () => new Map()),
+    };
+    const service = new CalendarService(query as never);
+
+    const result = await service.overdue(PERSONAL);
+
+    expect(result.occurrences).toHaveLength(1000);
+  });
+
   it('builds the overdue list from past occurrences only', async () => {
     const query = {
       sources: jest.fn(async () => ({ scheduled: [debtSource], providers: new Map() })),

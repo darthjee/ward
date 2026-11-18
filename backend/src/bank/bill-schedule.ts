@@ -2,8 +2,10 @@ import type { AccountRef } from './account-refs.js';
 import type { WithPayingAccount } from './account-types/schedule-fields.js';
 import type { Account } from './entities/account.entity.js';
 import type { DebtDetails } from './entities/debt-details.entity.js';
+import type { ProviderBill } from './entities/provider-bill.entity.js';
 import type { ProviderExpenseDetails } from './entities/provider-expense-details.entity.js';
 import type { BillSchedule } from './occurrence-generator.js';
+import { providerBillSchedule } from './provider-bill.schedule.js';
 
 /** The account types that are recurring bill sources. */
 export const DEBT_TYPE = 'debt';
@@ -21,6 +23,8 @@ export interface BillSource {
   /** `instalmentAmount` / `expectedAmount`, minor units; `null` when unset. */
   expected: bigint | null;
   defaultPayingAccount: AccountRef | null;
+  /** The recurring provider bill this source stands for; `null` for debts and legacy details-row sources. */
+  bill: ProviderBill | null;
 }
 
 type SourceDetails = (Partial<DebtDetails> & Partial<ProviderExpenseDetails> & WithPayingAccount) | undefined;
@@ -60,5 +64,22 @@ export function billSourceOf(account: Account, details: unknown): BillSource {
     },
     expected,
     defaultPayingAccount: row?.payingAccount ?? null,
+    bill: null,
   };
+}
+
+/**
+ * @param {ProviderBill} bill - A recurring provider bill.
+ * @param {Account} provider - Its provider-expense account.
+ * @param {AccountRef | null} defaultPayingRef - The bill's paying account ref, if any.
+ * @returns {BillSource} The bill's source: its own schedule, expected amount and paying account.
+ */
+export function billSourceOfProviderBill(bill: ProviderBill, provider: Account, defaultPayingRef: AccountRef | null): BillSource {
+  const schedule = providerBillSchedule(bill, provider);
+
+  if (schedule === null) {
+    throw new Error('A one-off provider bill has no schedule');
+  }
+
+  return { account: provider, kind: 'provider', schedule, expected: bill.expectedAmount, defaultPayingAccount: defaultPayingRef, bill };
 }

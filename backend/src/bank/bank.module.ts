@@ -28,6 +28,7 @@ import { ProviderExpenseDetails } from './entities/provider-expense-details.enti
 import { Transaction } from './entities/transaction.entity.js';
 import { LedgerQuery } from './ledger.query.js';
 import { PayingAccountResolver } from './paying-account.resolver.js';
+import { ProviderBillPaymentService } from './provider-bill-payment.service.js';
 import { ProviderBillResolver } from './provider-bill.resolver.js';
 import { ProviderBillService } from './provider-bill.service.js';
 import { TransactionService } from './transaction.service.js';
@@ -40,6 +41,7 @@ export { BillHistoryService } from './bill-history.service.js';
 export { BillPaymentService } from './bill-payment.service.js';
 export { BillService } from './bill.service.js';
 export { CalendarService } from './calendar.service.js';
+export { ProviderBillPaymentService } from './provider-bill-payment.service.js';
 export { ProviderBillService } from './provider-bill.service.js';
 export { TransactionService } from './transaction.service.js';
 
@@ -91,6 +93,7 @@ export { TransactionService } from './transaction.service.js';
     CalendarQuery,
     CalendarService,
     LedgerQuery,
+    ProviderBillPaymentService,
     ProviderBillService,
     TransactionService,
   ],
@@ -101,6 +104,7 @@ export { TransactionService } from './transaction.service.js';
     BillPaymentService,
     BillService,
     CalendarService,
+    ProviderBillPaymentService,
     ProviderBillResolver,
     ProviderBillService,
     TransactionService,

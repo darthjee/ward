@@ -4,6 +4,7 @@ import { ProviderExpenseAccountHandler } from '../account-types/provider-expense
 import { defaultProviderExpenseState, type ProviderExpenseState } from '../account-types/provider-expense-details.js';
 import type { ProviderExpenseDetailsDto } from '../dto/provider-expense-details.dto.js';
 import { Account } from '../entities/account.entity.js';
+import { ProviderBill } from '../entities/provider-bill.entity.js';
 import { ProviderExpenseDetails } from '../entities/provider-expense-details.entity.js';
 import { todayUtc } from '../ledger-date.js';
 
@@ -229,14 +230,20 @@ describe('ProviderExpenseAccountHandler', () => {
   describe('loadDetails', () => {
     it('loads every row in one query, keyed by account id', async () => {
       const rows = [stored(), Object.assign(stored(), { accountId: 2 })];
+      const bills = [Object.assign(new ProviderBill(), { id: 5, providerAccountId: 2, payingAccountId: null })];
       const find = jest.fn(async () => rows);
-      const manager = { getRepository: jest.fn(() => ({ find })) };
+      const findBills = jest.fn(async () => bills);
+      const manager = { getRepository: jest.fn((entity: unknown) => ({ find: entity === ProviderBill ? findBills : find })) };
 
       const details = await handler.loadDetails([1, 2], manager as never);
 
       expect(find).toHaveBeenCalledTimes(1);
+      expect(findBills).toHaveBeenCalledTimes(1);
       expect(manager.getRepository).toHaveBeenCalledWith(ProviderExpenseDetails);
       expect([...details.keys()]).toEqual([1, 2]);
+      expect((details.get(1) as { recurringBills: unknown[] }).recurringBills).toEqual([]);
+      expect((details.get(2) as { recurringBills: ProviderBill[] }).recurringBills.map(({ id }) => id)).toEqual([5]);
+      expect(details.get(2)).toMatchObject({ dueDay: 10, expectedAmount: 20000n });
     });
 
     it('skips the query for no accounts', async () => {
@@ -381,6 +388,59 @@ describe('ProviderExpenseAccountHandler', () => {
       });
       expect(handler.serialize(stored({ expectedAmount: 200n }), buildAccount({ currency: 'JPY' })))
         .toMatchObject({ expected_amount: '200' });
+    });
+
+    describe('source of the schedule fields', () => {
+      const bill = (overrides: Partial<ProviderBill> = {}) => Object.assign(new ProviderBill(), {
+        id: 5,
+        kind: 'recurring',
+        expectedAmount: 1500n,
+        chargeFrequency: 'monthly',
+        dueDay: 7,
+        dueMonth: null,
+        billsFrom: '2026-02-01',
+        showInCalendar: false,
+        payingAccountId: 9,
+        payingAccount: { id: 9, name: 'Checking' },
+        ...overrides,
+      });
+      const withBills = (bills: ProviderBill[]) => Object.assign(stored(), { recurringBills: bills });
+
+      it('reads the single recurring bill as stored, keeping the details row\'s accountant fields', () => {
+        expect(handler.serialize(withBills([bill()]), buildAccount({ currency: 'BRL' }))).toEqual({
+          for_accountant: true,
+          provider_tax_id: '12.345.678/0001-90',
+          expected_amount: '15.00',
+          charge_frequency: 'monthly',
+          due_day: 7,
+          due_month: null,
+          bills_from: '2026-02-01',
+          show_in_calendar: false,
+          paying_account: { id: 9, name: 'Checking' },
+        });
+      });
+
+      it('reads the details row when there is no recurring bill', () => {
+        expect(handler.serialize(withBills([]), buildAccount({ currency: 'BRL' }))).toMatchObject({ due_day: 10, expected_amount: '200.00' });
+      });
+
+      it('answers null for all seven schedule fields with two or more recurring bills', () => {
+        expect(handler.serialize(withBills([bill(), bill({ id: 6 })]), buildAccount({ currency: 'BRL' }))).toEqual({
+          for_accountant: true,
+          provider_tax_id: '12.345.678/0001-90',
+          expected_amount: null,
+          charge_frequency: null,
+          due_day: null,
+          due_month: null,
+          bills_from: null,
+          show_in_calendar: null,
+          paying_account: null,
+        });
+      });
+
+      it('does not leak the bills into the merge base', () => {
+        expect(handler.validateUpdate(undefined, withBills([bill()]), BRL)).not.toHaveProperty('recurringBills');
+      });
     });
 
     it('returns unset fields as null (and the defaults without a row)', () => {

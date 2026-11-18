@@ -55,6 +55,15 @@ describe('ProviderBillResolver', () => {
       expect(repos.bills.locks).toEqual(['pessimistic_write']);
     });
 
+    it('resolves a bill of an archived provider only with allowArchived', async () => {
+      const archived = await addAccount({ type: 'provider_expense', archivedAt: new Date() });
+      const bill = await addBill(archived.id);
+
+      await expect(resolver.peek(PERSONAL, bill.id, undefined, { allowArchived: true })).resolves.toMatchObject({ provider: { id: archived.id } });
+      await expect(resolver.resolve(PERSONAL, bill.id, undefined, { allowArchived: true })).resolves.toMatchObject({ bill: { id: bill.id } });
+      await expect(resolver.peek(PERSONAL, bill.id)).rejects.toBeInstanceOf(NotFoundException);
+    });
+
     it('answers the same 404 for unknown, foreign, other-context, archived and debt', async () => {
       const mine = await addAccount({ type: 'provider_expense' });
       const foreign = await addAccount({ type: 'provider_expense', userId: 99 });

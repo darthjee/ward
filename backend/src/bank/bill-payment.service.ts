@@ -1,21 +1,22 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import type { Repository } from 'typeorm';
-import { accountArchived } from './account-conflicts.js';
 import { accountRefsById } from './account-refs.js';
+import { undoPayment } from './bill-payment-undo.js';
 import { BillPaymentWriter, type PaymentTarget } from './bill-payment.writer.js';
 import { BillSourceResolver } from './bill-source.resolver.js';
 import { BillService } from './bill.service.js';
-import type { BillPayment } from './entities/bill-payment.entity.js';
-import { PayingAccountResolver } from './paying-account.resolver.js';
+import { ProviderBillPaymentService } from './provider-bill-payment.service.js';
 import type { OwnerContext } from '../core/owner-context.js';
 import { ownerNotFound } from '../core/parse-id.js';
 import type { PayOccurrenceDto } from './dto/pay-occurrence.dto.js';
 import { Account } from './entities/account.entity.js';
+import type { BillPayment } from './entities/bill-payment.entity.js';
 import { ProviderBill } from './entities/provider-bill.entity.js';
 import { isIsoDate, todayUtc } from './ledger-date.js';
 import { isNominalOccurrence, shiftWeekend } from './occurrence-generator.js';
 import { billInput, buildOccurrence, derivedInput, type OccurrenceInput, type OccurrenceResponse } from './occurrence-response.js';
+import { PayingAccountResolver } from './paying-account.resolver.js';
 import { paymentCommand } from './payment-body.js';
 
 /**
@@ -45,6 +46,7 @@ export class BillPaymentService {
   private readonly bills: BillService;
   private readonly payingAccounts: PayingAccountResolver;
   private readonly writer: BillPaymentWriter;
+  private readonly providerBills: ProviderBillPaymentService;
 
   /**
    * @param {Repository<Account>} accountRepository - The account repository.
@@ -52,6 +54,7 @@ export class BillPaymentService {
    * @param {BillService} bills - Owner-scoped one-off bill lookups.
    * @param {PayingAccountResolver} payingAccounts - Resolves body paying accounts.
    * @param {BillPaymentWriter} writer - The atomic payment writes.
+   * @param {ProviderBillPaymentService} providerBills - The per-bill pay / undo the provider aliases delegate to.
    */
   constructor(
     @InjectRepository(Account) accountRepository: Repository<Account>,
@@ -59,12 +62,14 @@ export class BillPaymentService {
       bills: BillService,
       payingAccounts: PayingAccountResolver,
       writer: BillPaymentWriter,
+      providerBills: ProviderBillPaymentService,
   ) {
     this.accountRepository = accountRepository;
     this.sources = sources;
     this.bills = bills;
     this.payingAccounts = payingAccounts;
     this.writer = writer;
+    this.providerBills = providerBills;
   }
 
   /**
@@ -80,6 +85,10 @@ export class BillPaymentService {
   async payOccurrence(owner: OwnerContext, accountId: number, dueDate: string, dto: PayOccurrenceDto): Promise<OccurrenceResponse> {
     const source = await this.sources.resolve(owner, accountId);
 
+    if (source.kind === 'provider') {
+      return this.providerBills.pay(owner, await this.#soleRecurringBillId(source.account.id), dueDate, dto);
+    }
+
     if (!isIsoDate(dueDate) || !isNominalOccurrence(source.schedule, dueDate)) {
       throw ownerNotFound();
     }
@@ -88,7 +97,7 @@ export class BillPaymentService {
     const target = {
       sourceAccountId: account.id,
       billId: null,
-      providerBillId: await this.#recurringBillId(source.kind, account.id),
+      providerBillId: null,
       nominal: dueDate,
       label: account.name,
       currency: account.currency,
@@ -126,10 +135,17 @@ export class BillPaymentService {
    * @throws {ConflictException} 409 on an archived account (checks 5–6).
    */
   async undoOccurrence(owner: OwnerContext, accountId: number, dueDate: string): Promise<void> {
-    const { account } = await this.sources.resolve(owner, accountId);
-    const payment = isIsoDate(dueDate) ? await this.writer.find({ sourceAccountId: account.id, billId: null, nominal: dueDate }) : null;
+    const { account, kind } = await this.sources.resolve(owner, accountId);
 
-    await this.#undo(account, payment);
+    if (kind === 'provider') {
+      return this.providerBills.undo(owner, await this.#soleRecurringBillId(account.id), dueDate);
+    }
+
+    const payment = isIsoDate(dueDate)
+      ? await this.writer.find({ sourceAccountId: account.id, billId: null, providerBillId: null, nominal: dueDate })
+      : null;
+
+    await undoPayment(this.writer, this.accountRepository, account, payment);
   }
 
   /**
@@ -143,22 +159,24 @@ export class BillPaymentService {
   async undoBill(owner: OwnerContext, id: number): Promise<void> {
     const { bill, provider } = await this.bills.findOwned(owner, id);
 
-    await this.#undo(provider, await this.writer.find({ sourceAccountId: provider.id, billId: bill.id, nominal: bill.dueDate as string }));
+    await undoPayment(this.writer, this.accountRepository, provider, await this.writer.find({ sourceAccountId: provider.id, billId: bill.id, providerBillId: null, nominal: bill.dueDate as string }));
   }
 
   /**
-   * The provider's recurring bill, stamped on its new derived payments so each row sits under
-   * exactly one unique key. Debt sources have none. A provider without a recurring bill cannot
-   * have derived occurrences (no schedule), so `null` is only a defensive fallback.
+   * The id of the provider's only recurring bill, which the account-level routes are aliases
+   * of. Zero or several recurring bills (or none to pay) answer the uniform 404.
    */
-  async #recurringBillId(kind: OccurrenceInput['kind'], providerAccountId: number): Promise<number | null> {
-    if (kind !== 'provider') {
-      return null;
+  async #soleRecurringBillId(providerAccountId: number): Promise<number> {
+    const bills = await this.accountRepository.manager.getRepository(ProviderBill).find({
+      where: { providerAccountId, kind: 'recurring' },
+      take: 2,
+    });
+
+    if (bills.length !== 1) {
+      throw ownerNotFound();
     }
 
-    const bill = await this.accountRepository.manager.getRepository(ProviderBill).findOneBy({ providerAccountId, kind: 'recurring' });
-
-    return bill?.id ?? null;
+    return bills[0].id;
   }
 
   async #record(
@@ -176,28 +194,6 @@ export class BillPaymentService {
     }
 
     return this.writer.record(owner, target, command);
-  }
-
-  async #undo(source: Account, payment: BillPayment | null): Promise<void> {
-    if (!payment || (payment.status === 'skipped' && source.archivedAt)) {
-      throw ownerNotFound();
-    }
-
-    if (payment.status === 'paid' && (source.archivedAt || (await this.#payingArchived(payment)))) {
-      throw accountArchived();
-    }
-
-    await this.writer.remove(payment);
-  }
-
-  async #payingArchived(payment: BillPayment): Promise<boolean> {
-    if (payment.payingAccountId === null) {
-      return false;
-    }
-
-    const paying = await this.accountRepository.findOneBy({ id: payment.payingAccountId });
-
-    return Boolean(paying?.archivedAt);
   }
 
   async #respond(input: OccurrenceInput): Promise<OccurrenceResponse> {

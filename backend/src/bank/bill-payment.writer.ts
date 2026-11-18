@@ -4,6 +4,7 @@ import { In, IsNull, type EntityManager, type Repository } from 'typeorm';
 import { occurrenceAlreadyPaid } from './bill-conflicts.js';
 import type { OwnerContext } from '../core/owner-context.js';
 import { ownerNotFound } from '../core/parse-id.js';
+import { Account } from './entities/account.entity.js';
 import { BillPayment } from './entities/bill-payment.entity.js';
 import { ProviderBill } from './entities/provider-bill.entity.js';
 import { Transaction } from './entities/transaction.entity.js';
@@ -11,6 +12,7 @@ import { isMysqlError, MYSQL_DUPLICATE_ENTRY } from './mysql-errors.js';
 import { PayingAccountResolver } from './paying-account.resolver.js';
 import type { PaymentCommand } from './payment-body.js';
 import { paymentDescription } from './payment-description.js';
+import { isProviderBillOccurrence } from './provider-bill.schedule.js';
 
 /** The occurrence a payment is recorded for. */
 export interface PaymentTarget {
@@ -37,9 +39,11 @@ export interface PaymentTarget {
  *
  * The caller's checks run before the transaction (for the public check
  * order); the ones a concurrent request could invalidate are repeated inside
- * it, under row locks: a one-off bill is locked `FOR UPDATE` (the same lock
- * `BillService` takes to edit / delete it, so the two serialize) and the
- * paying account is share-locked while it is re-validated.
+ * it, under row locks, always in the order provider (share) → provider bill
+ * (`FOR UPDATE`, the same lock `BillService` takes to edit / delete it, so the
+ * two serialize) → paying account (share): the provider is share-locked first
+ * because the inserts below take that lock on their parent rows anyway, and
+ * locking the bill first would invert against a bill `PATCH`.
  */
 @Injectable()
 export class BillPaymentWriter {
@@ -62,10 +66,14 @@ export class BillPaymentWriter {
    * @param {PaymentTarget} target - The occurrence.
    * @returns {Promise<BillPayment | null>} Its payment row, if any.
    */
-  async find(target: Pick<PaymentTarget, 'sourceAccountId' | 'billId' | 'nominal'>): Promise<BillPayment | null> {
+  async find(target: Pick<PaymentTarget, 'sourceAccountId' | 'billId' | 'providerBillId' | 'nominal'>): Promise<BillPayment | null> {
+    if (target.providerBillId !== null) {
+      return this.paymentRepository.findOneBy({ providerBillId: target.providerBillId, dueDate: target.nominal });
+    }
+
     return this.paymentRepository.findOneBy(
       target.billId === null
-        ? { sourceAccountId: target.sourceAccountId, billId: IsNull(), dueDate: target.nominal }
+        ? { sourceAccountId: target.sourceAccountId, billId: IsNull(), providerBillId: IsNull(), dueDate: target.nominal }
         : { billId: target.billId },
     );
   }
@@ -121,19 +129,31 @@ export class BillPaymentWriter {
   }
 
   async #recheck(manager: EntityManager, owner: OwnerContext, target: PaymentTarget, command: PaymentCommand): Promise<void> {
-    if (target.billId !== null) {
-      const bill = await manager.getRepository(ProviderBill).findOne({
-        where: { id: target.billId, providerAccountId: target.sourceAccountId, kind: 'one_off' },
-        lock: { mode: 'pessimistic_write' },
-      });
-
-      if (!bill) {
-        throw ownerNotFound();
-      }
+    if (target.billId !== null || target.providerBillId !== null) {
+      await this.#lockProviderBill(manager, target);
     }
 
     if (command.status === 'paid') {
       await this.payingAccounts.resolve(owner, command.payingAccountId, target.currency, manager);
+    }
+  }
+
+  async #lockProviderBill(manager: EntityManager, target: PaymentTarget): Promise<void> {
+    const provider = await manager.getRepository(Account).findOne({
+      where: { id: target.sourceAccountId },
+      lock: { mode: 'pessimistic_read' },
+    });
+    const bill = await manager.getRepository(ProviderBill).findOne({
+      where: {
+        id: (target.providerBillId ?? target.billId) as number,
+        providerAccountId: target.sourceAccountId,
+        kind: target.providerBillId === null ? 'one_off' : 'recurring',
+      },
+      lock: { mode: 'pessimistic_write' },
+    });
+
+    if (!provider || !bill || !isProviderBillOccurrence(bill, provider, target.nominal)) {
+      throw ownerNotFound();
     }
   }
 

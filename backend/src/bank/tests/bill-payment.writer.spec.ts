@@ -2,6 +2,7 @@ import { BadRequestException, ConflictException, NotFoundException, Unprocessabl
 import { QueryFailedError } from 'typeorm';
 import { BillPaymentWriter, type PaymentTarget } from '../bill-payment.writer.js';
 import type { PayOccurrenceDto } from '../dto/pay-occurrence.dto.js';
+import { Account } from '../entities/account.entity.js';
 import { BillPayment } from '../entities/bill-payment.entity.js';
 import { ProviderBill } from '../entities/provider-bill.entity.js';
 import { Transaction } from '../entities/transaction.entity.js';
@@ -21,14 +22,37 @@ function fakeDatabase(failOn?: number, error: Error = new Error('write failed'))
   let writes = 0;
   let nextId = 100;
   const findOneBy = jest.fn(async () => null);
-  const findOne = jest.fn(async (_options?: unknown): Promise<ProviderBill | null> => Object.assign(new ProviderBill(), { id: 7 }));
-  const resolve = jest.fn(async () => ({}));
+  const order: string[] = [];
+  const findOne = jest.fn(async (options?: unknown): Promise<ProviderBill | null> => {
+    const kind = (options as { where: { kind: ProviderBill['kind'] } }).where.kind;
+
+    return Object.assign(new ProviderBill(), kind === 'recurring'
+      ? { id: 7, kind, chargeFrequency: 'monthly', dueDay: 10, billsFrom: '2026-01-01', showInCalendar: true }
+      : { id: 7, kind, dueDate: '2026-01-10' });
+  });
+  const findProvider = jest.fn(async (_options?: unknown): Promise<Account | null> => Object.assign(new Account(), { id: 3, archivedAt: null }));
+  const resolve = jest.fn(async () => {
+    order.push('paying');
+    return {};
+  });
 
   const transaction = async <R>(work: (manager: unknown) => Promise<R>): Promise<R> => {
     const staged: typeof committed = [];
     const manager = {
       getRepository: (entity: unknown) => ({
-        findOne: (options: unknown) => (entity === ProviderBill ? findOne(options) : Promise.reject(new Error('unexpected read'))),
+        findOne: (options: unknown) => {
+          if (entity === ProviderBill) {
+            order.push('bill');
+            return findOne(options);
+          }
+
+          if (entity === Account) {
+            order.push('provider');
+            return findProvider(options);
+          }
+
+          return Promise.reject(new Error('unexpected read'));
+        },
         create: (fields: Record<string, unknown>) => ({ ...fields }),
         save: async (row: Record<string, unknown>) => {
           writes += 1;
@@ -52,7 +76,7 @@ function fakeDatabase(failOn?: number, error: Error = new Error('write failed'))
 
   const repository = { findOneBy, manager: { transaction } };
 
-  return { writer: new BillPaymentWriter(repository as never, { resolve } as never), committed, findOneBy, findOne, resolve };
+  return { writer: new BillPaymentWriter(repository as never, { resolve } as never), committed, findOneBy, findOne, findProvider, resolve, order };
 }
 
 describe('BillPaymentWriter', () => {
@@ -75,9 +99,9 @@ describe('BillPaymentWriter', () => {
   it('writes the target\'s provider bill id on the row', async () => {
     const { writer } = fakeDatabase();
 
-    const row = await writer.record(PERSONAL, { ...TARGET, providerBillId: 12 }, { status: 'skipped' });
+    const row = await writer.record(PERSONAL, { ...TARGET, providerBillId: 7 }, { status: 'skipped' });
 
-    expect(row).toMatchObject({ billId: null, providerBillId: 12 });
+    expect(row).toMatchObject({ billId: null, providerBillId: 7 });
   });
 
   it('records no charge without record_charge, and only the row for a skip', async () => {
@@ -147,10 +171,61 @@ describe('BillPaymentWriter', () => {
     expect(gone.committed).toEqual([]);
   });
 
+  it('locks provider (share), then the recurring bill (FOR UPDATE), then the paying account', async () => {
+    const { writer, findOne, findProvider, order } = fakeDatabase();
+
+    await writer.record(PERSONAL, { ...TARGET, providerBillId: 7 }, PAID);
+
+    expect(order).toEqual(['provider', 'bill', 'paying']);
+    expect(findProvider).toHaveBeenCalledWith({ where: { id: 3 }, lock: { mode: 'pessimistic_read' } });
+    expect(findOne).toHaveBeenCalledWith({ where: { id: 7, providerAccountId: 3, kind: 'recurring' }, lock: { mode: 'pessimistic_write' } });
+  });
+
+  it('answers 404 when the recurring bill is gone or no longer has the occurrence', async () => {
+    const target = { ...TARGET, providerBillId: 7 };
+    const gone = fakeDatabase();
+    gone.findOne.mockResolvedValueOnce(null);
+    await expect(gone.writer.record(PERSONAL, target, PAID)).rejects.toBeInstanceOf(NotFoundException);
+
+    const moved = fakeDatabase();
+    await expect(moved.writer.record(PERSONAL, { ...target, nominal: '2026-01-11' }, PAID)).rejects.toBeInstanceOf(NotFoundException);
+    expect(moved.committed).toEqual([]);
+
+    const noProvider = fakeDatabase();
+    noProvider.findProvider.mockResolvedValueOnce(null);
+    await expect(noProvider.writer.record(PERSONAL, target, PAID)).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('answers 404 when a one-off bill moved its due date', async () => {
+    const { writer } = fakeDatabase();
+
+    await expect(writer.record(PERSONAL, { ...TARGET, billId: 7, nominal: '2026-02-02' }, PAID)).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('writes two bills of one provider on the same date with distinct descriptions', async () => {
+    const { writer, committed } = fakeDatabase();
+
+    await writer.record(PERSONAL, { ...TARGET, providerBillId: 7, label: 'Plan A' }, PAID);
+    await writer.record(PERSONAL, { ...TARGET, providerBillId: 8, label: 'Plan B' }, PAID);
+
+    const descriptions = committed.filter(({ entity, row }) => entity === 'transaction' && row.accountId === 3 && (row.amount as bigint) > 0n).map(({ row }) => row.description);
+    expect(descriptions).toEqual(['Plan A — 2026-01-10', 'Plan B — 2026-01-10']);
+  });
+
+  it('looks payments up per provider bill, per one-off bill, or per debt occurrence', async () => {
+    const { writer, findOneBy } = fakeDatabase();
+
+    await writer.find({ sourceAccountId: 3, billId: null, providerBillId: 7, nominal: '2026-01-10' });
+    await writer.find({ sourceAccountId: 3, billId: null, providerBillId: null, nominal: '2026-01-10' });
+
+    expect(findOneBy).toHaveBeenNthCalledWith(1, { providerBillId: 7, dueDate: '2026-01-10' });
+    expect(findOneBy).toHaveBeenNthCalledWith(2, expect.objectContaining({ sourceAccountId: 3, dueDate: '2026-01-10' }));
+  });
+
   it('looks a one-off payment up by bill id', async () => {
     const { writer, findOneBy } = fakeDatabase();
 
-    await writer.find({ sourceAccountId: 3, billId: 7, nominal: '2026-01-10' });
+    await writer.find({ sourceAccountId: 3, billId: 7, providerBillId: null, nominal: '2026-01-10' });
 
     expect(findOneBy).toHaveBeenCalledWith({ billId: 7 });
   });

@@ -24,6 +24,8 @@ export interface OccurrenceResponse {
   kind: OccurrenceKind;
   source_account: AccountRef & { type: string };
   bill: { id: number; description: string } | null;
+  /** The recurring provider bill (or the one-off bill) the occurrence belongs to; `null` for debts. */
+  source_bill: { id: number; description: string } | null;
   nominal_date: string;
   effective_date: string;
   expected_amount: string | null;
@@ -46,6 +48,8 @@ export interface OccurrenceInput {
   /** The source account (a one-off's provider). */
   account: Account;
   bill: ProviderBill | null;
+  /** The recurring provider bill behind a derived provider occurrence. */
+  sourceBill: ProviderBill | null;
   nominal: string;
   effective: string;
   expected: bigint | null;
@@ -64,6 +68,7 @@ export function derivedInput(source: BillSource, occurrence: Occurrence, payment
     kind: source.kind,
     account: source.account,
     bill: null,
+    sourceBill: source.bill,
     nominal: occurrence.nominal,
     effective: occurrence.effective,
     expected: source.expected,
@@ -90,6 +95,7 @@ export function billInput(
     kind: 'bill',
     account: provider,
     bill,
+    sourceBill: bill,
     nominal: bill.dueDate as string,
     effective: bill.dueDate as string,
     expected: bill.expectedAmount,
@@ -128,7 +134,8 @@ export function buildOccurrence(input: OccurrenceInput, refs: Map<number, Accoun
     response: {
       kind: input.kind,
       source_account: { id: account.id, name: account.name, type: account.type },
-      bill: input.bill ? { id: input.bill.id, description: input.bill.description } : null,
+      bill: billRef(input.bill),
+      source_bill: billRef(input.sourceBill),
       nominal_date: input.nominal,
       effective_date: input.effective,
       expected_amount: input.expected === null ? null : formatAmount(input.expected, account.currency),
@@ -143,8 +150,8 @@ export function buildOccurrence(input: OccurrenceInput, refs: Map<number, Accoun
 }
 
 /**
- * Calendar order: `effective_date` ascending, then `kind`, then source account
- * id, then bill id.
+ * Calendar order: `effective_date` ascending, then `kind`, then source bill
+ * id, then source account id, then bill id.
  * @param {OccurrenceView} a - One occurrence.
  * @param {OccurrenceView} b - Another occurrence.
  * @returns {number} The sort comparison.
@@ -161,7 +168,9 @@ export function compareOccurrences(a: OccurrenceView, b: OccurrenceView): number
     return left.kind < right.kind ? -1 : 1;
   }
 
-  return left.source_account.id - right.source_account.id || (left.bill?.id ?? 0) - (right.bill?.id ?? 0);
+  return compareIds(left.source_bill, right.source_bill)
+    || left.source_account.id - right.source_account.id
+    || compareIds(left.bill, right.bill);
 }
 
 /**
@@ -171,4 +180,22 @@ export function compareOccurrences(a: OccurrenceView, b: OccurrenceView): number
  */
 function refOf(id: number | null, refs: Map<number, AccountRef>): AccountRef | null {
   return id === null ? null : refs.get(id) ?? null;
+}
+
+/**
+ * Explicit mapper: never spreads the entity, so `notes` is never exposed.
+ * @param {ProviderBill | null} bill - A provider bill, if any.
+ * @returns {{ id: number; description: string } | null} Its public reference.
+ */
+function billRef(bill: ProviderBill | null): { id: number; description: string } | null {
+  return bill ? { id: bill.id, description: bill.description } : null;
+}
+
+/**
+ * @param {{ id: number } | null} left - One optional reference.
+ * @param {{ id: number } | null} right - Another optional reference.
+ * @returns {number} The id difference, a missing reference counting as 0.
+ */
+function compareIds(left: { id: number } | null, right: { id: number } | null): number {
+  return (left?.id ?? 0) - (right?.id ?? 0);
 }

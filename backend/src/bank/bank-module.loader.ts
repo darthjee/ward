@@ -5,6 +5,7 @@ import type { BillHistoryService } from './bill-history.service.js';
 import type { BillPaymentService } from './bill-payment.service.js';
 import type { BillService } from './bill.service.js';
 import type { CalendarService } from './calendar.service.js';
+import type { ProviderBillPaymentService } from './provider-bill-payment.service.js';
 import type { ProviderBillService } from './provider-bill.service.js';
 import type { TransactionService } from './transaction.service.js';
 import { LazyModuleLoaderService } from '../core/lazy-module-loader.service.js';
@@ -19,6 +20,7 @@ export interface BankServices {
   billPayments: BillPaymentService;
   bills: BillService;
   calendar: CalendarService;
+  providerBillPayments: ProviderBillPaymentService;
   providerBills: ProviderBillService;
   transactions: TransactionService;
 }
@@ -56,6 +58,7 @@ export class BankModuleLoader {
       billPayments: moduleRef.get(bank.BillPaymentService),
       bills: moduleRef.get(bank.BillService),
       calendar: moduleRef.get(bank.CalendarService),
+      providerBillPayments: moduleRef.get(bank.ProviderBillPaymentService),
       providerBills: moduleRef.get(bank.ProviderBillService),
       transactions: moduleRef.get(bank.TransactionService),
     };
