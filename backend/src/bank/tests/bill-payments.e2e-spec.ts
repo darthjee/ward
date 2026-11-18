@@ -59,6 +59,18 @@ describe('bill payments (e2e)', () => {
     send(app, 'post', occurrencePath(orgId, accountId, dueDate), user, body);
   const undo = (orgId: number | null, accountId: number | string, dueDate: string, user = ALICE) =>
     send(app, 'delete', occurrencePath(orgId, accountId, dueDate), user);
+  const perBillPath = (orgId: number | null, id: number | string, dueDate: string) =>
+    `${base(orgId)}/provider-bills/${id}/occurrences/${dueDate}/payment.json`;
+  const payBill = (orgId: number | null, id: number | string, dueDate: string, body: Body, user = ALICE) =>
+    send(app, 'post', perBillPath(orgId, id, dueDate), user, body);
+  const undoBill = (orgId: number | null, id: number | string, dueDate: string, user = ALICE) =>
+    send(app, 'delete', perBillPath(orgId, id, dueDate), user);
+  const recurringOf = (providerId: number) =>
+    repos.bills.rows.filter((row) => row.providerAccountId === providerId && row.kind === 'recurring');
+  const addRecurring = async (orgId: number | null, providerId: number, fields: Body = {}) =>
+    (await send(app, 'post', `${base(orgId)}/accounts/${providerId}/provider-bills.json`, ALICE, {
+      kind: 'recurring', description: uniqueName('Plan'), due_day: 5, bills_from: '2026-01-01', ...fields,
+    }).expect(201)).body;
   const paid = (payingId: number, fields: Body = {}) =>
     ({ status: 'paid', paid_on: '2026-01-12', amount: '490.00', paying_account_id: payingId, ...fields });
   const createBill = async (orgId: number | null, providerId: number, payingId: number, fields: Body = {}) =>
@@ -460,6 +472,135 @@ describe('bill payments (e2e)', () => {
       });
     });
 
+    describe('per provider bill', () => {
+      it('pays and undoes a recurring bill, with the bill description in the ledger and source_bill in the answer', async () => {
+        const checking = await regular(orgId);
+        const fee = await provider(orgId);
+        const [recurring] = recurringOf(fee.id);
+
+        const response = await payBill(orgId, recurring.id, '2026-01-05', paid(checking.id, { paid_on: '2026-01-05' })).expect(201);
+
+        expect(response.headers['cache-control']).toBe('no-store');
+        expect(response.headers['x-cache-invalidate']).toBe(base(orgId));
+        expect(response.body).toMatchObject({ kind: 'provider', status: 'paid', source_bill: { id: recurring.id }, bill: null });
+        expect(ledgerOf(fee.id)[0].description).toBe(`${recurring.description} — 2026-01-05`);
+        expect(repos.billPayments.rows.find((row) => row.providerBillId === recurring.id)).toMatchObject({ billId: null, dueDate: '2026-01-05' });
+        await payBill(orgId, recurring.id, '2026-01-05', { status: 'skipped' }).expect(409);
+        await undoBill(orgId, recurring.id, '2026-01-05').expect(204);
+        expect(repos.billPayments.rows.some((row) => row.providerBillId === recurring.id)).toBe(false);
+        await repos.accounts.delete({ id: fee.id });
+      });
+
+      it('pays two recurring bills of one provider on the same date independently', async () => {
+        const checking = await regular(orgId);
+        const fee = await provider(orgId);
+        const [first] = recurringOf(fee.id);
+        const second = await addRecurring(orgId, fee.id);
+
+        await payBill(orgId, first.id, '2026-01-05', paid(checking.id)).expect(201);
+        await payBill(orgId, second.id, '2026-01-05', paid(checking.id)).expect(201);
+        await payBill(orgId, second.id, '2026-01-05', { status: 'skipped' }).expect(409);
+        await undoBill(orgId, first.id, '2026-01-05').expect(204);
+
+        expect(repos.billPayments.rows.filter((row) => row.sourceAccountId === fee.id).map((row) => row.providerBillId)).toEqual([second.id]);
+        await undoBill(orgId, second.id, '2026-01-05').expect(204);
+        await repos.accounts.delete({ id: fee.id });
+      });
+
+      it('pays and undoes a one-off bill through either route, sharing one row', async () => {
+        const checking = await regular(orgId);
+        const fee = await provider(orgId, { due_day: null });
+        const bill = await createBill(orgId, fee.id, checking.id);
+
+        await payBill(orgId, bill.id, '2026-01-20', paid(checking.id)).expect(201);
+        await send(app, 'post', billPaymentPath(orgId, bill.id), ALICE, { status: 'skipped' }).expect(409);
+        await send(app, 'delete', billPaymentPath(orgId, bill.id), ALICE).expect(204);
+        await send(app, 'post', billPaymentPath(orgId, bill.id), ALICE, { status: 'skipped' }).expect(201);
+        await payBill(orgId, bill.id, '2026-01-20', { status: 'skipped' }).expect(409);
+        await undoBill(orgId, bill.id, '2026-01-21').expect(404);
+        await undoBill(orgId, bill.id, '2026-01-20').expect(204);
+        await repos.accounts.delete({ id: fee.id });
+      });
+
+      it('answers the uniform 404 for dates that are not an occurrence of the bill', async () => {
+        const fee = await provider(orgId);
+        const [recurring] = recurringOf(fee.id);
+        const hidden = await addRecurring(orgId, fee.id, { show_in_calendar: false });
+        const early = await addRecurring(orgId, fee.id, { bills_from: '2026-03-01' });
+
+        for (const [id, date] of [[recurring.id, '2026-01-06'], [recurring.id, 'abc'], [recurring.id, '2026-02-31'], [hidden.id, '2026-01-05'], [early.id, '2026-02-05']] as const) {
+          expect((await payBill(orgId, id, date, { status: 'skipped' }).expect(404)).body).toEqual(NOT_FOUND_BODY);
+        }
+        expect((await undoBill(orgId, recurring.id, 'abc').expect(404)).body).toEqual(NOT_FOUND_BODY);
+        await repos.accounts.delete({ id: fee.id });
+      });
+
+      it('answers 404 for a debt id, an unknown id and a non-numeric id', async () => {
+        const loan = await debt(orgId);
+
+        for (const id of [loan.id, 999999, 'abc']) {
+          expect((await payBill(orgId, id, '2026-01-10', { status: 'skipped' }).expect(404)).body).toEqual(NOT_FOUND_BODY);
+          expect((await undoBill(orgId, id, '2026-01-10').expect(404)).body).toEqual(NOT_FOUND_BODY);
+        }
+        await repos.accounts.delete({ id: loan.id });
+      });
+
+      it('answers 400 for an invalid body after the occurrence check, and 422 for a bad paying account', async () => {
+        const fee = await provider(orgId);
+        const [recurring] = recurringOf(fee.id);
+
+        await payBill(orgId, recurring.id, '2026-01-05', { status: 'skipped', amount: '1.00' }).expect(400);
+        expect(withoutTimestamp(await payBill(orgId, recurring.id, '2026-01-05', paid(999999)).expect(422))).toEqual(ACCOUNT_NOT_FOUND);
+        await repos.accounts.delete({ id: fee.id });
+      });
+
+      it('on an archived provider: POST answers 404, DELETE answers 404 for a skip and 409 for a payment', async () => {
+        const checking = await regular(orgId);
+        const fee = await provider(orgId);
+        const [recurring] = recurringOf(fee.id);
+        await payBill(orgId, recurring.id, '2026-01-05', paid(checking.id)).expect(201);
+        await payBill(orgId, recurring.id, '2026-02-05', { status: 'skipped' }).expect(201);
+        await archive(orgId, fee.id);
+
+        await payBill(orgId, recurring.id, '2026-03-05', { status: 'skipped' }).expect(404);
+        await undoBill(orgId, recurring.id, '2026-02-05').expect(404);
+        expect((await undoBill(orgId, recurring.id, '2026-01-05').expect(409)).body.error.code).toBe('ACCOUNT_ARCHIVED');
+        await unarchive(orgId, fee.id);
+        await undoBill(orgId, recurring.id, '2026-02-05').expect(204);
+        await undoBill(orgId, recurring.id, '2026-01-05').expect(204);
+        await repos.accounts.delete({ id: fee.id });
+      });
+
+      it('undoes an off-schedule (drifted) payment', async () => {
+        const fee = await provider(orgId);
+        const [recurring] = recurringOf(fee.id);
+        await payBill(orgId, recurring.id, '2026-01-05', { status: 'skipped' }).expect(201);
+        await send(app, 'patch', `${base(orgId)}/provider-bills/${recurring.id}.json`, ALICE, { due_day: 15 }).expect(200);
+
+        await undoBill(orgId, recurring.id, '2026-01-05').expect(204);
+        await repos.accounts.delete({ id: fee.id });
+      });
+
+      it('makes the account-level routes aliases of the single recurring bill, and 404 for zero or several', async () => {
+        const fee = await provider(orgId);
+        const [recurring] = recurringOf(fee.id);
+
+        const aliased = await pay(orgId, fee.id, '2026-01-05', { status: 'skipped' }).expect(201);
+        expect(aliased.body.source_bill).toEqual({ id: recurring.id, description: recurring.description });
+        await undoBill(orgId, recurring.id, '2026-01-05').expect(204);
+        await pay(orgId, fee.id, '2026-01-05', { status: 'skipped' }).expect(201);
+        await undo(orgId, fee.id, '2026-01-05').expect(204);
+
+        const second = await addRecurring(orgId, fee.id);
+        await pay(orgId, fee.id, '2026-01-05', { status: 'skipped' }).expect(404);
+        await undo(orgId, fee.id, '2026-01-05').expect(404);
+        await send(app, 'delete', `${base(orgId)}/provider-bills/${second.id}.json`, ALICE).expect(204);
+        await send(app, 'delete', `${base(orgId)}/provider-bills/${recurring.id}.json`, ALICE).expect(204);
+        await pay(orgId, fee.id, '2026-01-05', { status: 'skipped' }).expect(404);
+        await repos.accounts.delete({ id: fee.id });
+      });
+    });
+
     describe('bill history', () => {
       const history = (accountId: number | string, query = '') =>
         send(app, 'get', `${base(orgId)}/accounts/${accountId}/bill-payments.json${query}`, ALICE);
@@ -582,7 +723,7 @@ describe('bill payments (e2e)', () => {
       ['a global admin who is not a member', ADMIN, true, ALICE_ORG, 'aliceOrg'],
     ];
 
-    it.each(CASES)('answers the uniform 404 on all five routes for %s', async (_label, user, admin, orgId, key) => {
+    it.each(CASES)('answers the uniform 404 on all seven routes for %s', async (_label, user, admin, orgId, key) => {
       const ids = owned[key] ?? { debt: 999999, bill: 999999 };
       const responses = [
         await send(app, 'post', occurrencePath(orgId, ids.debt, '2026-01-10'), user, { status: 'skipped' }, admin),
@@ -590,6 +731,8 @@ describe('bill payments (e2e)', () => {
         await send(app, 'post', billPaymentPath(orgId, ids.bill), user, { status: 'skipped' }, admin),
         await send(app, 'delete', billPaymentPath(orgId, ids.bill), user, undefined, admin),
         await send(app, 'get', `${base(orgId)}/accounts/${ids.debt}/bill-payments.json`, user, undefined, admin),
+        await send(app, 'post', perBillPath(orgId, ids.bill, '2026-01-20'), user, { status: 'skipped' }, admin),
+        await send(app, 'delete', perBillPath(orgId, ids.bill, '2026-01-20'), user, undefined, admin),
       ];
 
       for (const response of responses) {

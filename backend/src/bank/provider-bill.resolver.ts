@@ -15,6 +15,12 @@ export interface ResolvedProviderBill {
   provider: Account;
 }
 
+/** How {@link ProviderBillResolver#resolve} / `peek` treat an archived provider. */
+export interface BillResolveOptions {
+  /** Resolve the bill of an archived provider too (default: the uniform 404). */
+  allowArchived?: boolean;
+}
+
 /** How {@link ProviderBillResolver#provider} treats an archived account. */
 export interface ProviderResolveOptions {
   /** Return an archived provider instead of answering 409 `ACCOUNT_ARCHIVED`. */
@@ -54,11 +60,12 @@ export class ProviderBillResolver {
    * @param {OwnerContext} owner - The resolved owner.
    * @param {number} id - The bill id.
    * @param {EntityManager} [manager] - A transactional manager: the owned bill row is then locked `FOR UPDATE`.
+   * @param {BillResolveOptions} [options] - `allowArchived` also resolves a bill of an archived provider.
    * @returns {Promise<ResolvedProviderBill>} The bill and its provider.
    * @throws {NotFoundException} The uniform 404.
    */
-  async resolve(owner: OwnerContext, id: number, manager?: EntityManager): Promise<ResolvedProviderBill> {
-    const resolved = await this.peek(owner, id, manager);
+  async resolve(owner: OwnerContext, id: number, manager?: EntityManager, options: BillResolveOptions = {}): Promise<ResolvedProviderBill> {
+    const resolved = await this.peek(owner, id, manager, options);
 
     if (!manager) {
       return resolved;
@@ -79,15 +86,21 @@ export class ProviderBillResolver {
    * @param {OwnerContext} owner - The resolved owner.
    * @param {number} id - The bill id.
    * @param {EntityManager} [manager] - A transactional manager to read through.
+   * @param {BillResolveOptions} [options] - `allowArchived` also resolves a bill of an archived provider.
    * @returns {Promise<ResolvedProviderBill>} The bill and its provider.
    * @throws {NotFoundException} The uniform 404.
    */
-  async peek(owner: OwnerContext, id: number, manager?: EntityManager): Promise<ResolvedProviderBill> {
+  async peek(owner: OwnerContext, id: number, manager?: EntityManager, options: BillResolveOptions = {}): Promise<ResolvedProviderBill> {
     const bills = manager ? manager.getRepository(ProviderBill) : this.billRepository;
     const accounts = manager ? manager.getRepository(Account) : this.accountRepository;
     const bill = await bills.findOneBy({ id });
     const provider = bill
-      ? await accounts.findOneBy({ ...accountOwnerWhere(owner), id: bill.providerAccountId, type: PROVIDER_TYPE, archivedAt: IsNull() })
+      ? await accounts.findOneBy({
+        ...accountOwnerWhere(owner),
+        id: bill.providerAccountId,
+        type: PROVIDER_TYPE,
+        ...options.allowArchived ? {} : { archivedAt: IsNull() },
+      })
       : null;
 
     if (!bill || !provider) {
