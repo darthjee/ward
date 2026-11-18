@@ -6,12 +6,13 @@ import {
   SCHEDULE_COPIED_FIELDS,
   scheduleStateOf,
   serializeScheduleFields,
-  type ScheduleResponse,
   type ScheduleState,
+  type WithPayingAccount,
 } from './schedule-fields.js';
 import type { AccountRef } from '../account-refs.js';
 import { formatAmount } from '../currency.js';
 import type { ProviderExpenseDetailsDto } from '../dto/provider-expense-details.dto.js';
+import type { ProviderBill } from '../entities/provider-bill.entity.js';
 import type { ProviderChargeFrequency, ProviderExpenseDetails } from '../entities/provider-expense-details.entity.js';
 
 // Pure helpers of the provider-expense account type: defaults, PATCH merge,
@@ -32,11 +33,20 @@ export type ProviderExpenseState = Pick<
 export type ProviderExpenseResponse = {
   for_accountant: boolean;
   provider_tax_id: string | null;
+  /** The seven schedule fields are `null` when the provider has two or more recurring bills. */
   expected_amount: string | null;
-  charge_frequency: ProviderChargeFrequency;
+  charge_frequency: ProviderChargeFrequency | null;
   due_day: number | null;
   due_month: number | null;
-} & ScheduleResponse;
+  bills_from: string | null;
+  show_in_calendar: boolean | null;
+  paying_account: AccountRef | null;
+};
+
+/** A loaded details row with its provider's recurring bills (each with its paying account's ref) attached. */
+export type LoadedProviderExpense = ProviderExpenseState & WithPayingAccount & {
+  recurringBills?: Array<ProviderBill & WithPayingAccount>;
+};
 
 /** The body field named in `expected_amount` errors. */
 export const EXPECTED_AMOUNT_FIELD = 'provider_expense.expected_amount';
@@ -196,5 +206,51 @@ export function serializeProviderExpenseState(
     due_day: state.dueDay,
     due_month: state.dueMonth,
     ...serializeScheduleFields(state, payingAccount),
+  };
+}
+
+/**
+ * Serializes the nested `provider_expense` object: `for_accountant` and
+ * `provider_tax_id` always come from the details row; the seven schedule
+ * fields come from the provider's recurring bills: the single bill as stored,
+ * the details row when there is none, all `null` when there are two or more.
+ * @param {LoadedProviderExpense | undefined} loaded - The loaded details row, with its recurring bills.
+ * @param {string} currency - The account currency.
+ * @returns {ProviderExpenseResponse} The nested `provider_expense` response object.
+ */
+export function serializeProviderExpense(loaded: LoadedProviderExpense | undefined, currency: string): ProviderExpenseResponse {
+  const state = providerExpenseStateOf(loaded);
+  const bills = loaded?.recurringBills ?? [];
+
+  if (bills.length === 0) {
+    return serializeProviderExpenseState(state, currency, loaded?.payingAccount ?? null);
+  }
+
+  const common = { for_accountant: state.forAccountant, provider_tax_id: state.providerTaxId };
+
+  if (bills.length > 1) {
+    return {
+      ...common,
+      expected_amount: null,
+      charge_frequency: null,
+      due_day: null,
+      due_month: null,
+      bills_from: null,
+      show_in_calendar: null,
+      paying_account: null,
+    };
+  }
+
+  const [bill] = bills;
+
+  return {
+    ...common,
+    expected_amount: bill.expectedAmount === null ? null : formatAmount(bill.expectedAmount, currency),
+    charge_frequency: bill.chargeFrequency as ProviderChargeFrequency | null,
+    due_day: bill.dueDay,
+    due_month: bill.dueMonth,
+    bills_from: bill.billsFrom,
+    show_in_calendar: bill.showInCalendar,
+    paying_account: bill.payingAccountId === null ? null : bill.payingAccount ?? null,
   };
 }

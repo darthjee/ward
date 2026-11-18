@@ -111,6 +111,45 @@ describe('provider-expense accounts (e2e)', () => {
     describe('recurring provider bill write-through', () => {
       const recurringOf = (id: number) => repos.bills.rows.filter((row) => row.providerAccountId === id && row.kind === 'recurring');
 
+      describe('reading the schedule fields from the recurring bills', () => {
+        const shown = async (id: number) => (await send(app, 'get', accountPath(orgId, id), ALICE).expect(200)).body.provider_expense;
+        const billsPath = (id: number) => `${base(orgId)}/accounts/${id}/provider-bills.json`;
+
+        it('reflects the single bill edited through provider-bills', async () => {
+          const created = await createProvider(orgId, { provider_expense: FULL_PROVIDER_EXPENSE });
+          const [bill] = recurringOf(created.id);
+
+          await send(app, 'patch', `${base(orgId)}/provider-bills/${bill.id}.json`, ALICE, { due_day: 21, expected_amount: '12.34', show_in_calendar: false }).expect(200);
+
+          expect(await shown(created.id)).toMatchObject({ due_day: 21, expected_amount: '12.34', show_in_calendar: false, for_accountant: false });
+        });
+
+        it('reads the details row when the provider has no recurring bill', async () => {
+          const created = await createProvider(orgId, { provider_expense: { expected_amount: '45.00' } });
+
+          expect(recurringOf(created.id)).toEqual([]);
+          expect(await shown(created.id)).toMatchObject({ expected_amount: '45.00', due_day: null, show_in_calendar: true });
+        });
+
+        it('answers null for all seven schedule fields with two recurring bills', async () => {
+          const created = await createProvider(orgId, { provider_expense: FULL_PROVIDER_EXPENSE });
+          await send(app, 'post', billsPath(created.id), ALICE, { kind: 'recurring', description: 'Second', due_day: 9 }).expect(201);
+
+          const nested = await shown(created.id);
+
+          expect(nested).toMatchObject({
+            expected_amount: null,
+            charge_frequency: null,
+            due_day: null,
+            due_month: null,
+            bills_from: null,
+            show_in_calendar: null,
+            paying_account: null,
+          });
+          expect(nested).toHaveProperty('for_accountant');
+        });
+      });
+
       it('creates one recurring bill with the copied fields on create with due_day, and none without it', async () => {
         const scheduled = await createProvider(orgId, { provider_expense: FULL_PROVIDER_EXPENSE });
         const unscheduled = await createProvider(orgId);
@@ -159,7 +198,7 @@ describe('provider-expense accounts (e2e)', () => {
         }));
 
         const cleared = await patch(orgId, created.id, { provider_expense: { due_day: null, due_month: null, charge_frequency: 'monthly' } }).expect(200);
-        expect(cleared.body.provider_expense).toMatchObject({ due_day: null });
+        expect(cleared.body.provider_expense).toMatchObject({ due_day: 10, show_in_calendar: false });
         expect(recurringOf(created.id)).toEqual([expect.objectContaining({ id: bill.id, dueDay: 10, showInCalendar: false })]);
         expect(repos.billPayments.rows.some((row) => row.id === payment.id)).toBe(true);
 
@@ -454,8 +493,10 @@ describe('provider-expense accounts (e2e)', () => {
           ...FULL_PROVIDER_EXPENSE_RESPONSE,
           for_accountant: true,
           provider_tax_id: null,
-          expected_amount: null,
-          due_day: null,
+          // The schedule fields now come from the single recurring bill, which clearing `due_day` only hides.
+          expected_amount: '200.00',
+          due_day: 20,
+          show_in_calendar: false,
         });
       });
 
@@ -628,12 +669,14 @@ describe('provider-expense accounts (e2e)', () => {
         await createProvider(orgId);
         const balancesBefore = AccountBalancesQuery.groupedCalls;
         const detailsBefore = repos.providerExpenseDetails.findCalls;
+        const billsBefore = (repos.bills as unknown as { findCalls: number }).findCalls;
 
         const response = await send(app, 'get', `${prefix}/accounts.json?type=provider_expense&archived=true`, ALICE).expect(200);
 
         expect(response.body.length).toBeGreaterThan(2);
         expect(AccountBalancesQuery.groupedCalls - balancesBefore).toBe(1);
         expect(repos.providerExpenseDetails.findCalls - detailsBefore).toBe(1);
+        expect((repos.bills as unknown as { findCalls: number }).findCalls - billsBefore).toBe(1);
       });
     });
   });

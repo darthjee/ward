@@ -55,7 +55,10 @@ describe('schedule fields (e2e)', () => {
 
         await send(app, 'patch', path, ALICE, { [type]: { bills_from: '2026-01-01' } }).expect(200);
         const cleared = await send(app, 'patch', path, ALICE, { [type]: { due_day: null } }).expect(200);
-        expect(cleared.body[type]).toMatchObject({ due_day: null, bills_from: '2026-01-01' });
+        // A provider's schedule is read from its recurring bill, which clearing `due_day` only hides.
+        expect(cleared.body[type]).toMatchObject(type === 'provider_expense'
+          ? { due_day: 10, bills_from: '2026-01-01', show_in_calendar: false }
+          : { due_day: null, bills_from: '2026-01-01' });
       });
 
       it('round-trips the three fields through create, update, show and list', async () => {

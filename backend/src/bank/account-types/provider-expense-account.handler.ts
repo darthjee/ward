@@ -3,7 +3,6 @@ import { In, type EntityManager } from 'typeorm';
 import type { AccountTypeContext, AccountTypeHandler } from './account-type-handler.js';
 import { rescaleProviderBills } from './provider-bill-rescale.js';
 import { syncBillDescription, syncProviderBill } from './provider-bill-write-through.js';
-import type { WithPayingAccount } from './schedule-fields.js';
 import { withPayingAccounts } from '../account-refs.js';
 import {
   assertProviderExpensePairs,
@@ -11,7 +10,8 @@ import {
   mergeProviderExpenseState,
   providerExpenseStateOf,
   rescaleProviderExpenseState,
-  serializeProviderExpenseState,
+  serializeProviderExpense,
+  type LoadedProviderExpense,
   type ProviderExpenseResponse,
   type ProviderExpenseState,
 } from './provider-expense-details.js';
@@ -92,8 +92,10 @@ export class ProviderExpenseAccountHandler implements AccountTypeHandler {
   }
 
   /**
-   * Loads the details rows in one query, plus one for their default paying
-   * accounts' names (no N+1).
+   * Loads the details rows in one query, the providers' recurring bills in
+   * another (attached as `recurringBills`, never merged into the details, which
+   * `AccountService.update` uses as its merge base), plus one for the default
+   * paying accounts' names of both (no N+1).
    * @param {number[]} accountIds - The provider-expense accounts.
    * @param {EntityManager} manager - The entity manager.
    * @returns {Promise<Map<number, unknown>>} The rows keyed by account id.
@@ -104,8 +106,17 @@ export class ProviderExpenseAccountHandler implements AccountTypeHandler {
     }
 
     const rows = await manager.getRepository(ProviderExpenseDetails).find({ where: { accountId: In(accountIds) } });
+    const bills = await manager.getRepository(ProviderBill).find({
+      where: { providerAccountId: In(accountIds), kind: 'recurring' },
+      order: { id: 'ASC' },
+    });
 
-    return new Map((await withPayingAccounts(rows, manager)).map((row) => [row.accountId, row]));
+    await withPayingAccounts<{ payingAccountId: number | null }>([...rows, ...bills], manager);
+
+    return new Map(rows.map((row) => [
+      row.accountId,
+      Object.assign(row, { recurringBills: bills.filter(({ providerAccountId }) => providerAccountId === row.accountId) }),
+    ]));
   }
 
   /**
@@ -148,9 +159,7 @@ export class ProviderExpenseAccountHandler implements AccountTypeHandler {
    * @returns {ProviderExpenseResponse} The nested `provider_expense` object.
    */
   serialize(details: unknown, account: Account): ProviderExpenseResponse {
-    const loaded = details as (ProviderExpenseState & WithPayingAccount) | undefined;
-
-    return serializeProviderExpenseState(providerExpenseStateOf(loaded), account.currency, loaded?.payingAccount ?? null);
+    return serializeProviderExpense(details as LoadedProviderExpense | undefined, account.currency);
   }
 
   async #syncBills(

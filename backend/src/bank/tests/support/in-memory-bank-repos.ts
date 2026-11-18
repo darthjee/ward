@@ -232,6 +232,13 @@ export function createInMemoryBankRepos(): InMemoryBankRepos {
   const bills = createInMemoryBankRepo(ProviderBill, checkProviderBillKeys);
   const createBill = bills.create;
   // Like the column default: a bill is a one-off unless said otherwise.
+  // Counts `find()` calls so specs can assert there is no N+1.
+  const findBills = bills.find;
+  Object.assign(bills, { findCalls: 0 });
+  bills.find = async (options) => {
+    (bills as unknown as { findCalls: number }).findCalls += 1;
+    return findBills(options);
+  };
   bills.create = (fields: Partial<ProviderBill>): ProviderBill => createBill({ kind: 'one_off', ...fields });
   const billPayments = createInMemoryBankRepo(BillPayment, checkBillPaymentKeys);
   const deleteAccount = accounts.delete;
