@@ -25,12 +25,19 @@ archiving; see the README's Future epics).
 
 ## Provider list column
 
-Replaces "expected amount with frequency": the count of bills plus the recurring sums split by
-frequency, e.g. `3 bills · R$ 250,00/mo + R$ 1.200,00/yr`.
+Replaces "expected amount with frequency" with a right-aligned **Bills** column: the count of
+bills plus the recurring sums split by frequency, read from the list payload's `bills_summary`
+(no per-row request), e.g. `3 bills · R$ 250,00 / month + R$ 1.200,00 / year`.
 
-- A zero part is omitted; recurring bills without `expected_amount` count toward N but not the
-  sums; one-offs are excluded from the sums (they count toward N); no bills → `—`.
+- Singular `1 bill`, plural `N bills`.
+- A zero part is omitted; `null` and `"0.00"` sums both count as zero.
+- Recurring bills without `expected_amount` count toward N but not the sums; one-offs are
+  excluded from the sums (they count toward N).
+- No bills (`count: 0`) → `—`; a missing `bills_summary` → an **empty** cell, not `—`.
 - Sums are in the provider's single currency.
+- Each part (`3 bills`, `R$ 250,00 / month`, `R$ 1.200,00 / year`) stays whole on one line; the
+  cell wraps only between parts (at ` · ` and ` + `).
+- Archived providers follow the same rules.
 
 ## Per-bill history
 

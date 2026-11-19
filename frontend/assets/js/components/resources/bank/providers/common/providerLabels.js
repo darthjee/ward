@@ -29,6 +29,57 @@ export function formatExpected(amount, frequency, currency) {
 }
 
 /**
+ * Tell whether a `bills_summary` sum adds nothing to the Bills cell.
+ *
+ * @param {string|number|null|undefined} value - A `monthly` / `yearly` sum.
+ * @returns {boolean} True when the sum is unset or zero (e.g. `"0.00"`).
+ */
+function isZeroSum(value) {
+  return value === null || value === undefined || value === '' || Number(value) === 0;
+}
+
+/**
+ * Split a provider's `bills_summary` into the parts of the provider list's Bills cell.
+ *
+ * @param {{count: number, monthly: string|null, yearly: string|null}|null|undefined} summary -
+ *   The provider's `bills_summary` from the list payload.
+ * @param {string} currency - The provider's ISO 4217 currency.
+ * @returns {string[]|null} E.g. ["3 bills", "R$ 250,00 / month", "R$ 1.200,00 / year"];
+ *   [EMPTY_MARK] when the provider has no bills; null when the summary is missing.
+ */
+export function billsSummaryParts(summary, currency) {
+  if (summary === null || summary === undefined) return null;
+  if (!summary.count) return [EMPTY_MARK];
+
+  const { count, monthly, yearly } = summary;
+  const parts = [`${count} ${count === 1 ? 'bill' : 'bills'}`];
+
+  if (!isZeroSum(monthly)) parts.push(formatInstalment(monthly, 'monthly', currency));
+  if (!isZeroSum(yearly)) parts.push(formatInstalment(yearly, 'yearly', currency));
+
+  return parts;
+}
+
+/**
+ * Format a provider's `bills_summary` as the full text of the provider list's Bills cell.
+ *
+ * @param {{count: number, monthly: string|null, yearly: string|null}|null|undefined} summary -
+ *   The provider's `bills_summary` from the list payload.
+ * @param {string} currency - The provider's ISO 4217 currency.
+ * @returns {string} E.g. "3 bills · R$ 250,00 / month + R$ 1.200,00 / year"; "—" without
+ *   bills; `''` when the summary is missing.
+ */
+export function formatBillsSummary(summary, currency) {
+  const parts = billsSummaryParts(summary, currency);
+
+  if (!parts) return '';
+
+  const [first, ...sums] = parts;
+
+  return sums.length ? `${first} · ${sums.join(' + ')}` : first;
+}
+
+/**
  * Read the for-accountant marker of a provider.
  *
  * @param {boolean|null} forAccountant - The `for_accountant` flag.
