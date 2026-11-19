@@ -25,8 +25,9 @@ import { ProviderBillResolver, type ResolvedProviderBill } from './provider-bill
 /**
  * Provider bills of both kinds (lazy `BankModule`, see
  * `docs/agents/specs/split-provider/api/provider-bills.md`). A bill has no
- * owner column: it is reached only through an owned, active provider-expense
- * account (`ProviderBillResolver`), so every miss answers the uniform 404.
+ * owner column: it is reached only through an owned provider-expense account
+ * (active for writes; archived allowed for reads, see `ProviderBillResolver`),
+ * so every miss answers the uniform 404.
  * Every write runs in a transaction.
  */
 @Injectable()

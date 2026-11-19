@@ -469,6 +469,9 @@ describe('provider-bills (e2e)', () => {
       const read = await send(app, 'get', billPath(null, bill.id), ALICE).expect(200);
 
       expect(read.body).toEqual(bill);
+      await send(app, 'get', billPath(null, bill.id), BOB).expect(404);
+      await send(app, 'get', billPath(BOB_ORG, bill.id), BOB).expect(404);
+      await send(app, 'get', billPath(ALICE_ORG, bill.id), ALICE).expect(404);
       await send(app, 'patch', billPath(null, bill.id), ALICE, { notes: 'x' }).expect(404);
       await send(app, 'delete', billPath(null, bill.id), ALICE).expect(404);
     });
