@@ -10,11 +10,19 @@ const DERIVED = {
 const BILL = {
   ...DERIVED, kind: 'bill', source_account: { id: 6, name: 'Gym', type: 'provider_expense' }, bill: { id: 9, description: 'Fix' },
 };
+const RECURRING = {
+  ...DERIVED,
+  kind: 'provider_bill',
+  source_account: { id: 6, name: 'Vivo', type: 'provider_expense' },
+  source_bill: { id: 12, description: 'Internet' },
+};
+const ONE_OFF = { ...RECURRING, source_bill: { id: 13, description: 'Repair' } };
 const ACCOUNTS = [{ id: 4, name: 'Main', currency: 'BRL', type: 'regular' }];
 
 describe('CalendarActionsController', () => {
   let client;
   let billsClient;
+  let providerBillsClient;
   let deps;
   let controller;
 
@@ -27,6 +35,10 @@ describe('CalendarActionsController', () => {
       undoOccurrencePayment: jasmine.createSpy('undoOccurrencePayment').and.resolveTo({}),
       undoBillPayment: jasmine.createSpy('undoBillPayment').and.resolveTo({}),
     };
+    providerBillsClient = {
+      payOccurrence: jasmine.createSpy('payOccurrence').and.resolveTo({}),
+      undoOccurrencePayment: jasmine.createSpy('undoOccurrencePayment').and.resolveTo({}),
+    };
     deps = {
       context: CONTEXT,
       setDialog: jasmine.createSpy('setDialog'),
@@ -36,7 +48,9 @@ describe('CalendarActionsController', () => {
       setError: jasmine.createSpy('setError'),
       onChanged: jasmine.createSpy('onChanged'),
     };
-    controller = new CalendarActionsController({ ...deps, client, billsClient });
+    controller = new CalendarActionsController({
+      ...deps, client, billsClient, providerBillsClient,
+    });
   });
 
   it('opens Pay with the initial fields', () => {
@@ -71,6 +85,22 @@ describe('CalendarActionsController', () => {
       expect(client.payBill).toHaveBeenCalledWith(CONTEXT, 9, {
         status: 'paid', paid_on: '2026-01-01', amount: '10.00', paying_account_id: 4, record_charge: true,
       });
+    });
+
+    it('pays a recurring provider bill by its bill id, with record_charge', async () => {
+      await controller.confirmPay(RECURRING, fields);
+
+      expect(providerBillsClient.payOccurrence).toHaveBeenCalledWith(CONTEXT, 12, '2026-11-10', {
+        status: 'paid', paid_on: '2026-01-01', amount: '10.00', paying_account_id: 4, record_charge: true,
+      });
+      expect(client.payOccurrence).not.toHaveBeenCalled();
+    });
+
+    it('pays a one-off provider bill by its bill id', async () => {
+      await controller.confirmPay(ONE_OFF, fields);
+
+      expect(providerBillsClient.payOccurrence).toHaveBeenCalledWith(CONTEXT, 13, '2026-11-10', jasmine.objectContaining({ status: 'paid' }));
+      expect(client.payBill).not.toHaveBeenCalled();
     });
 
     it('does not send an invalid form', async () => {
@@ -120,6 +150,12 @@ describe('CalendarActionsController', () => {
   });
 
   describe('confirmSkip', () => {
+    it('skips a provider bill through the per-bill route', async () => {
+      await controller.confirmSkip(RECURRING);
+
+      expect(providerBillsClient.payOccurrence).toHaveBeenCalledWith(CONTEXT, 12, '2026-11-10', { status: 'skipped' });
+    });
+
     it('posts exactly the skipped status to the derived route', async () => {
       await controller.confirmSkip(DERIVED);
 
@@ -134,6 +170,16 @@ describe('CalendarActionsController', () => {
   });
 
   describe('confirmUndo', () => {
+    it('undoes a provider bill occurrence through the per-bill route', async () => {
+      await controller.confirmUndo(RECURRING);
+      await controller.confirmUndo(ONE_OFF);
+
+      expect(providerBillsClient.undoOccurrencePayment.calls.allArgs()).toEqual([
+        [CONTEXT, 12, '2026-11-10'], [CONTEXT, 13, '2026-11-10'],
+      ]);
+      expect(billsClient.undoOccurrencePayment).not.toHaveBeenCalled();
+    });
+
     it('undoes a derived entry by the nominal date', async () => {
       await controller.confirmUndo({ ...DERIVED, status: 'paid' });
 

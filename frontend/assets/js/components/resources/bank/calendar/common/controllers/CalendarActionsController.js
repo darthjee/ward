@@ -1,4 +1,5 @@
 import BillsClient from '../../../../../../client/BillsClient.js';
+import ProviderBillsClient from '../../../../../../client/ProviderBillsClient.js';
 import CalendarClient, { SKIP_BODY, paymentBody } from '../../../../../../client/CalendarClient.js';
 import { classifyError } from '../../../common/bankErrors.js';
 import { payingAccountOptions } from '../../../common/form/controllers/scheduleFields.js';
@@ -7,8 +8,9 @@ import { initialPayFields, validatePayFields } from '../payFields.js';
 /**
  * Controller of the Calendar's Pay / Skip / Undo actions, shared by the list and month views.
  *
- * @description A derived entry (`debt` / `provider`) goes through the account routes with the
- * nominal date in the path; a one-off entry (`bill`) through the bill routes. After a success,
+ * @description An entry of a provider bill (`source_bill`, recurring or one-off) goes through
+ * the per-bill routes with the nominal date in the path; a debt through the account routes; a
+ * legacy one-off entry (`bill` without `source_bill`) through the bill routes. After a success,
  * or a `409` / `404` (the entry changed elsewhere), the dialog closes and `onChanged` reloads
  * the view. A network / 5xx failure closes the dialog and shows the alert with Retry; a
  * validation failure of the Pay dialog keeps it open with the error.
@@ -27,10 +29,12 @@ export default class CalendarActionsController {
    * @param {Function} options.onChanged - Called when the view must reload.
    * @param {typeof CalendarClient} [options.client] - Calendar client override.
    * @param {typeof BillsClient} [options.billsClient] - Bills client override (undo).
+   * @param {typeof ProviderBillsClient} [options.providerBillsClient] - Provider bills client
+   *   override (per-bill pay, skip and undo).
    */
   constructor({
     context, setDialog, setFields, setFieldErrors, setPending, setError, onChanged,
-    client = CalendarClient, billsClient = BillsClient,
+    client = CalendarClient, billsClient = BillsClient, providerBillsClient = ProviderBillsClient,
   }) {
     this.context = context;
     this.setDialog = setDialog;
@@ -41,6 +45,7 @@ export default class CalendarActionsController {
     this.onChanged = onChanged;
     this.client = client;
     this.billsClient = billsClient;
+    this.providerBillsClient = providerBillsClient;
   }
 
   /**
@@ -87,6 +92,10 @@ export default class CalendarActionsController {
    * @returns {Promise<object|undefined>} The response body.
    */
   sendPayment(occ, body) {
+    if (occ.source_bill) {
+      return this.providerBillsClient.payOccurrence(this.context, occ.source_bill.id, occ.nominal_date, body);
+    }
+
     if (occ.kind === 'bill') {
       return this.client.payBill(this.context, occ.bill.id, body);
     }
@@ -101,6 +110,10 @@ export default class CalendarActionsController {
    * @returns {Promise<object|undefined>} The response body.
    */
   sendUndo(occ) {
+    if (occ.source_bill) {
+      return this.providerBillsClient.undoOccurrencePayment(this.context, occ.source_bill.id, occ.nominal_date);
+    }
+
     if (occ.kind === 'bill') {
       return this.billsClient.undoBillPayment(this.context, occ.bill.id);
     }
