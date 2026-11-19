@@ -3,7 +3,6 @@ import BankProviderFormHelper, {
   SETTINGS_WARNING,
 } from '../../../../../../../../../assets/js/components/resources/bank/providers/pages/helpers/BankProviderFormHelper.jsx';
 import { emptyProviderFields } from '../../../../../../../../../assets/js/components/resources/bank/providers/pages/controllers/providerFormFields.js';
-import { monthName } from '../../../../../../../../../assets/js/components/resources/bank/common/dates.js';
 import { renderedOutput } from '../../../../../../../../support/renderedOutput.js';
 
 const noop = () => undefined;
@@ -24,7 +23,6 @@ function output(state = {}, fields = {}) {
     currencyLocked: false,
     archived: false,
     idPrefix: 'prov-',
-    payingAccounts: [{ id: 3, name: 'Main BRL', currency: 'BRL' }, { id: 4, name: 'Main USD', currency: 'USD' }],
     ...state,
   }, HANDLERS, OPTIONS));
 }
@@ -41,7 +39,7 @@ describe('BankProviderFormHelper', () => {
     expect(page.containsElement('h1', 'New provider')).toBeTrue();
     expect(page.containsInOrder(
       'Name', 'Provider', 'Branch', 'Customer / contract number', 'Currency', 'Opening date', 'Opening balance',
-      'For accountant', 'Provider tax id', 'Expected amount', 'Frequency', 'Due day', 'Notes',
+      'For accountant', 'Provider tax id', 'Notes',
     )).toBeTrue();
     expect(page.contains('>Bank<')).toBeFalse();
     expect(page.contains('Account number')).toBeFalse();
@@ -54,35 +52,16 @@ describe('BankProviderFormHelper', () => {
       .toBeFalse();
   });
 
-  it('renders the schedule inputs after the provider fields, Show in Calendar checked', () => {
+  it('renders no schedule inputs', () => {
     const page = output();
 
-    expect(page.containsInOrder('Due day', 'Bills from', 'Show in Calendar', 'Default paying account', 'Notes')).toBeTrue();
-    expect(page.containsInOrder('id="prov-show_in_calendar"', 'checked=""')).toBeTrue();
+    ['Expected amount', 'Frequency', 'Due day', 'Due month', 'Bills from', 'Show in Calendar', 'Default paying account']
+      .forEach((label) => expect(page.contains(label)).toBeFalse());
   });
 
-  it('lists only the paying accounts in the provider currency', () => {
-    const page = output({}, { currency: 'USD' });
-
-    expect(page.containsElement('option', 'Main USD')).toBeTrue();
-    expect(page.containsElement('option', 'Main BRL')).toBeFalse();
-  });
-
-  it('offers the monthly and yearly frequencies', () => {
-    expect(output().containsInOrder('<option value="monthly" selected="">Monthly', 'Yearly')).toBeTrue();
-  });
-
-  it('shows Due month only for a yearly frequency', () => {
-    expect(output().contains('Due month')).toBeFalse();
-    expect(output({}, { charge_frequency: 'yearly' }).containsInOrder('Due day', 'Due month', monthName(1), monthName(12)))
+  it('shows the tax id error inline', () => {
+    expect(output({ fieldErrors: { provider_tax_id: 'Use at most 32 characters' } }).containsElement('div', 'Use at most 32 characters'))
       .toBeTrue();
-  });
-
-  it('shows the provider field errors inline', () => {
-    const page = output({ fieldErrors: { provider_tax_id: 'Use at most 32 characters', due_month: 'Choose the due month' } }, { charge_frequency: 'yearly' });
-
-    expect(page.containsElement('div', 'Use at most 32 characters')).toBeTrue();
-    expect(page.containsElement('div', 'Choose the due month')).toBeTrue();
   });
 
   it('renders only the name of an archived provider', () => {

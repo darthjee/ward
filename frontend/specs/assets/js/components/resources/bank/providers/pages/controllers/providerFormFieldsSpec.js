@@ -21,10 +21,6 @@ const STORED = {
   provider_expense: {
     for_accountant: false,
     provider_tax_id: '12.345',
-    expected_amount: '200.00',
-    charge_frequency: 'yearly',
-    due_day: 10,
-    due_month: 3,
   },
 };
 
@@ -40,26 +36,21 @@ function validate(overrides, options = {}) {
 
 describe('providerFormFields', () => {
   it('lists the provider fields', () => {
-    expect(PROVIDER_FIELD_NAMES).toEqual([
-      'for_accountant', 'provider_tax_id', 'expected_amount', 'charge_frequency', 'due_day', 'due_month',
-    ]);
+    expect(PROVIDER_FIELD_NAMES).toEqual(['for_accountant', 'provider_tax_id']);
   });
 
   describe('emptyProviderFields', () => {
-    it('defaults For accountant on and the frequency to monthly', () => {
+    it('defaults For accountant on, without schedule fields', () => {
+      const fields = emptyProviderFields('BRL', '2026-05-01');
+
+      ['expected_amount', 'charge_frequency', 'due_day', 'due_month', 'bills_from', 'show_in_calendar', 'paying_account_id']
+        .forEach((name) => expect(name in fields).toBeFalse());
       expect(emptyProviderFields('BRL', '2026-05-01')).toEqual(jasmine.objectContaining({
         currency: 'BRL',
         opening_date: '2026-05-01',
         opening_balance: '0',
         for_accountant: true,
         provider_tax_id: '',
-        expected_amount: '',
-        charge_frequency: 'monthly',
-        due_day: '',
-        due_month: '',
-        bills_from: '',
-        show_in_calendar: true,
-        paying_account_id: '',
       }));
     });
 
@@ -76,116 +67,46 @@ describe('providerFormFields', () => {
         opening_balance: '-50.00',
         for_accountant: false,
         provider_tax_id: '12.345',
-        expected_amount: '200.00',
-        charge_frequency: 'yearly',
-        due_day: '10',
-        due_month: '3',
       }));
     });
 
-    it('loads the schedule fields, the paying account id from its object', () => {
-      const account = {
-        ...STORED,
-        provider_expense: {
-          ...STORED.provider_expense, bills_from: '2026-02-01', show_in_calendar: false, paying_account: { id: 9, name: 'Main' },
-        },
-      };
+    it('does not load schedule fields', () => {
+      const fields = providerFieldsFromAccount({
+        ...STORED, provider_expense: { ...STORED.provider_expense, due_day: 3, bills_from: '2026-02-01' },
+      });
 
-      expect(providerFieldsFromAccount(account)).toEqual(jasmine.objectContaining({
-        bills_from: '2026-02-01', show_in_calendar: false, paying_account_id: '9',
-      }));
+      expect('due_day' in fields).toBeFalse();
+      expect('bills_from' in fields).toBeFalse();
     });
 
     it('fills the defaults without a provider_expense object', () => {
       expect(providerFieldsFromAccount({ ...STORED, provider_expense: null })).toEqual(jasmine.objectContaining({
-        for_accountant: true, provider_tax_id: '', expected_amount: '', charge_frequency: 'monthly', due_day: '', due_month: '',
+        for_accountant: true, provider_tax_id: '',
       }));
     });
   });
 
   describe('validateProviderFields', () => {
-    it('builds the body with the nested provider_expense object', () => {
-      expect(validate({
-        provider_tax_id: '  12.345  ', expected_amount: '200,5', due_day: '10', opening_balance: '-30',
-      })).toEqual({
+    it('builds the body with the nested provider_expense object, without schedule fields', () => {
+      expect(validate({ provider_tax_id: '  12.345  ', opening_balance: '-30' })).toEqual({
         errors: {},
         body: jasmine.objectContaining({
           name: 'Rent',
           opening_balance: '-30',
-          provider_expense: {
-            for_accountant: true,
-            provider_tax_id: '12.345',
-            expected_amount: '200.5',
-            charge_frequency: 'monthly',
-            due_day: 10,
-            due_month: null,
-            bills_from: null,
-            show_in_calendar: true,
-            paying_account_id: null,
-          },
+          provider_expense: { for_accountant: true, provider_tax_id: '12.345' },
         }),
       });
     });
 
-    it('sends nulls for blank optional fields', () => {
+    it('sends null for a blank tax id', () => {
       expect(validate({ for_accountant: false }).body.provider_expense).toEqual({
-        for_accountant: false,
-        provider_tax_id: null,
-        expected_amount: null,
-        charge_frequency: 'monthly',
-        due_day: null,
-        due_month: null,
-        bills_from: null,
-        show_in_calendar: true,
-        paying_account_id: null,
+        for_accountant: false, provider_tax_id: null,
       });
-    });
-
-    it('sends the schedule fields nested in provider_expense', () => {
-      expect(validate({ bills_from: '2026-02-01', show_in_calendar: false, paying_account_id: '9' }).body.provider_expense)
-        .toEqual(jasmine.objectContaining({ bills_from: '2026-02-01', show_in_calendar: false, paying_account_id: 9 }));
-    });
-
-    it('rejects an invalid Bills from date', () => {
-      expect(validate({ bills_from: '01/02/2026' }).errors.bills_from).toBeDefined();
     });
 
     it('rejects a tax id longer than 32 characters', () => {
       expect(validate({ provider_tax_id: 'x'.repeat(33) }).errors.provider_tax_id).toBeDefined();
       expect(validate({ provider_tax_id: 'x'.repeat(32) }).errors).toEqual({});
-    });
-
-    [['0', 'zero'], ['-5', 'negative'], ['1.234', 'too many decimals'], ['abc', 'not a number'], ['100000000000.01', 'too large']]
-      .forEach(([amount, label]) => {
-        it(`rejects a ${label} expected amount`, () => {
-          expect(validate({ expected_amount: amount }).errors.expected_amount).toBeDefined();
-        });
-      });
-
-    it('rejects decimals on a zero-decimal currency', () => {
-      expect(validate({ currency: 'JPY', expected_amount: '1.5' }).errors.expected_amount).toBeDefined();
-      expect(validate({ currency: 'JPY', expected_amount: '1500' }).body.provider_expense.expected_amount).toBe('1500');
-    });
-
-    ['0', '32', '1.5', 'x'].forEach((day) => {
-      it(`rejects the due day ${day}`, () => {
-        expect(validate({ due_day: day }).errors.due_day).toBeDefined();
-      });
-    });
-
-    it('requires the due month for a yearly frequency', () => {
-      expect(validate({ charge_frequency: 'yearly' }).errors.due_month).toBeDefined();
-      expect(validate({ charge_frequency: 'yearly', due_month: '13' }).errors.due_month).toBeDefined();
-      expect(validate({ charge_frequency: 'yearly', due_month: '3' }).body.provider_expense)
-        .toEqual(jasmine.objectContaining({ charge_frequency: 'yearly', due_month: 3 }));
-    });
-
-    it('drops the due month for a monthly frequency', () => {
-      expect(validate({ charge_frequency: 'monthly', due_month: '3' }).body.provider_expense.due_month).toBeNull();
-    });
-
-    it('reads an unknown frequency as monthly', () => {
-      expect(validate({ charge_frequency: 'weekly' }).body.provider_expense.charge_frequency).toBe('monthly');
     });
 
     it('keeps the common errors', () => {
@@ -207,21 +128,11 @@ describe('providerFormFields', () => {
   describe('changedProviderFields', () => {
     it('keeps the changed common fields and provider keys only', () => {
       const original = validate(providerFieldsFromAccount(STORED)).body;
-      const body = validate({
-        ...providerFieldsFromAccount(STORED), bank_name: 'New Ltd', charge_frequency: 'monthly', expected_amount: '',
-      }).body;
+      const body = validate({ ...providerFieldsFromAccount(STORED), bank_name: 'New Ltd', provider_tax_id: '' }).body;
 
       expect(changedProviderFields(body, original)).toEqual({
-        bank_name: 'New Ltd',
-        provider_expense: { expected_amount: null, charge_frequency: 'monthly', due_month: null },
+        bank_name: 'New Ltd', provider_expense: { provider_tax_id: null },
       });
-    });
-
-    it('sends only the changed schedule fields', () => {
-      const original = validate(providerFieldsFromAccount(STORED)).body;
-      const body = validate({ ...providerFieldsFromAccount(STORED), paying_account_id: '9' }).body;
-
-      expect(changedProviderFields(body, original)).toEqual({ provider_expense: { paying_account_id: 9 } });
     });
 
     it('omits provider_expense when nothing in it changed', () => {

@@ -1,6 +1,5 @@
 import NotFound from '../../../../common/notFound/NotFound.jsx';
 import useAccountEditPage from '../../common/form/hooks/useAccountEditPage.js';
-import useScheduleForm from '../../common/form/hooks/useScheduleForm.js';
 import BankProviderEditController from './controllers/BankProviderEditController.js';
 import { providerFieldsFromAccount } from './controllers/providerFormFields.js';
 import BankProviderFormHelper from './helpers/BankProviderFormHelper.jsx';
@@ -19,9 +18,8 @@ export default function BankProviderEdit() {
     base: PROVIDERS_BASE, fieldsFrom: providerFieldsFromAccount, idPrefix: 'bank-provider-edit-',
   });
   const {
-    context, notFound, accountId, account,
+    context, notFound, accountId, account, state, handlers,
   } = page;
-  const { state, handlers } = useScheduleForm(page);
 
   if (notFound) {
     return <NotFound orgId={context.orgId ?? null} />;
