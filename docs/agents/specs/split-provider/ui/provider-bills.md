@@ -13,6 +13,10 @@ bill has none) and no `for_accountant` (a provider flag). Actions: **Add bill**,
 **Delete**, and a link to that bill's history. `PROVIDER_BILL_PAID` and other server errors are
 mapped to messages.
 
+On an archived provider, **Add bill**, **Edit** and **Delete** are hidden, but every row (one-offs
+included) keeps its **History** link, which opens the read-only per-bill history (payments
+listed, Undo hidden).
+
 ## Add / edit bill
 
 Routes `<ui>/bills/new?provider=:id` and `<ui>/bills/:billId/edit` are reused. The form opens with
