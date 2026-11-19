@@ -18,6 +18,7 @@ const PROVIDERS = [
     provider_expense: {
       for_accountant: true, provider_tax_id: '123', expected_amount: '200.00', charge_frequency: 'monthly', due_day: 10, due_month: null,
     },
+    bills_summary: { count: 3, monthly: '250.00', yearly: '1200.00' },
   },
   {
     id: 2,
@@ -29,6 +30,7 @@ const PROVIDERS = [
     provider_expense: {
       for_accountant: false, provider_tax_id: null, expected_amount: '1500', charge_frequency: 'yearly', due_day: null, due_month: 3,
     },
+    bills_summary: { count: 1, monthly: null, yearly: '1500' },
   },
   {
     id: 3,
@@ -40,8 +42,21 @@ const PROVIDERS = [
     provider_expense: {
       for_accountant: false, provider_tax_id: null, expected_amount: null, charge_frequency: 'monthly', due_day: null, due_month: null,
     },
+    bills_summary: { count: 0, monthly: null, yearly: null },
   },
 ];
+
+const LEGACY = {
+  id: 4,
+  name: 'Legacy',
+  bank_name: 'Old bank',
+  currency: 'BRL',
+  balance: '0.00',
+  archived_at: null,
+  provider_expense: {
+    for_accountant: true, provider_tax_id: null, expected_amount: null, charge_frequency: 'monthly', due_day: null, due_month: null,
+  },
+};
 
 const handlers = { onRetry: () => undefined, onDismiss: () => undefined };
 
@@ -56,23 +71,47 @@ describe('BankProviderListHelper', () => {
     const page = output();
 
     expect(page.containsElement('h1', 'Providers')).toBeTrue();
-    expect(page.containsInOrder('Name', 'Provider', 'Balance', 'Expected amount', 'For accountant', 'Currency')).toBeTrue();
+    expect(page.containsInOrder('Name', 'Provider', 'Balance', 'Bills', 'For accountant', 'Currency')).toBeTrue();
+    expect(page.contains('Expected amount')).toBeFalse();
   });
 
   it('renders the rows in the given (name) order', () => {
     expect(output().containsInOrder('Office rent', 'Domain', 'Zed')).toBeTrue();
   });
 
-  it('formats the balance, the expected amount with its frequency and the for-accountant marker', () => {
+  it('formats the balance, the bills summary and the for-accountant marker', () => {
     expect(output().containsInOrder(
-      'Office rent', 'Landlord Ltd', formatMoney('-200.00', 'BRL'), `${formatMoney('200.00', 'BRL')} / month`, 'Yes', 'BRL',
+      'Office rent', 'Landlord Ltd', formatMoney('-200.00', 'BRL'),
+      '3 bills', ' · ', `${formatMoney('250.00', 'BRL')} / month`, ' + ', `${formatMoney('1200.00', 'BRL')} / year`,
+      'Yes', 'BRL',
     )).toBeTrue();
-    expect(output().containsInOrder('Domain', formatMoney('0', 'JPY'), `${formatMoney('1500', 'JPY')} / year`, '—', 'JPY'))
-      .toBeTrue();
   });
 
-  it('shows "—" without an expected amount', () => {
+  it('summarises an archived provider\'s bills the same way', () => {
+    expect(output().containsInOrder(
+      'Domain', formatMoney('0', 'JPY'), '1 bill', ' · ', `${formatMoney('1500', 'JPY')} / year`, '—', 'JPY',
+    )).toBeTrue();
+  });
+
+  it('shows "—" without bills', () => {
     expect(output({ accounts: [PROVIDERS[2]] }).containsInOrder('Zed', formatMoney('0.00', 'BRL'), '—', '—', 'BRL')).toBeTrue();
+  });
+
+  it('leaves the cell empty without a bills summary', () => {
+    const page = output({ accounts: [LEGACY] });
+
+    expect(page.containsInOrder('Legacy', formatMoney('0.00', 'BRL'), '<td class="text-end"></td>', 'Yes', 'BRL')).toBeTrue();
+    expect(page.contains('—')).toBeFalse();
+  });
+
+  it('keeps each part of the bills summary on one line', () => {
+    const page = output({ accounts: [PROVIDERS[0]] });
+
+    expect(page.containsAttribute('class', 'text-nowrap')).toBeTrue();
+    expect(page.containsElement('span', '3 bills')).toBeTrue();
+    expect(page.containsElement('span', `${formatMoney('250.00', 'BRL')} / month`)).toBeTrue();
+    expect(page.containsElement('span', `${formatMoney('1200.00', 'BRL')} / year`)).toBeTrue();
+    expect(page.containsInOrder('<span class="text-nowrap">3 bills</span> · <span class="text-nowrap">')).toBeTrue();
   });
 
   it('tolerates a row without its provider_expense object', () => {

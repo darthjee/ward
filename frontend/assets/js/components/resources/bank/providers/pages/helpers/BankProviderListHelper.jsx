@@ -1,3 +1,4 @@
+import { Fragment } from 'react';
 import Table from 'react-bootstrap/cjs/Table.js';
 import BankErrorAlert from '../../../common/BankErrorAlert.jsx';
 import { formatMoney } from '../../../common/amounts.js';
@@ -5,13 +6,47 @@ import ArchivedBadge from '../../../common/list/ArchivedBadge.jsx';
 import AccountListHeader from '../../../common/list/AccountListHeader.jsx';
 import EmptyAccountList from '../../../common/list/EmptyAccountList.jsx';
 import { PROVIDERS_BASE as LIST_PATH } from '../../../common/sections.js';
-import { forAccountantLabel, formatExpected } from '../../common/providerLabels.js';
+import { billsSummaryParts, forAccountantLabel } from '../../common/providerLabels.js';
 import { contextHash } from '../../../../../../utils/context/ownerContext.js';
+
+/**
+ * Pick the separator placed before a Bills cell part.
+ *
+ * @param {number} index - The part's position in the cell.
+ * @returns {string|null} Nothing before the count, " · " before the first sum, " + " after.
+ */
+function partSeparator(index) {
+  if (index === 0) return null;
+
+  return index === 1 ? ' · ' : ' + ';
+}
+
+/**
+ * Render the Bills cell content: each part in its own non-wrapping span, so the line only
+ * breaks between parts.
+ *
+ * @param {object|null|undefined} summary - The provider's `bills_summary`.
+ * @param {string} currency - The provider's ISO 4217 currency.
+ * @returns {Array<React.ReactElement>|null} The parts, or nothing when the summary is missing.
+ */
+function renderBillsSummary(summary, currency) {
+  const parts = billsSummaryParts(summary, currency);
+
+  if (!parts) return null;
+
+  return parts.map((part, index) => (
+    <Fragment key={part}>
+      {partSeparator(index)}
+      <span className="text-nowrap">{part}</span>
+    </Fragment>
+  ));
+}
 
 /**
  * Render one provider row; the whole row links to the provider detail page.
  *
- * @param {object} provider - The provider account (with its `provider_expense` object).
+ * @param {object} provider - The provider account (with its `provider_expense` and
+ *   `bills_summary` objects).
  * @param {object} context - The active owner context.
  * @returns {React.ReactElement} The row.
  */
@@ -26,9 +61,7 @@ function renderRow(provider, context) {
       </td>
       <td className="text-break">{provider.bank_name}</td>
       <td className="text-end text-nowrap">{formatMoney(provider.balance, provider.currency)}</td>
-      <td className="text-end text-nowrap">
-        {formatExpected(details.expected_amount, details.charge_frequency, provider.currency)}
-      </td>
+      <td className="text-end">{renderBillsSummary(provider.bills_summary, provider.currency)}</td>
       <td>{forAccountantLabel(details.for_accountant)}</td>
       <td>{provider.currency}</td>
     </tr>
@@ -60,7 +93,7 @@ function renderProviders(providers, context) {
           <th>Name</th>
           <th>Provider</th>
           <th className="text-end">Balance</th>
-          <th className="text-end">Expected amount</th>
+          <th className="text-end">Bills</th>
           <th>For accountant</th>
           <th>Currency</th>
         </tr>
@@ -92,8 +125,8 @@ const BankProviderListHelper = {
   /**
    * Render the Providers list: the header with the *Show archived* toggle, the **Accountant
    * hand-off** link and **New provider**, the error alert and the providers table — name,
-   * provider, current balance, expected amount with its frequency ("—" when unset),
-   * for-accountant marker, currency (no total row, since currencies may differ).
+   * provider, current balance, bills: count and monthly/yearly sums from `bills_summary` ("—"
+   * with no bills, empty when the field is missing), for-accountant marker, currency (no total row, since currencies may differ).
    *
    * @param {{accounts: (Array<object>|null), error: (object|null), archived: boolean,
    *   context: object}} state - The loaded providers, the classified error, the archived
