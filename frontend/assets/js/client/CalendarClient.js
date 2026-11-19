@@ -8,7 +8,8 @@ export const PAYMENT_FIELDS = ['status', 'paid_on', 'amount', 'paying_account_id
 /** The body that skips an occurrence. */
 export const SKIP_BODY = Object.freeze({ status: 'skipped' });
 
-const CHARGE_KINDS = ['provider', 'bill'];
+/** The occurrence kinds that can also record the charge (`provider` stays until #125). */
+export const CHARGE_KINDS = ['provider', 'provider_bill', 'bill'];
 
 /**
  * Build the body that pays an occurrence.
@@ -16,7 +17,7 @@ const CHARGE_KINDS = ['provider', 'bill'];
  * @param {{kind: string}} occ - The occurrence.
  * @param {object} fields - The form values (`paid_on`, `amount`, `paying_account_id`,
  *   `record_charge`).
- * @returns {object} The body; `record_charge` is kept only for the `provider` and `bill` kinds.
+ * @returns {object} The body; `record_charge` is kept only for the charge kinds ({@link CHARGE_KINDS}).
  */
 export function paymentBody(occ, fields) {
   const body = whitelist({ ...fields, status: 'paid' }, PAYMENT_FIELDS);

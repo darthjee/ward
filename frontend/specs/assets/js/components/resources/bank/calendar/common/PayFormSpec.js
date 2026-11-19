@@ -16,6 +16,7 @@ function render(kind, state = { fields: { amount: '10.00', record_charge: true }
 describe('PayForm', () => {
   it('shows the charge checkbox for provider and bill, checked', () => {
     expect(render('provider').contains('Also record the charge')).toBeTrue();
+    expect(render('provider_bill').contains('Also record the charge')).toBeTrue();
     expect(render('bill').contains('Also record the charge')).toBeTrue();
     expect(render('bill').containsAttribute('checked', '')).toBeTrue();
   });

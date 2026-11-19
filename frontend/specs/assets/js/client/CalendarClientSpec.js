@@ -33,8 +33,8 @@ describe('CalendarClient', () => {
   }
 
   describe('paymentBody', () => {
-    it('sends record_charge for providers and bills', () => {
-      ['provider', 'bill'].forEach((kind) => {
+    it('sends record_charge for providers, provider bills and bills', () => {
+      ['provider', 'provider_bill', 'bill'].forEach((kind) => {
         expect(paymentBody({ kind }, FIELDS)).toEqual({
           status: 'paid', paid_on: '2026-11-10', amount: '10.00', paying_account_id: 4, record_charge: true,
         });
