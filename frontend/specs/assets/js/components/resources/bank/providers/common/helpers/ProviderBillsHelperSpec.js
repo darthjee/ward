@@ -73,12 +73,17 @@ describe('ProviderBillsHelper', () => {
     expect(output({ data: { provider_bills: [{ ...ONE_OFF, due_date: null }], pagination: {} } }).contains('—')).toBeTrue();
   });
 
-  it('shows Add bill, Edit and Delete', () => {
+  it('shows Add bill, History, Edit and Delete on an active provider', () => {
     const page = output();
 
     expect(page.contains('Add bill')).toBeTrue();
+    expect(page.containsAttribute('href', '#/bank/bills/4/history')).toBeTrue();
     expect(page.contains('/bills/4/edit')).toBeTrue();
     expect(page.contains('Delete')).toBeTrue();
+  });
+
+  it('renders the Actions header on an active provider', () => {
+    expect(output().containsAttribute('aria-label', 'Actions')).toBeTrue();
   });
 
   it('links each row to its history, in both contexts', () => {
@@ -87,14 +92,34 @@ describe('ProviderBillsHelper', () => {
     expect(output({ context: { kind: 'organization', orgId: 5 } }).containsAttribute('href', '#/orgs/5/bank/bills/4/history')).toBeTrue();
   });
 
-  it('hides Add, Edit and Delete on an archived provider', () => {
-    const page = output({ account: { ...ACCOUNT, archived_at: '2026-05-01T00:00:00Z' } });
+  describe('on an archived provider', () => {
+    const ARCHIVED = { ...ACCOUNT, archived_at: '2026-05-01T00:00:00Z' };
 
-    expect(page.contains('Add bill')).toBeFalse();
-    expect(page.contains('/edit')).toBeFalse();
-    expect(page.contains('/history')).toBeFalse();
-    expect(page.contains('>Delete<')).toBeFalse();
-    expect(page.contains('Rent')).toBeTrue();
+    it('hides Add, Edit and Delete', () => {
+      const page = output({ account: ARCHIVED });
+
+      expect(page.contains('Add bill')).toBeFalse();
+      expect(page.contains('/edit')).toBeFalse();
+      expect(page.contains('>Delete<')).toBeFalse();
+      expect(page.contains('Rent')).toBeTrue();
+    });
+
+    it('keeps the History link of every row, one-offs included', () => {
+      const page = output({ account: ARCHIVED });
+
+      expect(page.containsAttribute('href', '#/bank/bills/4/history')).toBeTrue();
+      expect(page.containsAttribute('href', '#/bank/bills/5/history')).toBeTrue();
+    });
+
+    it('keeps the History link in the organization context', () => {
+      const page = output({ account: ARCHIVED, context: { kind: 'organization', orgId: 5 } });
+
+      expect(page.containsAttribute('href', '#/orgs/5/bank/bills/5/history')).toBeTrue();
+    });
+
+    it('renders the Actions header', () => {
+      expect(output({ account: ARCHIVED }).containsAttribute('aria-label', 'Actions')).toBeTrue();
+    });
   });
 
   it('shows an empty state', () => {

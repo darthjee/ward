@@ -28,9 +28,9 @@ async function fetchBillHistoryPage(context, billId, { bills, bank }) {
  * Build the load effect of the bill history page. Exported so specs can run it without a React
  * renderer.
  *
- * @description Outcomes follow `runLoad`: a `404` from either call (unknown bill, or one of an
- * archived provider) reports Not-found, other failures the classified error, an expired session
- * nothing; late answers are dropped.
+ * @description Outcomes follow `runLoad`: a `404` from either call (unknown or foreign bill)
+ * reports Not-found, other failures the classified error, an expired session nothing; late
+ * answers are dropped. A bill of an archived provider loads normally and renders read-only.
  * @param {object} context - The owner context.
  * @param {string} billId - The bill id.
  * @param {{onLoaded: Function, onNotFound: Function, onError: Function}} callbacks - Outcome

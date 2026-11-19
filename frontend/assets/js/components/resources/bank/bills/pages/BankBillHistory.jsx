@@ -4,8 +4,9 @@ import BankBillHistoryHelper from './helpers/BankBillHistoryHelper.jsx';
 
 /**
  * Bill history page (`<ui>/bank/bills/:billId/history`): the paid and skipped payments of one
- * provider bill, newest first, with Undo (hidden while the provider is archived). An unknown
- * bill, or one of an archived provider, shows Not-found.
+ * provider bill, newest first, with Undo (hidden while the provider is archived). Only an
+ * unknown (or foreign) bill shows Not-found; a bill of an archived provider renders read-only
+ * (payments listed, Undo hidden by `BillHistoryHelper`).
  *
  * @returns {React.ReactElement} The rendered page.
  */
