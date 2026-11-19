@@ -121,8 +121,9 @@ generated column over a cascading FK, as `20261108120023-bank-create-bills.ts` a
 
 ## Edge cases pinned by the model
 
-- **Provider archived**: its bills leave the list, the Calendar and the history; `GET` / `PATCH`
-  / `DELETE` on them answer `404`; they return on unarchive.
+- **Provider archived**: its bills leave the Calendar; the list, the single `GET` and the
+  per-bill history stay readable; `PATCH` / `DELETE` on them answer `404`; they return to the
+  Calendar on unarchive.
 - **Provider deleted**: bills cascade, and their payment rows cascade through the bill.
 - **Currency change on the provider** (only before any transaction): rescales every bill's
   `expected_amount`; an amount not representable in the new exponent → `400` and the whole PATCH

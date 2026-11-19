@@ -42,7 +42,7 @@ additions) after review. Read by [#121](https://github.com/darthjee/ward/issues/
 
 | Concern | Decision |
 |---|---|
-| Resolution | `ProviderBillResolver` reuses the `BillService.findOwned` pattern: load the bill, then its provider with `accountOwnerWhere(owner)`, `type = provider_expense`, `archivedAt IS NULL`. Unknown, foreign, other-context, archived-provider and debt ids answer the **same `404`** (same body, no per-case message). The nested `accounts/:accountId/provider-bills` routes and the aliases use the same owner-scoped resolution. |
+| Resolution | `ProviderBillResolver` reuses the `BillService.findOwned` pattern: load the bill, then its provider with `accountOwnerWhere(owner)`, `type = provider_expense`, `archivedAt IS NULL`. Unknown, foreign, other-context, archived-provider and debt ids answer the **same `404`** (same body, no per-case message). Reads (the list, the single `GET` and the per-bill history) pass `allowArchived`, so an archived provider's bills stay readable; the bill writes (`PATCH` / `DELETE`) still answer the uniform `404` for an archived provider. The nested `accounts/:accountId/provider-bills` routes and the aliases use the same owner-scoped resolution. |
 | Provider lock | `provider_account_id` is immutable on `recurring` bills → `409 PROVIDER_BILL_PROVIDER_LOCKED`, checked **before** resolving any target provider, so a foreign id cannot be probed through 404-vs-409. One-offs may move unless paid; the target provider is resolved owner-scoped (uniform `404` / generic `422`). |
 | `:dueDate` | Strictly parsed `YYYY-MM-DD` (impossible dates rejected). Validated per bill: generator check for `recurring` (only inside the 366-day window, so a far date cannot force iteration), equality with `due_date` for `one_off`; otherwise `404`. |
 | Concurrency | The payment writer locks the `ProviderBill` row `FOR UPDATE` and re-checks the payment in the same transaction; the unique keys stay the final guard. Two bills of one provider pay concurrently (lock is per bill). |
@@ -67,8 +67,8 @@ additions) after review. Read by [#121](https://github.com/darthjee/ward/issues/
 ## Required tests
 
 - `provider-bill.resolver.spec.ts` (new, [#122](https://github.com/darthjee/ward/issues/122)) —
-  the uniform `404` for unknown, foreign, other context, archived provider and a debt id,
-  identical bodies.
+  the uniform `404` for unknown, foreign, other context, archived provider (by default; reads
+  pass `allowArchived`) and a debt id, identical bodies.
 - `provider-bills.e2e-spec.ts` — the `404` matrix over both base paths; cross-owner and
   cross-organization denial on every verb; the cap (including concurrent creates) and the
   lock conflicts (provider lock checked before target resolution); non-whitelisted fields
