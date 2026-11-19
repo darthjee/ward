@@ -66,12 +66,12 @@ export class ProviderBillService {
 
   /**
    * @param {OwnerContext} owner - The resolved owner.
-   * @param {number} id - The bill id.
+   * @param {number} id - The bill id (archived providers allowed, read-only).
    * @returns {Promise<ProviderBillResponse>} The bill.
    * @throws {NotFoundException} The uniform 404.
    */
   async find(owner: OwnerContext, id: number): Promise<ProviderBillResponse> {
-    const { bill, provider } = await this.resolver.resolve(owner, id);
+    const { bill, provider } = await this.resolver.resolve(owner, id, undefined, { allowArchived: true });
 
     return serializeProviderBill(bill, provider.currency);
   }
