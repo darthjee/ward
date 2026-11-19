@@ -34,6 +34,7 @@ import BankProviderDetail from '../resources/bank/providers/pages/BankProviderDe
 import BankProviderAccountant from '../resources/bank/providers/pages/BankProviderAccountant.jsx';
 import BankBillNew from '../resources/bank/bills/pages/BankBillNew.jsx';
 import BankBillEdit from '../resources/bank/bills/pages/BankBillEdit.jsx';
+import BankBillHistory from '../resources/bank/bills/pages/BankBillHistory.jsx';
 
 const PAGES = new Map([
   ['register', <ModalRedirect mode="register" />],
@@ -67,6 +68,7 @@ const PAGES = new Map([
   ['bank-provider', <BankProviderDetail />],
   ['bank-bill-new', <BankBillNew />],
   ['bank-bill-edit', <BankBillEdit />],
+  ['bank-bill-history', <BankBillHistory />],
   ['not-found', <NotFound />],
   ['home', <Home />],
 ]);
