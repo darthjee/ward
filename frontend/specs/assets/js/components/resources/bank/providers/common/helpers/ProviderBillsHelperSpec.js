@@ -81,11 +81,18 @@ describe('ProviderBillsHelper', () => {
     expect(page.contains('Delete')).toBeTrue();
   });
 
+  it('links each row to its history, in both contexts', () => {
+    expect(output().containsAttribute('href', '#/bank/bills/4/history')).toBeTrue();
+    expect(output().containsAttribute('href', '#/bank/bills/5/history')).toBeTrue();
+    expect(output({ context: { kind: 'organization', orgId: 5 } }).containsAttribute('href', '#/orgs/5/bank/bills/4/history')).toBeTrue();
+  });
+
   it('hides Add, Edit and Delete on an archived provider', () => {
     const page = output({ account: { ...ACCOUNT, archived_at: '2026-05-01T00:00:00Z' } });
 
     expect(page.contains('Add bill')).toBeFalse();
     expect(page.contains('/edit')).toBeFalse();
+    expect(page.contains('/history')).toBeFalse();
     expect(page.contains('>Delete<')).toBeFalse();
     expect(page.contains('Rent')).toBeTrue();
   });

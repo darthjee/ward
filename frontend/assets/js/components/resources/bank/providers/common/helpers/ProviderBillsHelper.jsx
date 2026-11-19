@@ -30,7 +30,7 @@ function dueLabel(bill) {
 }
 
 /**
- * Render a row's actions, hidden while the provider is archived.
+ * Render a row's actions (History, Edit and Delete), hidden while the provider is archived.
  *
  * @param {object} bill - The bill.
  * @param {object} state - Helper state.
@@ -43,9 +43,11 @@ function renderActions(bill, state, handlers) {
   }
 
   const editHref = contextHash(state.context, `${BILLS_BASE}/${bill.id}/edit`);
+  const historyHref = contextHash(state.context, `${BILLS_BASE}/${bill.id}/history`);
 
   return (
     <td className="text-end text-nowrap">
+      <a className="btn btn-sm btn-link" href={historyHref}>History</a>
       <a className="btn btn-sm btn-link" href={editHref}>Edit</a>
       <button type="button" className="btn btn-sm btn-link text-danger" onClick={() => handlers.onDelete(bill)} disabled={state.pending}>
         Delete
