@@ -43,12 +43,15 @@ export function buildBillHistoryHandlers({
  * @description The page lives in component state, not in the hash (the ledger owns `?page`).
  * Undo opens the shared confirmation; confirming it goes through
  * {@link BillHistoryController#undo}.
- * @param {{context: object, account: object, onUndone: Function}} options - The owner context,
- *   the loaded account and the callback run after an undo (reloads the account).
+ * @param {{context: object, account: object, onUndone: Function, billId: (number|string)}} options
+ *   - The owner context, the loaded account, the callback run after an undo (reloads the
+ *   account) and the optional provider bill id (per-bill history).
  * @returns {{state: object, handlers: object}} The helper state (`page`, `data`, `error`,
  *   `pending`, `confirmation`, `selfHref`) and its handlers.
  */
-export default function useBillHistory({ context, account, onUndone }) {
+export default function useBillHistory({
+  context, account, onUndone, billId,
+}) {
   const [page, setPage] = useState(1);
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
@@ -67,8 +70,9 @@ export default function useBillHistory({ context, account, onUndone }) {
     setPending,
     setConfirmation,
     reload,
+    billId,
     onUndone: () => onUndoneRef.current?.(),
-  }), [context, account.id, reload]);
+  }), [context, account.id, billId, reload]);
 
   useEffect(() => {
     onUndoneRef.current = onUndone;

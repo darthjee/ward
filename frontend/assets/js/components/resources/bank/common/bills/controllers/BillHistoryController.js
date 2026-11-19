@@ -1,4 +1,5 @@
 import BillsClient from '../../../../../../client/BillsClient.js';
+import ProviderBillsClient from '../../../../../../client/ProviderBillsClient.js';
 import { classifyError } from '../../bankErrors.js';
 import { runLoad } from '../../runLoad.js';
 
@@ -17,6 +18,10 @@ export const EMPTY_HISTORY = {
  * the list (and, through `onUndone`, the account) reloads. A network / 5xx failure shows the
  * alert with Retry; any other failure (`404` already undone, `409`) shows its message (a `404`
  * shown like a conflict, since the alert hides Not-found) and reloads.
+ *
+ * With a `billId` the history is that of one provider bill: it lists through
+ * `provider-bills/:billId/bill-payments.json` and undoes every row through
+ * `provider-bills/:billId/occurrences/:dueDate/payment.json`.
  */
 export default class BillHistoryController {
   /**
@@ -31,11 +36,14 @@ export default class BillHistoryController {
    * @param {Function} options.setConfirmation - Opens / closes the Undo confirmation.
    * @param {Function} options.reload - Reloads the current history page.
    * @param {Function} [options.onUndone] - Called after an undo attempt (reloads the account).
+   * @param {number|string} [options.billId] - The provider bill id (per-bill history).
    * @param {typeof BillsClient} [options.client] - HTTP client override.
+   * @param {typeof ProviderBillsClient} [options.providerBillsClient] - Per-bill client override.
    */
   constructor({
     context, accountId, setData, setError, setPending, setConfirmation, reload,
-    onUndone = () => undefined, client = BillsClient,
+    onUndone = () => undefined, billId = undefined, client = BillsClient,
+    providerBillsClient = ProviderBillsClient,
   }) {
     this.context = context;
     this.accountId = accountId;
@@ -45,7 +53,9 @@ export default class BillHistoryController {
     this.setConfirmation = setConfirmation;
     this.reload = reload;
     this.onUndone = onUndone;
+    this.billId = billId;
     this.client = client;
+    this.providerBillsClient = providerBillsClient;
   }
 
   /**
@@ -56,7 +66,7 @@ export default class BillHistoryController {
    * @returns {Promise<void>} Resolves once the outcome is reported.
    */
   async load(page, isActive = () => true) {
-    await runLoad(() => this.client.listBillPayments(this.context, this.accountId, page), {
+    await runLoad(() => this.listPage(page), {
       onLoaded: this.setData,
       onNotFound: () => this.setData(EMPTY_HISTORY),
       onError: (error) => this.setError({ ...error, retry: this.reload }),
@@ -64,12 +74,30 @@ export default class BillHistoryController {
   }
 
   /**
-   * Send the undo request matching the row (derived or one-off).
+   * Request one page of the history, of the bill or of the account.
+   *
+   * @param {number} page - The 1-based page.
+   * @returns {Promise<object|undefined>} The history page.
+   */
+  listPage(page) {
+    if (this.billId !== undefined) {
+      return this.providerBillsClient.listBillPayments(this.context, this.billId, page);
+    }
+
+    return this.client.listBillPayments(this.context, this.accountId, page);
+  }
+
+  /**
+   * Send the undo request matching the row (per-bill, derived or one-off).
    *
    * @param {object} row - The history row.
    * @returns {Promise<object|undefined>} The (empty) response body.
    */
   sendUndo(row) {
+    if (this.billId !== undefined) {
+      return this.providerBillsClient.undoOccurrencePayment(this.context, this.billId, row.due_date);
+    }
+
     if (row.bill) {
       return this.client.undoBillPayment(this.context, row.bill.id);
     }
