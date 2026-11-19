@@ -64,6 +64,19 @@ describe('AccountDetailHelper', () => {
     expect(renderShortcuts).toHaveBeenCalledWith(ACCOUNT, HANDLERS, pageState);
   });
 
+  it('renders the after-header slot between the header and the Ledger heading', () => {
+    const renderAfterHeader = jasmine.createSpy('renderAfterHeader').and.returnValue(React.createElement('p', null, 'AFTER'));
+    const pageState = state();
+    const page = renderedOutput(AccountDetailHelper.render(pageState, HANDLERS, { ...options, renderAfterHeader }));
+
+    expect(page.containsInOrder('HEADER', 'AFTER', 'Ledger')).toBeTrue();
+    expect(renderAfterHeader).toHaveBeenCalledWith(ACCOUNT, HANDLERS, pageState);
+  });
+
+  it('renders no after-header block without the slot', () => {
+    expect(renderedOutput(AccountDetailHelper.render(state(), HANDLERS, options)).contains('AFTER')).toBeFalse();
+  });
+
   it('renders without shortcuts', () => {
     expect(renderedOutput(AccountDetailHelper.render(state(), HANDLERS, options)).containsInOrder('Ledger', 'New transaction'))
       .toBeTrue();

@@ -147,6 +147,7 @@ function renderLoaded(state, handlers, options) {
         actionPending: state.actionPending,
         context: state.context,
       }, handlers)}
+      {renderSlot(options.renderAfterHeader, account, handlers, state)}
       <BankErrorAlert error={state.error} onRetry={handlers.onRetry} onDismiss={handlers.onDismiss} />
       <h2 className="h4 mt-4">Ledger</h2>
       {renderSlot(options.renderShortcuts, account, handlers, state)}
@@ -205,12 +206,13 @@ const AccountDetailHelper = {
    *   confirmation: (object|null)}} state - Page state.
    * @param {object} handlers - Page handlers (see `buildDetailHandlers`).
    * @param {{base: string, backLabel: string, renderHeader: Function,
-   *   renderShortcuts: Function, renderRowExtra: Function, renderAfterLedger: Function}}
-   *   options - The section base path,
+   *   renderShortcuts: Function, renderRowExtra: Function, renderAfterHeader: Function,
+   *   renderAfterLedger: Function}} options - The section base path,
    *   the back link label, the header renderer (called with `{ account, hasTransactions,
    *   actionPending, context }` and the handlers), the optional shortcuts renderer (called
    *   with the account, the handlers and the page state, which may carry section extras),
-   *   the optional per-row renderer (called with the transaction, the handlers and the page
+   *   the optional block after the header (called like the shortcuts; e.g. the provider's
+   *   Bills), the optional per-row renderer (called with the transaction, the handlers and the page
    *   state; rendered under the description, also on an archived account) and the optional
    *   block after the ledger (called with the account, the handlers and the page state, e.g.
    *   the Bill history).

@@ -78,6 +78,10 @@ function findAll(node, predicate, acc = []) {
 }
 
 describe('BankProviderDetailHelper', () => {
+  it('renders the Bills block below the provider info and above the ledger', () => {
+    expect(output().containsInOrder('Provider info', 'Bills', 'Ledger')).toBeTrue();
+  });
+
   it('renders the Bill history after the ledger', () => {
     expect(output().containsInOrder('Ledger', 'Bill history', 'Loading')).toBeTrue();
   });

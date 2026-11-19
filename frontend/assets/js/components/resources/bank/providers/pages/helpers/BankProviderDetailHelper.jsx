@@ -4,6 +4,7 @@ import ProviderInfoHelper from './ProviderInfoHelper.jsx';
 import ProviderShortcuts from '../../common/ProviderShortcuts.jsx';
 import AddBillLink from '../../common/AddBillLink.jsx';
 import SentMark from '../../common/SentMark.jsx';
+import ProviderBills from '../../common/ProviderBills.jsx';
 import BillHistory from '../../../common/bills/BillHistory.jsx';
 import { PROVIDERS_BASE } from '../../../common/sections.js';
 
@@ -36,6 +37,18 @@ function renderShortcuts(account, handlers, state) {
       <AddBillLink account={account} context={state.context} />
     </ProviderShortcuts>
   );
+}
+
+/**
+ * Render the provider's Bills block, below the provider info.
+ *
+ * @param {object} account - The provider account.
+ * @param {object} handlers - Page handlers.
+ * @param {{context: object}} state - Page state.
+ * @returns {React.ReactElement} The Bills block.
+ */
+function renderAfterHeader(account, handlers, state) {
+  return <ProviderBills context={state.context} account={account} />;
 }
 
 /**
@@ -93,7 +106,7 @@ const BankProviderDetailHelper = {
   render(state, handlers) {
     return AccountDetailHelper.render(state, handlers, {
       base: PROVIDERS_BASE, backLabel: 'Providers', renderHeader, renderShortcuts, renderRowExtra,
-      renderAfterLedger,
+      renderAfterHeader, renderAfterLedger,
     });
   },
 };
