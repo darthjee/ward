@@ -30,6 +30,24 @@ function render(occurrence, context = PERSONAL) {
 }
 
 describe('CalendarEntry', () => {
+  it('labels a provider-bill occurrence "Bill / Provider"', () => {
+    const entry = occ({
+      kind: 'provider_bill', source_account: { id: 3, name: 'Vivo', type: 'provider_expense' }, source_bill: { id: 8, description: 'Internet' },
+    });
+
+    expect(render(entry).contains('>Internet / Vivo</a>')).toBeTrue();
+  });
+
+  it('keeps the account name without a source bill', () => {
+    expect(render(occ({ source_bill: null })).contains('>Loan</a>')).toBeTrue();
+  });
+
+  it('keeps the bill description for a legacy bill', () => {
+    const entry = occ({ kind: 'bill', bill: { id: 2, description: 'Repair' } });
+
+    expect(render(entry).contains('>Repair</a>')).toBeTrue();
+  });
+
   it('shows the nominal date only when shifted', () => {
     expect(render(occ()).contains('moved to')).toBeFalse();
     expect(render(occ({ effective_date: '2026-11-16' })).contains('moved to')).toBeTrue();
@@ -112,9 +130,17 @@ describe('CalendarEntry', () => {
   });
 
   describe('occurrenceKey', () => {
+    it('tells two bills of one provider due on the same date apart', () => {
+      const first = occ({ kind: 'provider_bill', source_bill: { id: 1, description: 'A' } });
+      const second = occ({ kind: 'provider_bill', source_bill: { id: 2, description: 'B' } });
+
+      expect(occurrenceKey(first)).not.toEqual(occurrenceKey(second));
+      expect(occurrenceKey(first)).toEqual('provider_bill|3||1|2026-11-14');
+    });
+
     it('combines kind, account, bill and nominal date', () => {
-      expect(occurrenceKey(occ())).toEqual('debt|3||2026-11-14');
-      expect(occurrenceKey(occ({ kind: 'bill', bill: { id: 9 } }))).toEqual('bill|3|9|2026-11-14');
+      expect(occurrenceKey(occ())).toEqual('debt|3|||2026-11-14');
+      expect(occurrenceKey(occ({ kind: 'bill', bill: { id: 9 } }))).toEqual('bill|3|9||2026-11-14');
     });
   });
 });
