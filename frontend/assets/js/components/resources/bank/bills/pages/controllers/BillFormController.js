@@ -1,4 +1,4 @@
-import BillsClient from '../../../../../../client/BillsClient.js';
+import ProviderBillsClient from '../../../../../../client/ProviderBillsClient.js';
 import { contextHash } from '../../../../../../utils/context/ownerContext.js';
 import { classifyError } from '../../../common/bankErrors.js';
 import { navigate } from '../../../common/currentHash.js';
@@ -8,8 +8,30 @@ import { billFieldsFromBill, changedBillFields, validateBillFields } from './bil
 /** Message shown when a paid bill is changed or deleted (`409 BILL_PAID`). */
 export const BILL_PAID_MESSAGE = 'This bill is paid: undo the payment first.';
 
+/** Message of a recurring bill whose provider can't be changed. */
+const PROVIDER_LOCKED_MESSAGE = "A recurring bill can't be moved to another provider.";
+
+/** Message of a bill whose kind can't be changed. */
+const KIND_LOCKED_MESSAGE = "A bill's kind can't be changed.";
+
 /**
- * Submit, update and delete flow of the one-off bill pages (`<ui>/bills/new`,
+ * Where each error code is shown: on a field (`field`) or on the form alert (`form`), with the
+ * message to display.
+ */
+const ERROR_PLACEMENTS = new Map([
+  ['PROVIDER_BILL_NAME_TAKEN', { field: 'description', message: 'A recurring bill with this description already exists for this provider' }],
+  ['CURRENCY_MISMATCH', { field: 'paying_account_id', message: "Account currency must match the provider's" }],
+  ['ACCOUNT_NOT_FOUND', { field: 'paying_account_id', message: 'Account not available' }],
+  ['PROVIDER_BILL_LIMIT', { message: 'This provider already has 50 recurring bills' }],
+  ['ACCOUNT_ARCHIVED', { message: 'The provider is archived' }],
+  ['PROVIDER_BILL_KIND_LOCKED', { message: KIND_LOCKED_MESSAGE }],
+  ['PROVIDER_BILL_PROVIDER_LOCKED', { message: PROVIDER_LOCKED_MESSAGE }],
+  ['PROVIDER_BILL_PAID', { message: BILL_PAID_MESSAGE }],
+  ['BILL_PAID', { message: BILL_PAID_MESSAGE }],
+]);
+
+/**
+ * Submit, update and delete flow of the provider bill pages (one-off and recurring) (`<ui>/bills/new`,
  * `<ui>/bills/:id/edit`).
  *
  * @description Validates on the client, sets `pending` while a request runs (so a double click
@@ -31,11 +53,11 @@ export default class BillFormController {
    * @param {Function} options.setConfirming - Opens / closes the Delete confirmation.
    * @param {Function} options.onNotFound - Called on a `404`.
    * @param {Function} [options.navigate] - Navigation override, for testability.
-   * @param {typeof BillsClient} [options.client] - HTTP client override.
+   * @param {typeof ProviderBillsClient} [options.client] - HTTP client override.
    */
   constructor({
     context, setFieldErrors, setSubmitError, setPending, setConfirming, onNotFound,
-    navigate: navigateTo = navigate, client = BillsClient,
+    navigate: navigateTo = navigate, client = ProviderBillsClient,
   }) {
     this.context = context;
     this.setFieldErrors = setFieldErrors;
@@ -66,7 +88,7 @@ export default class BillFormController {
    * @returns {Promise<void>} Resolves once submission handling finishes.
    */
   async create(fields, currency) {
-    await this.submit(validateBillFields(fields, { currency }), (body) => this.client.createBill(this.context, body));
+    await this.submit(validateBillFields(fields, { currency }), (body) => this.client.createProviderBill(this.context, body.provider_account_id, body));
   }
 
   /**
@@ -78,7 +100,7 @@ export default class BillFormController {
    * @returns {Promise<void>} Resolves once submission handling finishes.
    */
   async update(bill, fields, currency) {
-    const validation = validateBillFields(fields, { currency });
+    const validation = validateBillFields({ ...fields, kind: bill.kind }, { currency });
 
     if (validation.body) {
       const original = validateBillFields(billFieldsFromBill(bill), { currency }).body ?? {};
@@ -87,12 +109,12 @@ export default class BillFormController {
 
       if (Object.keys(validation.body).length === 0) {
         this.setFieldErrors({});
-        this.navigate(this.returnHash(bill.provider_account?.id));
+        this.navigate(this.returnHash(bill.provider_account_id));
         return;
       }
     }
 
-    await this.submit(validation, (body) => this.client.updateBill(this.context, bill.id, body));
+    await this.submit(validation, (body) => this.client.updateProviderBill(this.context, bill.id, body));
   }
 
   /**
@@ -106,13 +128,13 @@ export default class BillFormController {
     this.setPending(true);
 
     try {
-      const reply = await this.client.deleteBill(this.context, bill.id);
+      const reply = await this.client.deleteProviderBill(this.context, bill.id);
 
       this.setPending(false);
       this.setConfirming(false);
 
       if (reply !== undefined) {
-        this.navigate(this.returnHash(bill.provider_account?.id));
+        this.navigate(this.returnHash(bill.provider_account_id));
       }
     } catch (error) {
       this.setConfirming(false);
@@ -145,10 +167,32 @@ export default class BillFormController {
         return;
       }
 
-      this.navigate(this.returnHash(bill.provider_account?.id));
+      this.navigate(this.returnHash(bill.provider_account_id));
     } catch (error) {
       this.handleError(error, () => this.submit({ errors, body }, request));
     }
+  }
+
+  /**
+   * Show a mapped error code on its field or on the form alert.
+   *
+   * @param {object} classified - The classified error.
+   * @returns {boolean} Whether the code is mapped (and so shown).
+   */
+  placeError(classified) {
+    const placement = ERROR_PLACEMENTS.get(classified.code);
+
+    if (!placement) {
+      return false;
+    }
+
+    if (placement.field) {
+      this.setFieldErrors({ [placement.field]: placement.message });
+    } else {
+      this.setSubmitError({ ...classified, message: placement.message, messages: [placement.message] });
+    }
+
+    return true;
   }
 
   /**
@@ -168,8 +212,7 @@ export default class BillFormController {
       return;
     }
 
-    if (classified.code === 'BILL_PAID') {
-      this.setSubmitError({ ...classified, message: BILL_PAID_MESSAGE, messages: [BILL_PAID_MESSAGE] });
+    if (this.placeError(classified)) {
       return;
     }
 

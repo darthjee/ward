@@ -1,7 +1,6 @@
 import BankProviderDetailHelper from '../../../../../../../../../assets/js/components/resources/bank/providers/pages/helpers/BankProviderDetailHelper.jsx';
 import { initialLedgerForm } from '../../../../../../../../../assets/js/components/resources/bank/common/detail/hooks/useLedgerForm.js';
 import { formatDate, localToday } from '../../../../../../../../../assets/js/components/resources/bank/common/dates.js';
-import BillHistoryHelper from '../../../../../../../../../assets/js/components/resources/bank/common/bills/helpers/BillHistoryHelper.jsx';
 import { renderedOutput } from '../../../../../../../../support/renderedOutput.js';
 
 const SENT_AT = '2026-03-02T15:00:00.000Z';
@@ -78,18 +77,12 @@ function findAll(node, predicate, acc = []) {
 }
 
 describe('BankProviderDetailHelper', () => {
-  it('renders the Bill history after the ledger', () => {
-    expect(output().containsInOrder('Ledger', 'Bill history', 'Loading')).toBeTrue();
+  it('renders the Bills block below the provider info and above the ledger', () => {
+    expect(output().containsInOrder('Provider info', 'Bills', 'Ledger')).toBeTrue();
   });
 
-  it('hands the account and its source type to the Bill history', () => {
-    spyOn(BillHistoryHelper, 'render').and.returnValue(null);
-    output();
-
-    expect(BillHistoryHelper.render).toHaveBeenCalledWith(
-      jasmine.objectContaining({ sourceType: 'provider_expense', account: jasmine.objectContaining({ id: jasmine.anything() }) }),
-      jasmine.any(Object),
-    );
+  it('no longer renders the account-level Bill history', () => {
+    expect(output().contains('Bill history')).toBeFalse();
   });
 
   it('renders the header, the info block, the shortcuts, the plain inline add and the ledger', () => {

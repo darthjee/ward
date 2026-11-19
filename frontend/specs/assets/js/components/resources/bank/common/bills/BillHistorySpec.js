@@ -28,4 +28,12 @@ describe('BillHistory', () => {
 
     expect(page.containsInOrder('Bill history', 'Loading')).toBeTrue();
   });
+
+  it('renders the loading history of one provider bill', () => {
+    const page = renderedOutput(React.createElement(BillHistory, {
+      context: { kind: 'personal' }, account: { id: 7, currency: 'BRL', archived_at: null }, sourceType: 'provider_expense', billId: 12,
+    }));
+
+    expect(page.containsInOrder('Bill history', 'Loading')).toBeTrue();
+  });
 });

@@ -59,6 +59,7 @@ export const ROUTES_CONTEXT = [
   ['/bank/providers/:accountId', 'bank-provider'],
   ['/bank/bills/new', 'bank-bill-new'],
   ['/bank/bills/:billId/edit', 'bank-bill-edit'],
+  ['/bank/bills/:billId/history', 'bank-bill-history'],
   ['/bank/calendar', 'bank-calendar'],
   ['/bank/calendar/month', 'bank-calendar-month'],
 ];

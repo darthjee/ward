@@ -18,6 +18,14 @@ describe('payFields', () => {
       expect(initialPayFields({ ...OCC, expected_amount: null }, OPTIONS, '2026-11-14').amount).toEqual('');
     });
 
+    it('starts a provider-bill occurrence without an expected amount empty, and requires it', () => {
+      const occ = { ...OCC, kind: 'provider_bill', expected_amount: null };
+      const fields = initialPayFields(occ, OPTIONS, '2026-11-14');
+
+      expect(fields.amount).toEqual('');
+      expect(validatePayFields(fields, occ, NOW).errors.amount).toBeDefined();
+    });
+
     it('leaves the account empty without a default', () => {
       expect(initialPayFields({ ...OCC, default_paying_account: null }, OPTIONS, '2026-11-14').paying_account_id).toEqual('');
     });

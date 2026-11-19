@@ -3,14 +3,16 @@ import {
   mergeLoadedBill,
 } from '../../../../../../../../../assets/js/components/resources/bank/bills/pages/controllers/billFormLoad.js';
 import BankClient from '../../../../../../../../../assets/js/client/BankClient.js';
-import BillsClient from '../../../../../../../../../assets/js/client/BillsClient.js';
+import ProviderBillsClient from '../../../../../../../../../assets/js/client/ProviderBillsClient.js';
 import ApiError from '../../../../../../../../../assets/js/client/ApiError.js';
 import { flushMicrotasks } from '../../../../../../../../support/flushMicrotasks.js';
 
 const CONTEXT = { kind: 'organization', orgId: 5 };
 const PROVIDERS = [{ id: 3, name: 'Plumber', currency: 'BRL' }];
 const ACCOUNTS = [{ id: 1, name: 'Main', currency: 'BRL' }];
-const BILL = { id: 9, provider_account: { id: 3 }, paying_account: { id: 1 }, due_date: '2026-03-10' };
+const BILL = {
+  id: 9, kind: 'one_off', provider_account_id: 3, paying_account_id: 1, due_date: '2026-03-10',
+};
 
 describe('billFormLoad', () => {
   let clients;
@@ -23,7 +25,7 @@ describe('billFormLoad', () => {
           type === 'regular' ? ACCOUNTS : PROVIDERS,
         )),
       },
-      bills: { getBill: jasmine.createSpy('getBill').and.resolveTo(BILL) },
+      bills: { getProviderBill: jasmine.createSpy('getProviderBill').and.resolveTo(BILL) },
     };
     callbacks = {
       onLoaded: jasmine.createSpy('onLoaded'),
@@ -39,7 +41,7 @@ describe('billFormLoad', () => {
 
       expect(clients.bank.listAccounts).toHaveBeenCalledWith(CONTEXT, { type: 'provider_expense' });
       expect(clients.bank.listAccounts).toHaveBeenCalledWith(CONTEXT, { type: 'regular' });
-      expect(clients.bills.getBill).not.toHaveBeenCalled();
+      expect(clients.bills.getProviderBill).not.toHaveBeenCalled();
       expect(callbacks.onLoaded).toHaveBeenCalledWith({ providers: PROVIDERS, accounts: ACCOUNTS, bill: null });
     });
 
@@ -47,12 +49,12 @@ describe('billFormLoad', () => {
       buildBillFormLoadEffect(CONTEXT, '9', callbacks, clients)();
       await flushMicrotasks();
 
-      expect(clients.bills.getBill).toHaveBeenCalledWith(CONTEXT, '9');
+      expect(clients.bills.getProviderBill).toHaveBeenCalledWith(CONTEXT, '9');
       expect(callbacks.onLoaded).toHaveBeenCalledWith({ providers: PROVIDERS, accounts: ACCOUNTS, bill: BILL });
     });
 
     it('reports a 404 bill as not-found', async () => {
-      clients.bills.getBill.and.rejectWith(new ApiError(404, 'Not found'));
+      clients.bills.getProviderBill.and.rejectWith(new ApiError(404, 'Not found'));
       buildBillFormLoadEffect(CONTEXT, '9', callbacks, clients)();
       await flushMicrotasks();
 
@@ -60,7 +62,7 @@ describe('billFormLoad', () => {
     });
 
     it('reports nothing when the session expired', async () => {
-      clients.bills.getBill.and.resolveTo(undefined);
+      clients.bills.getProviderBill.and.resolveTo(undefined);
       buildBillFormLoadEffect(CONTEXT, '9', callbacks, clients)();
       await flushMicrotasks();
 
@@ -78,11 +80,11 @@ describe('billFormLoad', () => {
 
     it('defaults to the bank and bills clients', async () => {
       spyOn(BankClient, 'listAccounts').and.resolveTo([]);
-      spyOn(BillsClient, 'getBill').and.resolveTo(BILL);
+      spyOn(ProviderBillsClient, 'getProviderBill').and.resolveTo(BILL);
       buildBillFormLoadEffect(CONTEXT, '9', callbacks)();
       await flushMicrotasks();
 
-      expect(BillsClient.getBill).toHaveBeenCalled();
+      expect(ProviderBillsClient.getProviderBill).toHaveBeenCalled();
       expect(callbacks.onLoaded).toHaveBeenCalled();
     });
   });

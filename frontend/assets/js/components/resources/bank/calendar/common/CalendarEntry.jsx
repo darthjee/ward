@@ -24,9 +24,14 @@ const ROW_CLASSES = new Map([
  * Build the name shown for an occurrence.
  *
  * @param {object} occ - The occurrence.
- * @returns {string} The bill description for a bill, otherwise the source account name.
+ * @returns {string} "Bill / Provider" for a provider-bill occurrence (`source_bill`), the bill
+ *   description for a legacy bill, otherwise the source account name.
  */
 function entryName(occ) {
+  if (occ.source_bill) {
+    return `${occ.source_bill.description} / ${occ.source_account.name}`;
+  }
+
   return occ.kind === 'bill' ? occ.bill.description : occ.source_account.name;
 }
 

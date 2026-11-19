@@ -7,12 +7,13 @@ import { readField } from './AccountFormInput.jsx';
  * `state.idPrefix + name`. The change handler receives an event-like
  * `{ target: { name, value } }` whose `value` is a boolean, so it plugs into the forms'
  * `onFieldChange`.
- * @param {{name: string, label: string, state: object, onChange: Function}} props - The field
- *   name, label, the form state and the change handler.
+ * @param {{name: string, label: string, state: object, onChange: Function, hint: string}} props
+ *   - The field name, label, the form state, the change handler and an optional hint shown
+ *   under the checkbox.
  * @returns {React.ReactElement} The field.
  */
 export default function AccountFormCheckbox({
-  name, label, state, onChange,
+  name, label, state, onChange, hint = null,
 }) {
   const error = readField(state.fieldErrors, name);
   const id = `${state.idPrefix}${name}`;
@@ -29,6 +30,7 @@ export default function AccountFormCheckbox({
       />
       <label className="form-check-label" htmlFor={id}>{label}</label>
       {error && <div className="invalid-feedback">{error}</div>}
+      {hint && <div className="form-text">{hint}</div>}
     </div>
   );
 }

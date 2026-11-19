@@ -2,8 +2,7 @@ import AccountFormCheckbox from '../../common/form/AccountFormCheckbox.jsx';
 import AccountFormInput from '../../common/form/AccountFormInput.jsx';
 import AccountFormSelect from '../../common/form/AccountFormSelect.jsx';
 import { payingAccountOptions } from '../../common/form/controllers/scheduleFields.js';
-
-const CHARGE_KINDS = ['provider', 'bill'];
+import { CHARGE_KINDS } from '../../../../../client/CalendarClient.js';
 
 /**
  * The fields of the Pay dialog: amount, paid on, paying account and, for provider / bill

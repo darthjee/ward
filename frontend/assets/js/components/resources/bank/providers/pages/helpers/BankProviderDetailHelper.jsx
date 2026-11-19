@@ -4,7 +4,7 @@ import ProviderInfoHelper from './ProviderInfoHelper.jsx';
 import ProviderShortcuts from '../../common/ProviderShortcuts.jsx';
 import AddBillLink from '../../common/AddBillLink.jsx';
 import SentMark from '../../common/SentMark.jsx';
-import BillHistory from '../../../common/bills/BillHistory.jsx';
+import ProviderBills from '../../common/ProviderBills.jsx';
 import { PROVIDERS_BASE } from '../../../common/sections.js';
 
 /**
@@ -39,6 +39,18 @@ function renderShortcuts(account, handlers, state) {
 }
 
 /**
+ * Render the provider's Bills block, below the provider info.
+ *
+ * @param {object} account - The provider account.
+ * @param {object} handlers - Page handlers.
+ * @param {{context: object}} state - Page state.
+ * @returns {React.ReactElement} The Bills block.
+ */
+function renderAfterHeader(account, handlers, state) {
+  return <ProviderBills context={state.context} account={account} />;
+}
+
+/**
  * Render a ledger row's sent mark (charges carrying `sent_to_accountant_at` only).
  *
  * @param {object} transaction - The ledger row.
@@ -57,21 +69,6 @@ function renderRowExtra(transaction, handlers, state) {
 }
 
 /**
- * Render the provider's Bill history after the ledger; an undo reloads the provider and its
- * ledger.
- *
- * @param {object} account - The provider account.
- * @param {{onRetryLoad: Function}} handlers - Page handlers.
- * @param {{context: object}} state - Page state.
- * @returns {React.ReactElement} The Bill history.
- */
-function renderAfterLedger(account, handlers, state) {
-  return (
-    <BillHistory context={state.context} account={account} sourceType="provider_expense" onUndone={handlers.onRetryLoad} />
-  );
-}
-
-/**
  * Rendering helper composing the provider detail page.
  */
 const BankProviderDetailHelper = {
@@ -79,8 +76,8 @@ const BankProviderDetailHelper = {
    * Render the provider detail page: the shared detail page under the Providers section, with
    * the provider header (info block), the Add charge / Add payment shortcuts and the Add bill
    * link above the ledger
-   * and each sent charge's mark with **Mark as unsent** (also on an archived provider), and the
-   * Bill history after the ledger.
+   * and each sent charge's mark with **Mark as unsent** (also on an archived provider). The
+   * Bills block (with a History link per bill) sits below the provider info.
    *
    * @param {{context: object, accountId: (number|string), page: number,
    *   data: ({account: object, ledger: object}|null), loadError: (object|null),
@@ -93,7 +90,7 @@ const BankProviderDetailHelper = {
   render(state, handlers) {
     return AccountDetailHelper.render(state, handlers, {
       base: PROVIDERS_BASE, backLabel: 'Providers', renderHeader, renderShortcuts, renderRowExtra,
-      renderAfterLedger,
+      renderAfterHeader,
     });
   },
 };

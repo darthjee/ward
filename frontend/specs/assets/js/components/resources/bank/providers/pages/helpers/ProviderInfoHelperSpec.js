@@ -1,7 +1,5 @@
 import { formatDate } from '../../../../../../../../../assets/js/components/resources/bank/common/dates.js';
 import ProviderInfoHelper from '../../../../../../../../../assets/js/components/resources/bank/providers/pages/helpers/ProviderInfoHelper.jsx';
-import { formatMoney } from '../../../../../../../../../assets/js/components/resources/bank/common/amounts.js';
-import { monthName } from '../../../../../../../../../assets/js/components/resources/bank/common/dates.js';
 import { renderedOutput } from '../../../../../../../../support/renderedOutput.js';
 
 const PROVIDER = {
@@ -36,57 +34,22 @@ describe('ProviderInfoHelper', () => {
     )).toBeTrue();
   });
 
-  it('renders the provider info block', () => {
-    expect(output().containsInOrder(
-      'Provider info',
-      'Provider tax id', '12.345.678/0001-90',
-      'Expected amount', `${formatMoney('200.00', 'BRL')} / year`,
-      'Frequency', 'Yearly',
-      'Due day', '10',
-      'Due month', monthName(3),
-      'For accountant', 'Yes',
-    )).toBeTrue();
+  it('renders the provider info block without schedule entries', () => {
+    const page = output();
+
+    expect(page.containsInOrder('Provider info', 'Provider tax id', '12.345.678/0001-90', 'For accountant', 'Yes')).toBeTrue();
+    ['Expected amount', 'Frequency', 'Due day', 'Due month', 'Bills from', 'Show in Calendar', 'Default paying account']
+      .forEach((label) => expect(page.contains(label)).toBeFalse());
   });
 
-  it('shows "—" for a missing expected amount and a personal provider', () => {
-    const page = output({ expected_amount: null, for_accountant: false, charge_frequency: 'monthly' });
-
-    expect(page.containsInOrder('Expected amount', '—', 'Frequency', 'Monthly')).toBeTrue();
-    expect(page.containsInOrder('For accountant', '—')).toBeTrue();
-  });
-
-  it('shows the due day and month only when set', () => {
-    const page = output({ due_day: null, due_month: null, charge_frequency: 'monthly' });
-
-    expect(page.contains('Due day')).toBeFalse();
-    expect(page.contains('Due month')).toBeFalse();
+  it('shows "—" for a personal provider', () => {
+    expect(output({ for_accountant: false }).containsInOrder('For accountant', '—')).toBeTrue();
   });
 
   it('tolerates a missing provider_expense object', () => {
     const page = renderedOutput(ProviderInfoHelper.render({ ...PROVIDER, provider_expense: null }));
 
-    expect(page.containsInOrder('Expected amount', '—')).toBeTrue();
-  });
-
-  it('renders the schedule values after the provider info', () => {
-    const page = output({ bills_from: '2026-02-01', show_in_calendar: false, paying_account: { id: 9, name: 'Main' } });
-
-    expect(page.containsInOrder(
-      'For accountant', 'Bills from', formatDate('2026-02-01'), 'Show in Calendar', 'No', 'Default paying account', 'Main',
-    )).toBeTrue();
-  });
-
-  it('shows "—" for blank schedule values and Show in Calendar on by default', () => {
-    expect(output({ bills_from: null, paying_account: null }).containsInOrder(
-      'Bills from', '—', 'Show in Calendar', 'Yes', 'Default paying account', '—',
-    )).toBeTrue();
-  });
-
-  it('escapes the default paying account name', () => {
-    const page = output({ paying_account: { id: 9, name: '<img src=x onerror=alert(1)>' } });
-
-    expect(page.containsTag('img')).toBeFalse();
-    expect(page.contains('&lt;img')).toBeTrue();
+    expect(page.containsInOrder('Provider tax id', '—', 'For accountant', '—')).toBeTrue();
   });
 
   it('escapes the provider and the tax id', () => {

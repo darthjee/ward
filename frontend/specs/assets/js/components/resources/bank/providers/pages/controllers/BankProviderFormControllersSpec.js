@@ -22,10 +22,6 @@ const STORED = {
   provider_expense: {
     for_accountant: true,
     provider_tax_id: null,
-    expected_amount: '200.00',
-    charge_frequency: 'monthly',
-    due_day: null,
-    due_month: null,
   },
 };
 
@@ -49,13 +45,13 @@ describe('provider form controllers', () => {
   describe('BankProviderNewController', () => {
     it('creates through the provider call, then opens the provider', async () => {
       await new BankProviderNewController(deps).handleSubmit({
-        ...emptyProviderFields('BRL', '2026-01-01'), name: 'Office rent', expected_amount: '200',
+        ...emptyProviderFields('BRL', '2026-01-01'), name: 'Office rent',
       });
 
       expect(deps.client.createAccount).not.toHaveBeenCalled();
       expect(deps.client.createProviderExpense).toHaveBeenCalledWith(deps.context, jasmine.objectContaining({
         name: 'Office rent',
-        provider_expense: jasmine.objectContaining({ for_accountant: true, expected_amount: '200', charge_frequency: 'monthly' }),
+        provider_expense: { for_accountant: true, provider_tax_id: null },
       }));
       expect(deps.navigate).toHaveBeenCalledWith('#/bank/providers/4');
     });
@@ -68,38 +64,30 @@ describe('provider form controllers', () => {
 
     it('keeps the values and shows the errors when invalid', async () => {
       await new BankProviderNewController(deps).handleSubmit({
-        ...emptyProviderFields('BRL', '2026-01-01'), name: 'X', charge_frequency: 'yearly',
+        ...emptyProviderFields('BRL', '2026-01-01'), name: 'X', provider_tax_id: 'x'.repeat(40),
       });
 
       expect(deps.client.createProviderExpense).not.toHaveBeenCalled();
-      expect(deps.setFieldErrors).toHaveBeenCalledWith({ due_month: jasmine.any(String) });
+      expect(deps.setFieldErrors).toHaveBeenCalledWith({ provider_tax_id: jasmine.any(String) });
     });
   });
 
   describe('BankProviderEditController', () => {
     it('sends only the changed fields and provider keys, without type', async () => {
       await new BankProviderEditController({ ...deps, context: ORG })
-        .handleSubmit(4, { ...providerFieldsFromAccount(STORED), bank_name: 'New Ltd', due_day: '15' }, STORED);
+        .handleSubmit(4, { ...providerFieldsFromAccount(STORED), bank_name: 'New Ltd', provider_tax_id: '9' }, STORED);
 
       expect(deps.client.updateAccount).not.toHaveBeenCalled();
-      expect(deps.client.updateProviderExpense).toHaveBeenCalledWith(ORG, 4, { bank_name: 'New Ltd', provider_expense: { due_day: 15 } });
+      expect(deps.client.updateProviderExpense).toHaveBeenCalledWith(ORG, 4, { bank_name: 'New Ltd', provider_expense: { provider_tax_id: '9' } });
       expect(deps.navigate).toHaveBeenCalledWith('#/orgs/5/bank/providers/4');
     });
 
-    it('clears the expected amount with null', async () => {
-      await new BankProviderEditController(deps).handleSubmit(4, { ...providerFieldsFromAccount(STORED), expected_amount: '' }, STORED);
+    it('clears the tax id with null', async () => {
+      const stored = { ...STORED, provider_expense: { ...STORED.provider_expense, provider_tax_id: '1' } };
 
-      expect(deps.client.updateProviderExpense).toHaveBeenCalledWith(deps.context, 4, { provider_expense: { expected_amount: null } });
-    });
+      await new BankProviderEditController(deps).handleSubmit(4, { ...providerFieldsFromAccount(stored), provider_tax_id: '' }, stored);
 
-    it('switches to yearly with the due month', async () => {
-      await new BankProviderEditController(deps).handleSubmit(4, {
-        ...providerFieldsFromAccount(STORED), charge_frequency: 'yearly', due_month: '6',
-      }, STORED);
-
-      expect(deps.client.updateProviderExpense).toHaveBeenCalledWith(deps.context, 4, {
-        provider_expense: { charge_frequency: 'yearly', due_month: 6 },
-      });
+      expect(deps.client.updateProviderExpense).toHaveBeenCalledWith(deps.context, 4, { provider_expense: { provider_tax_id: null } });
     });
 
     it('turns For accountant off', async () => {

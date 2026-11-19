@@ -44,4 +44,9 @@ describe('AccountFormCheckbox', () => {
     expect(page.contains('is-invalid')).toBeTrue();
     expect(page.containsElement('div', 'Invalid')).toBeTrue();
   });
+
+  it('shows the hint only when given', () => {
+    expect(renderedOutput(element({ hint: 'Careful' })).containsElement('div', 'Careful')).toBeTrue();
+    expect(renderedOutput(element()).contains('form-text')).toBeFalse();
+  });
 });

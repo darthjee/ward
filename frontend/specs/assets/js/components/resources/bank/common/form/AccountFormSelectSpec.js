@@ -37,4 +37,9 @@ describe('AccountFormSelect', () => {
     expect(page.contains('is-invalid')).toBeTrue();
     expect(page.containsElement('div', 'Choose the interest period')).toBeTrue();
   });
+
+  it('is enabled by default and locked with `disabled`', () => {
+    expect(output().contains('disabled')).toBeFalse();
+    expect(output({ disabled: true }).contains('disabled=""')).toBeTrue();
+  });
 });

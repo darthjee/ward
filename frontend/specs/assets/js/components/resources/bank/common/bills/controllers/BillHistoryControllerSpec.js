@@ -2,6 +2,7 @@ import BillHistoryController, {
   EMPTY_HISTORY,
 } from '../../../../../../../../../assets/js/components/resources/bank/common/bills/controllers/BillHistoryController.js';
 import BillsClient from '../../../../../../../../../assets/js/client/BillsClient.js';
+import ProviderBillsClient from '../../../../../../../../../assets/js/client/ProviderBillsClient.js';
 import ApiError from '../../../../../../../../../assets/js/client/ApiError.js';
 
 const CONTEXT = { kind: 'organization', orgId: 5 };
@@ -76,6 +77,41 @@ describe('BillHistoryController', () => {
       await build().load(1, () => false);
 
       expect(deps.setData).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('per-bill history', () => {
+    let providerBillsClient;
+
+    beforeEach(() => {
+      providerBillsClient = {
+        listBillPayments: jasmine.createSpy('listBillPayments').and.resolveTo({ payments: [DERIVED], pagination: {} }),
+        undoOccurrencePayment: jasmine.createSpy('undoOccurrencePayment').and.resolveTo({}),
+      };
+    });
+
+    function buildPerBill() {
+      return build({ billId: 12, providerBillsClient });
+    }
+
+    it('lists through the bill route', async () => {
+      await buildPerBill().load(2);
+
+      expect(providerBillsClient.listBillPayments).toHaveBeenCalledWith(CONTEXT, 12, 2);
+      expect(client.listBillPayments).not.toHaveBeenCalled();
+    });
+
+    it('undoes every row, one-off ones included, through the bill occurrence route', async () => {
+      await buildPerBill().undo(ONE_OFF);
+
+      expect(providerBillsClient.undoOccurrencePayment).toHaveBeenCalledWith(CONTEXT, 12, '2026-03-12');
+      expect(client.undoBillPayment).not.toHaveBeenCalled();
+      expect(client.undoOccurrencePayment).not.toHaveBeenCalled();
+      expect(deps.reload).toHaveBeenCalled();
+    });
+
+    it('defaults to the provider bills client', () => {
+      expect(new BillHistoryController({ ...deps, billId: 1 }).providerBillsClient).toBe(ProviderBillsClient);
     });
   });
 
