@@ -34,7 +34,7 @@ describe('useBillForm', () => {
 
     beforeEach(() => {
       fields = {
-        provider_account_id: '3', paying_account_id: '1', due_date: '2026-03-10', amount: '1', description: 'x', notes: '',
+        kind: 'one_off', provider_account_id: '3', paying_account_id: '1', due_date: '2026-03-10', expected_amount: '1', description: 'x', notes: '',
       };
       deps = {
         controller: {

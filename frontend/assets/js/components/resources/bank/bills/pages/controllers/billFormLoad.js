@@ -1,5 +1,5 @@
 import BankClient from '../../../../../../client/BankClient.js';
-import BillsClient from '../../../../../../client/BillsClient.js';
+import ProviderBillsClient from '../../../../../../client/ProviderBillsClient.js';
 import { buildLoadEffect, runLoad } from '../../../common/runLoad.js';
 import { findProvider, billFieldsFromBill } from './billFormFields.js';
 
@@ -9,7 +9,7 @@ import { findProvider, billFieldsFromBill } from './billFormFields.js';
  *
  * @param {object} context - The owner context.
  * @param {string|null} billId - The bill id (edit page), or `null`.
- * @param {{bank: typeof BankClient, bills: typeof BillsClient}} clients - HTTP clients.
+ * @param {{bank: typeof BankClient, bills: typeof ProviderBillsClient}} clients - HTTP clients.
  * @returns {Promise<{providers: Array<object>, accounts: Array<object>, bill: (object|null)}|undefined>}
  *   The loaded data, or `undefined` when the session expired.
  */
@@ -17,7 +17,7 @@ async function fetchBillForm(context, billId, { bank, bills }) {
   const [providers, accounts, bill] = await Promise.all([
     bank.listAccounts(context, { type: 'provider_expense' }),
     bank.listAccounts(context, { type: 'regular' }),
-    billId ? bills.getBill(context, billId) : Promise.resolve(null),
+    billId ? bills.getProviderBill(context, billId) : Promise.resolve(null),
   ]);
 
   if (!providers || !accounts || (billId && !bill)) {
@@ -37,11 +37,11 @@ async function fetchBillForm(context, billId, { bank, bills }) {
  * @param {string|null} billId - The bill id (edit page), or `null`.
  * @param {{onLoaded: Function, onNotFound: Function, onError: Function}} callbacks - Outcome
  *   callbacks (`onLoaded` receives `{ providers, accounts, bill }`).
- * @param {{bank: typeof BankClient, bills: typeof BillsClient}} [clients] - HTTP client
+ * @param {{bank: typeof BankClient, bills: typeof ProviderBillsClient}} [clients] - HTTP client
  *   overrides.
  * @returns {Function} Effect callback, returning a cleanup that drops late answers.
  */
-export function buildBillFormLoadEffect(context, billId, callbacks, clients = { bank: BankClient, bills: BillsClient }) {
+export function buildBillFormLoadEffect(context, billId, callbacks, clients = { bank: BankClient, bills: ProviderBillsClient }) {
   return buildLoadEffect((isActive) => runLoad(() => fetchBillForm(context, billId, clients), callbacks, isActive));
 }
 

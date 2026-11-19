@@ -85,7 +85,7 @@ describe('BankBillFormHelper', () => {
   });
 
   it('shows the field errors', () => {
-    expect(output({ fieldErrors: { amount: 'Amount is required' } }).contains('Amount is required')).toBeTrue();
+    expect(output({ fieldErrors: { expected_amount: 'Amount is required' } }).contains('Amount is required')).toBeTrue();
   });
 
   it('shows a 422 on the form', () => {

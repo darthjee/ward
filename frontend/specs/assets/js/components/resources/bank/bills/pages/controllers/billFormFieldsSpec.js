@@ -19,23 +19,37 @@ const ACCOUNTS = [
   { id: 2, name: 'Travel', currency: 'USD', type: 'regular' },
 ];
 const VALID = {
+  kind: 'one_off',
   provider_account_id: '3',
   paying_account_id: '1',
   due_date: '2020-01-31',
-  amount: '120,50',
+  expected_amount: '120,50',
   description: '  Boiler repair ',
   notes: '',
 };
 const BILL = {
   id: 9,
-  provider_account: { id: 3, name: 'Plumber' },
-  paying_account: { id: 1, name: 'Main' },
+  kind: 'one_off',
+  provider_account_id: 3,
+  paying_account_id: 1,
   due_date: '2026-03-10',
-  amount: '120.50',
-  currency: 'BRL',
+  expected_amount: '120.50',
   description: 'Boiler repair',
   notes: null,
-  payment: null,
+};
+const RECURRING = {
+  kind: 'recurring',
+  provider_account_id: '3',
+  paying_account_id: '',
+  due_date: '',
+  expected_amount: '',
+  description: 'Rent',
+  notes: '',
+  charge_frequency: 'monthly',
+  due_day: '5',
+  due_month: '',
+  bills_from: '',
+  show_in_calendar: true,
 };
 
 function validate(overrides = {}, currency = 'BRL') {
@@ -51,7 +65,18 @@ describe('billFormFields', () => {
   describe('emptyBillFields', () => {
     it('pre-selects the given provider and is due today', () => {
       expect(emptyBillFields('3', '2026-05-10')).toEqual({
-        provider_account_id: '3', paying_account_id: '', due_date: '2026-05-10', amount: '', description: '', notes: '',
+        kind: 'one_off',
+        provider_account_id: '3',
+        paying_account_id: '',
+        due_date: '2026-05-10',
+        expected_amount: '',
+        description: '',
+        notes: '',
+        charge_frequency: 'monthly',
+        due_day: '',
+        due_month: '',
+        bills_from: '',
+        show_in_calendar: true,
       });
     });
 
@@ -62,20 +87,34 @@ describe('billFormFields', () => {
   });
 
   describe('billFieldsFromBill', () => {
-    it('reads the account ids from their objects', () => {
+    it('reads the raw account ids', () => {
       expect(billFieldsFromBill(BILL)).toEqual({
+        kind: 'one_off',
         provider_account_id: '3',
         paying_account_id: '1',
         due_date: '2026-03-10',
-        amount: '120.50',
+        expected_amount: '120.50',
         description: 'Boiler repair',
         notes: '',
+        charge_frequency: 'monthly',
+        due_day: '',
+        due_month: '',
+        bills_from: '',
+        show_in_calendar: true,
       });
     });
 
+    it('reads the recurring fields', () => {
+      expect(billFieldsFromBill({
+        kind: 'recurring', charge_frequency: 'yearly', due_day: 5, due_month: 3, bills_from: '2026-01-01', show_in_calendar: false,
+      })).toEqual(jasmine.objectContaining({
+        kind: 'recurring', charge_frequency: 'yearly', due_day: '5', due_month: '3', bills_from: '2026-01-01', show_in_calendar: false,
+      }));
+    });
+
     it('tolerates a bill without a paying account', () => {
-      expect(billFieldsFromBill({ id: 1, paying_account: null }).paying_account_id).toBe('');
-      expect(billFieldsFromBill({ id: 1 })).toEqual(jasmine.objectContaining({ provider_account_id: '', amount: '' }));
+      expect(billFieldsFromBill({ id: 1, paying_account_id: null }).paying_account_id).toBe('');
+      expect(billFieldsFromBill({ id: 1 })).toEqual(jasmine.objectContaining({ provider_account_id: '', expected_amount: '', kind: 'one_off' }));
     });
   });
 
@@ -105,12 +144,18 @@ describe('billFormFields', () => {
         .toEqual({ ...VALID, provider_account_id: '3', paying_account_id: '1' });
     });
 
+    it('fills Bills from the first time a due day is entered', () => {
+      const next = withBillFieldChange({ ...RECURRING, due_day: '' }, 'due_day', '5', lists);
+
+      expect(next.bills_from).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    });
+
     it('clears the paying account when the provider is unset', () => {
       expect(withBillFieldChange(VALID, 'provider_account_id', '', lists).paying_account_id).toBe('');
     });
 
     it('only sets other fields', () => {
-      expect(withBillFieldChange(VALID, 'amount', '5', lists)).toEqual({ ...VALID, amount: '5' });
+      expect(withBillFieldChange(VALID, 'expected_amount', '5', lists)).toEqual({ ...VALID, expected_amount: '5' });
       expect(withBillFieldChange({ ...VALID, paying_account_id: '' }, 'provider_account_id', '4', lists).paying_account_id).toBe('');
     });
   });
@@ -120,10 +165,11 @@ describe('billFormFields', () => {
       expect(validate()).toEqual({
         errors: {},
         body: {
+          kind: 'one_off',
           provider_account_id: 3,
           paying_account_id: 1,
           due_date: '2020-01-31',
-          amount: '120.50',
+          expected_amount: '120.50',
           description: 'Boiler repair',
           notes: null,
         },
@@ -132,12 +178,12 @@ describe('billFormFields', () => {
 
     it('requires the provider, the paying account, the due date, the amount and the description', () => {
       expect(validate({
-        provider_account_id: '', paying_account_id: '', due_date: '', amount: ' ', description: '   ',
+        provider_account_id: '', paying_account_id: '', due_date: '', expected_amount: ' ', description: '   ',
       }).errors).toEqual({
         provider_account_id: jasmine.any(String),
         paying_account_id: jasmine.any(String),
         due_date: jasmine.any(String),
-        amount: jasmine.any(String),
+        expected_amount: jasmine.any(String),
         description: jasmine.any(String),
       });
       expect(validate({ description: '' }).body).toBeNull();
@@ -150,17 +196,17 @@ describe('billFormFields', () => {
     [['0', 'zero'], ['-5', 'negative'], ['1.234', 'too many decimals'], ['abc', 'not a number'], ['100000000000.01', 'too large']]
       .forEach(([amount, label]) => {
         it(`rejects a ${label} amount`, () => {
-          expect(validate({ amount }).errors.amount).toBeDefined();
+          expect(validate({ expected_amount: amount }).errors.expected_amount).toBeDefined();
         });
       });
 
     it('checks the decimals against the provider currency', () => {
-      expect(validate({ amount: '10.5' }, 'JPY').errors.amount).toBeDefined();
-      expect(validate({ amount: '10' }, 'JPY').body.amount).toBe('10');
+      expect(validate({ expected_amount: '10.5' }, 'JPY').errors.expected_amount).toBeDefined();
+      expect(validate({ expected_amount: '10' }, 'JPY').body.expected_amount).toBe('10');
     });
 
     it('parses the amount without a known currency', () => {
-      expect(validateBillFields(VALID).body.amount).toBe('120.50');
+      expect(validateBillFields(VALID).body.expected_amount).toBe('120.50');
     });
 
     it('bounds the description to 255 and the notes to 2000 characters', () => {
@@ -183,10 +229,18 @@ describe('billFormFields', () => {
       expect(changedBillFields(original, original)).toEqual({});
     });
 
-    it('keeps only the changed fields', () => {
-      const body = validateBillFields({ ...billFieldsFromBill(BILL), amount: '99', notes: 'n' }, { currency: 'BRL' }).body;
+    it('never keeps the kind, nor the provider of a recurring bill', () => {
+      const before = validateBillFields(RECURRING, { currency: 'BRL' }).body;
+      const after = validateBillFields({ ...RECURRING, provider_account_id: '4', due_day: '6' }, { currency: 'BRL' }).body;
 
-      expect(changedBillFields(body, original)).toEqual({ amount: '99', notes: 'n' });
+      expect(changedBillFields(after, before)).toEqual({ due_day: 6 });
+      expect(changedBillFields({ ...after, kind: 'one_off' }, { ...before, kind: 'recurring' })).toEqual({ due_day: 6, provider_account_id: 4 });
+    });
+
+    it('keeps only the changed fields', () => {
+      const body = validateBillFields({ ...billFieldsFromBill(BILL), expected_amount: '99', notes: 'n' }, { currency: 'BRL' }).body;
+
+      expect(changedBillFields(body, original)).toEqual({ expected_amount: '99', notes: 'n' });
     });
   });
 });

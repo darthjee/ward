@@ -37,7 +37,7 @@ function renderFields(state, { onFieldChange }) {
         onChange={onFieldChange}
       />
       <AccountFormInput name="due_date" label="Due date" type="date" state={state} onChange={onFieldChange} />
-      <AccountFormInput name="amount" label="Amount" extra={{ inputMode: 'decimal' }} state={state} onChange={onFieldChange} />
+      <AccountFormInput name="expected_amount" label="Amount" extra={{ inputMode: 'decimal' }} state={state} onChange={onFieldChange} />
       <AccountFormInput
         name="description"
         label="Description"

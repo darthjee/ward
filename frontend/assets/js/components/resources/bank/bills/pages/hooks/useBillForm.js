@@ -83,7 +83,7 @@ export function readBillRoute(edit, hash = currentHash()) {
 function deriveBillView({
   edit, bill, fields, lists, controller,
 }) {
-  const providerId = edit ? bill?.provider_account?.id : fields?.provider_account_id;
+  const providerId = edit ? bill?.provider_account_id : fields?.provider_account_id;
 
   return {
     currency: findProvider(lists.providers, fields?.provider_account_id)?.currency ?? '',
@@ -93,7 +93,7 @@ function deriveBillView({
 }
 
 /**
- * State and handlers of the one-off bill pages (`<ui>/bills/new[?provider=:id]` and
+ * State and handlers of the provider bill pages (`<ui>/bills/new[?provider=:id]` and
  * `<ui>/bills/:billId/edit`).
  *
  * @description Loads the non-archived providers and regular accounts (and the bill, on edit).
@@ -155,6 +155,8 @@ export default function useBillForm({ edit = false, idPrefix }) {
       currency,
       confirming,
       canDelete: edit,
+      edit,
+      kind: fields?.kind ?? 'one_off',
       idPrefix,
     },
     handlers: buildBillFormHandlers({
