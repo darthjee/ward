@@ -8,8 +8,27 @@ import { billFieldsFromBill, changedBillFields, validateBillFields } from './bil
 /** Message shown when a paid bill is changed or deleted (`409 BILL_PAID`). */
 export const BILL_PAID_MESSAGE = 'This bill is paid: undo the payment first.';
 
-/** Error codes of a paid bill (the legacy and the provider-bills routes). */
-const PAID_CODES = new Set(['BILL_PAID', 'PROVIDER_BILL_PAID']);
+/** Message of a recurring bill whose provider can't be changed. */
+const PROVIDER_LOCKED_MESSAGE = "A recurring bill can't be moved to another provider.";
+
+/** Message of a bill whose kind can't be changed. */
+const KIND_LOCKED_MESSAGE = "A bill's kind can't be changed.";
+
+/**
+ * Where each error code is shown: on a field (`field`) or on the form alert (`form`), with the
+ * message to display.
+ */
+const ERROR_PLACEMENTS = new Map([
+  ['PROVIDER_BILL_NAME_TAKEN', { field: 'description', message: 'A recurring bill with this description already exists for this provider' }],
+  ['CURRENCY_MISMATCH', { field: 'paying_account_id', message: "Account currency must match the provider's" }],
+  ['ACCOUNT_NOT_FOUND', { field: 'paying_account_id', message: 'Account not available' }],
+  ['PROVIDER_BILL_LIMIT', { message: 'This provider already has 50 recurring bills' }],
+  ['ACCOUNT_ARCHIVED', { message: 'The provider is archived' }],
+  ['PROVIDER_BILL_KIND_LOCKED', { message: KIND_LOCKED_MESSAGE }],
+  ['PROVIDER_BILL_PROVIDER_LOCKED', { message: PROVIDER_LOCKED_MESSAGE }],
+  ['PROVIDER_BILL_PAID', { message: BILL_PAID_MESSAGE }],
+  ['BILL_PAID', { message: BILL_PAID_MESSAGE }],
+]);
 
 /**
  * Submit, update and delete flow of the provider bill pages (one-off and recurring) (`<ui>/bills/new`,
@@ -155,6 +174,28 @@ export default class BillFormController {
   }
 
   /**
+   * Show a mapped error code on its field or on the form alert.
+   *
+   * @param {object} classified - The classified error.
+   * @returns {boolean} Whether the code is mapped (and so shown).
+   */
+  placeError(classified) {
+    const placement = ERROR_PLACEMENTS.get(classified.code);
+
+    if (!placement) {
+      return false;
+    }
+
+    if (placement.field) {
+      this.setFieldErrors({ [placement.field]: placement.message });
+    } else {
+      this.setSubmitError({ ...classified, message: placement.message, messages: [placement.message] });
+    }
+
+    return true;
+  }
+
+  /**
    * Handle a failed request (see the class description).
    *
    * @param {Error} error - The error thrown by the client.
@@ -171,8 +212,7 @@ export default class BillFormController {
       return;
     }
 
-    if (PAID_CODES.has(classified.code)) {
-      this.setSubmitError({ ...classified, message: BILL_PAID_MESSAGE, messages: [BILL_PAID_MESSAGE] });
+    if (this.placeError(classified)) {
       return;
     }
 

@@ -1,25 +1,38 @@
 import Button from 'react-bootstrap/cjs/Button.js';
 import BankErrorAlert from '../../../common/BankErrorAlert.jsx';
 import ConfirmModal from '../../../common/ConfirmModal.jsx';
+import AccountFormCheckbox from '../../../common/form/AccountFormCheckbox.jsx';
 import AccountFormInput from '../../../common/form/AccountFormInput.jsx';
 import AccountFormSelect from '../../../common/form/AccountFormSelect.jsx';
 import { payingAccountOptions } from '../../../common/form/controllers/scheduleFields.js';
-import { DESCRIPTION_MAX_LENGTH, NOTES_MAX_LENGTH, providerOptions } from '../controllers/billFormFields.js';
+import { monthName } from '../../../common/dates.js';
+import { FREQUENCY_OPTIONS } from '../../../providers/common/providerLabels.js';
+import {
+  DESCRIPTION_MAX_LENGTH, KIND_OPTIONS, NOTES_MAX_LENGTH, providerOptions,
+} from '../controllers/billFormFields.js';
+
+const MONTH_OPTIONS = Array.from({ length: 12 }, (_, index) => [String(index + 1), monthName(index + 1)]);
+
+/** Hint of the Show in calendar checkbox of a recurring bill. */
+export const SHOW_IN_CALENDAR_HINT = 'Untick to stop this bill. Its payment history is kept.';
 
 /** Body of the Delete bill confirmation. */
 export const DELETE_BILL_BODY = 'Delete this bill? This cannot be undone.';
 
 /**
- * Render the bill's fields: provider, paying account (in the provider's currency), due date,
- * amount, description and notes.
+ * Render the kind select (locked on the edit page) and the provider select (locked on a
+ * recurring bill's edit page, since its provider can't change).
  *
  * @param {object} state - Form state.
  * @param {{onFieldChange: Function}} handlers - Field handlers.
- * @returns {React.ReactElement} The fields.
+ * @returns {React.ReactElement} The selects.
  */
-function renderFields(state, { onFieldChange }) {
+function renderKindAndProvider(state, { onFieldChange }) {
+  const locked = Boolean(state.edit);
+
   return (
     <>
+      <AccountFormSelect name="kind" label="Kind" options={KIND_OPTIONS} state={state} onChange={onFieldChange} disabled={locked} />
       <AccountFormSelect
         name="provider_account_id"
         label="Provider"
@@ -27,32 +40,118 @@ function renderFields(state, { onFieldChange }) {
         placeholder="Choose…"
         state={state}
         onChange={onFieldChange}
+        disabled={locked && state.fields.kind === 'recurring'}
       />
+    </>
+  );
+}
+
+/**
+ * Render the amount, description and notes inputs shared by both kinds, in the order given by
+ * `name`.
+ *
+ * @param {string} name - `expected_amount`, `description` or `notes`.
+ * @param {object} state - Form state.
+ * @param {Function} onChange - Change handler.
+ * @returns {React.ReactElement} The input.
+ */
+function renderCommonInput(name, state, onChange) {
+  const inputs = new Map([
+    ['expected_amount', { label: 'Amount', extra: { inputMode: 'decimal' } }],
+    ['description', { label: 'Description', extra: { maxLength: DESCRIPTION_MAX_LENGTH } }],
+    ['notes', { label: 'Notes', type: 'textarea', extra: { maxLength: NOTES_MAX_LENGTH } }],
+  ]);
+
+  return <AccountFormInput name={name} {...inputs.get(name)} state={state} onChange={onChange} />;
+}
+
+/**
+ * Render the fields of a one-off bill: paying account (in the provider's currency), due date,
+ * amount, description and notes.
+ *
+ * @param {object} state - Form state.
+ * @param {Function} onChange - Change handler.
+ * @returns {React.ReactElement} The fields.
+ */
+function renderOneOffFields(state, onChange) {
+  return (
+    <>
       <AccountFormSelect
         name="paying_account_id"
         label="Paying account"
         options={payingAccountOptions(state.accounts, state.currency)}
         placeholder="Choose…"
         state={state}
-        onChange={onFieldChange}
+        onChange={onChange}
       />
-      <AccountFormInput name="due_date" label="Due date" type="date" state={state} onChange={onFieldChange} />
-      <AccountFormInput name="expected_amount" label="Amount" extra={{ inputMode: 'decimal' }} state={state} onChange={onFieldChange} />
-      <AccountFormInput
-        name="description"
-        label="Description"
-        extra={{ maxLength: DESCRIPTION_MAX_LENGTH }}
+      <AccountFormInput name="due_date" label="Due date" type="date" state={state} onChange={onChange} />
+      {renderCommonInput('expected_amount', state, onChange)}
+      {renderCommonInput('description', state, onChange)}
+      {renderCommonInput('notes', state, onChange)}
+    </>
+  );
+}
+
+/**
+ * Render the due month select, shown only for a yearly frequency.
+ *
+ * @param {object} state - Form state.
+ * @param {Function} onChange - Change handler.
+ * @returns {React.ReactElement|null} The select, or `null` for a monthly frequency.
+ */
+function renderDueMonth(state, onChange) {
+  if (state.fields.charge_frequency !== 'yearly') {
+    return null;
+  }
+
+  return <AccountFormSelect name="due_month" label="Due month" options={MONTH_OPTIONS} placeholder="Choose…" state={state} onChange={onChange} />;
+}
+
+/**
+ * Render the fields of a recurring bill: description, expected amount, frequency, due day, due
+ * month (yearly only), Bills from, Show in calendar and the default paying account.
+ *
+ * @param {object} state - Form state.
+ * @param {Function} onChange - Change handler.
+ * @returns {React.ReactElement} The fields.
+ */
+function renderRecurringFields(state, onChange) {
+  return (
+    <>
+      {renderCommonInput('description', state, onChange)}
+      {renderCommonInput('expected_amount', state, onChange)}
+      <AccountFormSelect name="charge_frequency" label="Frequency" options={FREQUENCY_OPTIONS} state={state} onChange={onChange} />
+      <AccountFormInput name="due_day" label="Due day" extra={{ inputMode: 'numeric' }} state={state} onChange={onChange} />
+      {renderDueMonth(state, onChange)}
+      <AccountFormInput name="bills_from" label="Bills from" type="date" state={state} onChange={onChange} />
+      <AccountFormCheckbox name="show_in_calendar" label="Show in calendar" hint={SHOW_IN_CALENDAR_HINT} state={state} onChange={onChange} />
+      <AccountFormSelect
+        name="paying_account_id"
+        label="Default paying account"
+        options={payingAccountOptions(state.accounts, state.currency)}
+        placeholder="None"
         state={state}
-        onChange={onFieldChange}
+        onChange={onChange}
       />
-      <AccountFormInput
-        name="notes"
-        label="Notes"
-        type="textarea"
-        extra={{ maxLength: NOTES_MAX_LENGTH }}
-        state={state}
-        onChange={onFieldChange}
-      />
+      {renderCommonInput('notes', state, onChange)}
+    </>
+  );
+}
+
+/**
+ * Render the bill's fields: the kind and provider selects, then the fields of the kind.
+ *
+ * @param {object} state - Form state.
+ * @param {{onFieldChange: Function}} handlers - Field handlers.
+ * @returns {React.ReactElement} The fields.
+ */
+function renderFields(state, handlers) {
+  const recurring = state.fields.kind === 'recurring';
+
+  return (
+    <>
+      {renderKindAndProvider(state, handlers)}
+      {recurring ? renderRecurringFields(state, handlers.onFieldChange) : renderOneOffFields(state, handlers.onFieldChange)}
     </>
   );
 }
@@ -110,7 +209,7 @@ function renderForm(state, handlers, options) {
 }
 
 /**
- * Rendering helper of the one-off bill pages (create and edit).
+ * Rendering helper of the provider bill pages (create and edit, one-off and recurring).
  */
 const BankBillFormHelper = {
   /**
@@ -120,7 +219,7 @@ const BankBillFormHelper = {
    * @param {{fields: (object|null), fieldErrors: object, submitError: (object|null),
    *   loadError: (object|null), pending: boolean, providers: (Array<object>|null),
    *   accounts: (Array<object>|null), currency: string, confirming: boolean,
-   *   canDelete: boolean, idPrefix: string}} state - Form state.
+   *   canDelete: boolean, edit: boolean, idPrefix: string}} state - Form state.
    * @param {{onSubmit: Function, onFieldChange: Function, onRetry: Function,
    *   onDismiss: Function, onRetryLoad: Function, onDelete: Function,
    *   onConfirmDelete: Function, onCancelDelete: Function}} handlers - Event handlers.

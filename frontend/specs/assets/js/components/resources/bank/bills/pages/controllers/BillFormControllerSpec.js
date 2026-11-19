@@ -124,14 +124,44 @@ const BILL = {
       expect(deps.setFieldErrors).toHaveBeenCalledWith({ expected_amount: jasmine.any(String) });
     });
 
-    it('shows a 422 on the form with the server message only', async () => {
-      client.createProviderBill.and.rejectWith(new ApiError(422, 'currency mismatch', 'CURRENCY_MISMATCH'));
+    it('shows an unmapped 422 on the form with the server message only', async () => {
+      client.createProviderBill.and.rejectWith(new ApiError(422, 'odd', 'ODD'));
       await build().create(VALID, 'BRL');
 
       expect(deps.setSubmitError).toHaveBeenCalledWith(jasmine.objectContaining({
-        kind: 'validation', messages: ['currency mismatch'],
+        kind: 'validation', messages: ['odd'],
       }));
       expect(deps.navigate).not.toHaveBeenCalled();
+    });
+
+    [
+      ['PROVIDER_BILL_NAME_TAKEN', 'description', 'A recurring bill with this description already exists for this provider'],
+      ['CURRENCY_MISMATCH', 'paying_account_id', "Account currency must match the provider's"],
+      ['ACCOUNT_NOT_FOUND', 'paying_account_id', 'Account not available'],
+    ].forEach(([code, field, message]) => {
+      it(`shows ${code} on the ${field} field`, async () => {
+        client.createProviderBill.and.rejectWith(new ApiError(409, 'server', code));
+        await build().create(VALID, 'BRL');
+
+        expect(deps.setFieldErrors).toHaveBeenCalledWith({ [field]: message });
+        expect(deps.navigate).not.toHaveBeenCalled();
+      });
+    });
+
+    [
+      ['PROVIDER_BILL_LIMIT', 'This provider already has 50 recurring bills'],
+      ['ACCOUNT_ARCHIVED', 'The provider is archived'],
+      ['PROVIDER_BILL_KIND_LOCKED', "A bill's kind can't be changed."],
+      ['PROVIDER_BILL_PROVIDER_LOCKED', "A recurring bill can't be moved to another provider."],
+      ['PROVIDER_BILL_PAID', BILL_PAID_MESSAGE],
+      ['BILL_PAID', BILL_PAID_MESSAGE],
+    ].forEach(([code, message]) => {
+      it(`shows ${code} on the form`, async () => {
+        client.createProviderBill.and.rejectWith(new ApiError(409, 'server', code));
+        await build().create(VALID, 'BRL');
+
+        expect(deps.setSubmitError).toHaveBeenCalledWith(jasmine.objectContaining({ messages: [message] }));
+      });
     });
 
     it('tells the user to undo the payment first on a paid bill update', async () => {
@@ -165,10 +195,10 @@ const BILL = {
     });
 
     it('shows another conflict with its message', async () => {
-      client.createProviderBill.and.rejectWith(new ApiError(409, 'Archived', 'ACCOUNT_ARCHIVED'));
+      client.createProviderBill.and.rejectWith(new ApiError(409, 'Other', 'OTHER'));
       await build().create(VALID, 'BRL');
 
-      expect(deps.setSubmitError).toHaveBeenCalledWith(jasmine.objectContaining({ kind: 'conflict', messages: ['Archived'] }));
+      expect(deps.setSubmitError).toHaveBeenCalledWith(jasmine.objectContaining({ kind: 'conflict', messages: ['Other'] }));
     });
 
     describe('destroy', () => {

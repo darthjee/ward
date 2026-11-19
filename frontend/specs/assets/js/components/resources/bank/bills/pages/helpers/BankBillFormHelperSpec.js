@@ -1,5 +1,6 @@
 import BankBillFormHelper, {
   DELETE_BILL_BODY,
+  SHOW_IN_CALENDAR_HINT,
 } from '../../../../../../../../../assets/js/components/resources/bank/bills/pages/helpers/BankBillFormHelper.jsx';
 import ConfirmModal from '../../../../../../../../../assets/js/components/resources/bank/common/ConfirmModal.jsx';
 import { emptyBillFields } from '../../../../../../../../../assets/js/components/resources/bank/bills/pages/controllers/billFormFields.js';
@@ -26,6 +27,7 @@ function state(overrides = {}, fields = {}) {
     currency: 'BRL',
     confirming: false,
     canDelete: false,
+    edit: false,
     idPrefix: 'bill-',
     ...overrides,
   };
@@ -52,7 +54,53 @@ function findAll(node, predicate, acc = []) {
   return findAll(node.props?.children, predicate, acc);
 }
 
+const RECURRING = {
+  kind: 'recurring', charge_frequency: 'monthly', due_day: '5', description: 'Rent',
+};
+
 describe('BankBillFormHelper', () => {
+  describe('kind', () => {
+    it('shows the kind select with both kinds, enabled on the new page', () => {
+      const page = output();
+
+      expect(page.containsInOrder('Kind', 'One-off', 'Recurring')).toBeTrue();
+      expect(page.contains('id="bill-kind" name="kind" class="form-select" disabled')).toBeFalse();
+    });
+
+    it('disables the kind select on the edit page', () => {
+      expect(output({ edit: true }).containsInOrder('id="bill-kind"', 'disabled=""', 'One-off')).toBeTrue();
+    });
+
+    it('shows the one-off fields only for a one-off bill', () => {
+      const page = output();
+
+      expect(page.contains('Due date')).toBeTrue();
+      expect(page.contains('Frequency')).toBeFalse();
+      expect(page.contains(SHOW_IN_CALENDAR_HINT)).toBeFalse();
+    });
+
+    it('shows the recurring fields, without the due date', () => {
+      const page = output({}, RECURRING);
+
+      expect(page.containsInOrder('Description', 'Amount', 'Frequency', 'Due day', 'Bills from', 'Show in calendar', 'Default paying account', 'Notes')).toBeTrue();
+      expect(page.contains('Due date')).toBeFalse();
+    });
+
+    it('shows the hint on the Show in calendar checkbox of a recurring bill', () => {
+      expect(output({}, RECURRING).contains(SHOW_IN_CALENDAR_HINT)).toBeTrue();
+    });
+
+    it('shows the due month only for a yearly frequency', () => {
+      expect(output({}, RECURRING).contains('Due month')).toBeFalse();
+      expect(output({}, { ...RECURRING, charge_frequency: 'yearly' }).contains('Due month')).toBeTrue();
+    });
+
+    it('locks the provider when editing a recurring bill only', () => {
+      expect(output({ edit: true }, RECURRING).containsInOrder('id="bill-provider_account_id"', 'disabled=""', 'Plumber')).toBeTrue();
+      expect(output({ edit: true }).containsInOrder('id="bill-provider_account_id"', 'disabled=""', 'Plumber')).toBeFalse();
+    });
+  });
+
   it('renders the fields in order', () => {
     expect(output().containsInOrder(
       'New bill', 'Provider', 'Paying account', 'Due date', 'Amount', 'Description', 'Notes', 'Create', 'Cancel',
