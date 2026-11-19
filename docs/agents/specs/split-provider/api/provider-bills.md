@@ -42,7 +42,7 @@ currency. A provider currency change (only before any transaction) rescales ever
 | Status | Code | When |
 |---|---|---|
 | 400 | (validation) | Violation of the matrix; field of the other group; bad `due_month` pairing |
-| 404 | — | Uniform: unknown, foreign, other-context, archived-provider or debt id |
+| 404 | — | Uniform: unknown, foreign, other-context or debt id; an archived-provider bill is readable through `GET` but answers `404` on `PATCH` / `DELETE` |
 | 409 | `PROVIDER_BILL_KIND_LOCKED` | PATCH sends a different `kind` |
 | 409 | `PROVIDER_BILL_PROVIDER_LOCKED` | PATCH moves a recurring bill to another provider |
 | 409 | `PROVIDER_BILL_NAME_TAKEN` | Recurring `description` already used on the provider |

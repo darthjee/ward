@@ -9,7 +9,7 @@ import { ownerNotFound } from '../core/parse-id.js';
 import { Account } from './entities/account.entity.js';
 import { ProviderBill } from './entities/provider-bill.entity.js';
 
-/** A provider bill and its (owned, active) provider-expense account. */
+/** A provider bill and its owned provider-expense account (active for writes; archived allowed for reads). */
 export interface ResolvedProviderBill {
   bill: ProviderBill;
   provider: Account;
@@ -32,8 +32,9 @@ export interface ProviderResolveOptions {
 /**
  * Resolves provider bills and providers owner-scoped (see
  * `docs/agents/specs/split-provider/security.md`). A bill has no owner column:
- * it is reached only through an owned, non-archived `provider_expense`
- * account, so every miss answers the same uniform 404.
+ * it is reached only through an owned `provider_expense` account (active for
+ * writes; archived allowed for reads via `allowArchived`), so every miss
+ * answers the same uniform 404.
  */
 @Injectable()
 export class ProviderBillResolver {
@@ -53,7 +54,8 @@ export class ProviderBillResolver {
   }
 
   /**
-   * Loads a bill of any kind and its provider (owned, `provider_expense`, not archived).
+   * Loads a bill of any kind and its provider (owned, `provider_expense`; not archived
+   * unless `allowArchived`, which read-only callers pass).
    * The ownership check always runs on an unlocked read; only an owned bill is then
    * re-read with `FOR UPDATE` (when a manager is given), so a caller can never lock
    * another tenant's row.

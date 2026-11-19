@@ -30,28 +30,47 @@ function dueLabel(bill) {
 }
 
 /**
- * Render a row's actions (History, Edit and Delete), hidden while the provider is archived.
+ * Render a row's Edit and Delete actions, hidden while the provider is archived.
  *
  * @param {object} bill - The bill.
  * @param {object} state - Helper state.
  * @param {{onDelete: Function}} handlers - Row handlers.
- * @returns {React.ReactElement|null} The actions cell, or `null` on an archived provider.
+ * @returns {React.ReactElement|null} The Edit link and Delete button, or `null` on an archived
+ *   provider.
  */
-function renderActions(bill, state, handlers) {
+function renderEditDelete(bill, state, handlers) {
   if (state.account.archived_at) {
     return null;
   }
 
   const editHref = contextHash(state.context, `${BILLS_BASE}/${bill.id}/edit`);
+
+  return (
+    <>
+      <a className="btn btn-sm btn-link" href={editHref}>Edit</a>
+      <button type="button" className="btn btn-sm btn-link text-danger" onClick={() => handlers.onDelete(bill)} disabled={state.pending}>
+        Delete
+      </button>
+    </>
+  );
+}
+
+/**
+ * Render a row's actions: History is always shown (archived providers included, so the bill's
+ * payments stay reachable read-only); Edit and Delete are hidden while the provider is archived.
+ *
+ * @param {object} bill - The bill.
+ * @param {object} state - Helper state.
+ * @param {{onDelete: Function}} handlers - Row handlers.
+ * @returns {React.ReactElement} The actions cell.
+ */
+function renderActions(bill, state, handlers) {
   const historyHref = contextHash(state.context, `${BILLS_BASE}/${bill.id}/history`);
 
   return (
     <td className="text-end text-nowrap">
       <a className="btn btn-sm btn-link" href={historyHref}>History</a>
-      <a className="btn btn-sm btn-link" href={editHref}>Edit</a>
-      <button type="button" className="btn btn-sm btn-link text-danger" onClick={() => handlers.onDelete(bill)} disabled={state.pending}>
-        Delete
-      </button>
+      {renderEditDelete(bill, state, handlers)}
     </td>
   );
 }
@@ -100,7 +119,7 @@ function renderBody(state, handlers) {
           <th>Kind</th>
           <th>Expected</th>
           <th>Due</th>
-          {state.account.archived_at ? null : <th aria-label="Actions" />}
+          <th aria-label="Actions" />
         </tr>
       </thead>
       <tbody>{state.data.provider_bills.map((bill) => renderRow(bill, state, handlers))}</tbody>

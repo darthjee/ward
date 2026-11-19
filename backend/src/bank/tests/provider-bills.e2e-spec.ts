@@ -453,16 +453,25 @@ describe('provider-bills (e2e)', () => {
       }
     });
 
-    it('answers 404 for a debt, a regular and an archived-provider bill', async () => {
+    it('answers 404 for a debt and a regular account', async () => {
       const debt = await createAccount(app, ALICE, null, { type: 'debt', name: uniqueName('Loan') });
       const checking = await regular(null);
+
+      await send(app, 'get', listPath(null, debt.id), ALICE).expect(404);
+      await send(app, 'post', listPath(null, checking.id), ALICE, recurring('x')).expect(404);
+    });
+
+    it('reads an archived-provider bill but rejects writes on it', async () => {
       const fee = await provider(null);
       const bill = (await post(null, fee.id, oneOff('Fine')).expect(201)).body;
       await archive(null, fee.id);
 
-      await send(app, 'get', listPath(null, debt.id), ALICE).expect(404);
-      await send(app, 'post', listPath(null, checking.id), ALICE, recurring('x')).expect(404);
-      await send(app, 'get', billPath(null, bill.id), ALICE).expect(404);
+      const read = await send(app, 'get', billPath(null, bill.id), ALICE).expect(200);
+
+      expect(read.body).toEqual(bill);
+      await send(app, 'get', billPath(null, bill.id), BOB).expect(404);
+      await send(app, 'get', billPath(BOB_ORG, bill.id), BOB).expect(404);
+      await send(app, 'get', billPath(ALICE_ORG, bill.id), ALICE).expect(404);
       await send(app, 'patch', billPath(null, bill.id), ALICE, { notes: 'x' }).expect(404);
       await send(app, 'delete', billPath(null, bill.id), ALICE).expect(404);
     });

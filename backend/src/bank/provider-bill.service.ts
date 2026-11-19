@@ -25,8 +25,9 @@ import { ProviderBillResolver, type ResolvedProviderBill } from './provider-bill
 /**
  * Provider bills of both kinds (lazy `BankModule`, see
  * `docs/agents/specs/split-provider/api/provider-bills.md`). A bill has no
- * owner column: it is reached only through an owned, active provider-expense
- * account (`ProviderBillResolver`), so every miss answers the uniform 404.
+ * owner column: it is reached only through an owned provider-expense account
+ * (active for writes; archived allowed for reads, see `ProviderBillResolver`),
+ * so every miss answers the uniform 404.
  * Every write runs in a transaction.
  */
 @Injectable()
@@ -66,12 +67,12 @@ export class ProviderBillService {
 
   /**
    * @param {OwnerContext} owner - The resolved owner.
-   * @param {number} id - The bill id.
+   * @param {number} id - The bill id (archived providers allowed, read-only).
    * @returns {Promise<ProviderBillResponse>} The bill.
    * @throws {NotFoundException} The uniform 404.
    */
   async find(owner: OwnerContext, id: number): Promise<ProviderBillResponse> {
-    const { bill, provider } = await this.resolver.resolve(owner, id);
+    const { bill, provider } = await this.resolver.resolve(owner, id, undefined, { allowArchived: true });
 
     return serializeProviderBill(bill, provider.currency);
   }
