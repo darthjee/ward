@@ -63,6 +63,37 @@ describe('ProviderBillsClient', () => {
         expect(lastCall()).toEqual({ path: `${prefix}/bank/provider-bills/7.json`, method: 'PATCH', body: { notes: 'n' } });
       });
 
+      it('lists a page of the bill history', async () => {
+        stub({ payments: [], pagination: {} });
+        await ProviderBillsClient.listBillPayments(context, 7, 2);
+
+        expect(lastCall()).toEqual({
+          path: `${prefix}/bank/provider-bills/7/bill-payments.json?page=2`, method: 'GET', body: undefined,
+        });
+      });
+
+      it('pays an occurrence with a whitelisted body', async () => {
+        stub({ id: 1 }, 201);
+        await ProviderBillsClient.payOccurrence(context, 7, '2026-03-10', {
+          status: 'paid', paid_on: '2026-03-11', amount: '5.00', other: 1,
+        });
+
+        expect(lastCall()).toEqual({
+          path: `${prefix}/bank/provider-bills/7/occurrences/2026-03-10/payment.json`,
+          method: 'POST',
+          body: { status: 'paid', paid_on: '2026-03-11', amount: '5.00' },
+        });
+      });
+
+      it('undoes an occurrence payment', async () => {
+        stub(undefined, 204);
+        await ProviderBillsClient.undoOccurrencePayment(context, 7, '2026-03-10');
+
+        expect(lastCall()).toEqual(jasmine.objectContaining({
+          path: `${prefix}/bank/provider-bills/7/occurrences/2026-03-10/payment.json`, method: 'DELETE',
+        }));
+      });
+
       it('deletes a bill', async () => {
         stub(undefined, 204);
         await ProviderBillsClient.deleteProviderBill(context, 7);
@@ -77,6 +108,13 @@ describe('ProviderBillsClient', () => {
     await ProviderBillsClient.listProviderBills({ kind: 'personal' }, 3);
 
     expect(lastCall().path).toEqual('/bank/accounts/3/provider-bills.json?page=1');
+  });
+
+  it('defaults the history to the first page', async () => {
+    stub({ payments: [], pagination: {} });
+    await ProviderBillsClient.listBillPayments({ kind: 'personal' }, 7);
+
+    expect(lastCall().path).toEqual('/bank/provider-bills/7/bill-payments.json?page=1');
   });
 
   it('exposes the bill fields', () => {

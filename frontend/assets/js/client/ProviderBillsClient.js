@@ -1,4 +1,5 @@
 import ApiClient from './ApiClient.js';
+import { PAYMENT_FIELDS } from './CalendarClient.js';
 import { whitelist } from './accountBodies.js';
 import { contextPath } from '../utils/context/ownerContext.js';
 
@@ -20,7 +21,19 @@ function billPath(context, id) {
 }
 
 /**
- * HTTP client for the provider-bills CRUD routes, in both owner contexts.
+ * Build the context-aware path of a provider bill's occurrence payment.
+ *
+ * @param {object} context - The owner context.
+ * @param {number|string} billId - The provider bill id.
+ * @param {string} dueDate - The occurrence's `YYYY-MM-DD` due date.
+ * @returns {string} The API path, with the `.json` suffix.
+ */
+function occurrencePaymentPath(context, billId, dueDate) {
+  return contextPath(context, `/bank/provider-bills/${billId}/occurrences/${dueDate}/payment.json`);
+}
+
+/**
+ * HTTP client for the provider-bills CRUD, payment and history routes, in both owner contexts.
  *
  * @description Every method takes the owner context first and builds its path through
  * `contextPath`. Bodies are whitelisted to {@link PROVIDER_BILL_FIELDS}; the update never sends
@@ -90,6 +103,49 @@ const ProviderBillsClient = {
    */
   async deleteProviderBill(context, billId) {
     return ApiClient.deleteJson(billPath(context, billId));
+  },
+
+  /**
+   * Fetch one page of a bill's payment history (newest due date first).
+   *
+   * @param {object} context - The owner context.
+   * @param {number|string} billId - The provider bill id.
+   * @param {number} [page] - The 1-based page.
+   * @returns {Promise<{payments: Array<object>, pagination: object}|undefined>} The history.
+   */
+  async listBillPayments(context, billId, page = 1) {
+    return ApiClient.getJson(
+      contextPath(context, `/bank/provider-bills/${billId}/bill-payments.json?page=${page}`),
+    );
+  },
+
+  /**
+   * Pay or skip an occurrence of a bill. Build the body with `paymentBody` / `SKIP_BODY` of
+   * `CalendarClient`.
+   *
+   * @param {object} context - The owner context.
+   * @param {number|string} billId - The provider bill id.
+   * @param {string} dueDate - The occurrence's `YYYY-MM-DD` due date.
+   * @param {object} body - The payment body.
+   * @returns {Promise<object|undefined>} The response body.
+   */
+  async payOccurrence(context, billId, dueDate, body) {
+    return ApiClient.postJson(
+      occurrencePaymentPath(context, billId, dueDate),
+      whitelist(body, PAYMENT_FIELDS),
+    );
+  },
+
+  /**
+   * Undo the payment (or skip) of an occurrence of a bill.
+   *
+   * @param {object} context - The owner context.
+   * @param {number|string} billId - The provider bill id.
+   * @param {string} dueDate - The occurrence's `YYYY-MM-DD` due date.
+   * @returns {Promise<object|undefined>} The (empty) response body.
+   */
+  async undoOccurrencePayment(context, billId, dueDate) {
+    return ApiClient.deleteJson(occurrencePaymentPath(context, billId, dueDate));
   },
 };
 
