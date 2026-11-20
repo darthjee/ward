@@ -8,8 +8,8 @@ export const PAYMENT_FIELDS = ['status', 'paid_on', 'amount', 'paying_account_id
 /** The body that skips an occurrence. */
 export const SKIP_BODY = Object.freeze({ status: 'skipped' });
 
-/** The occurrence kinds that can also record the charge (`provider` stays until #125). */
-export const CHARGE_KINDS = ['provider', 'provider_bill', 'bill'];
+/** The occurrence kinds that can also record the charge. */
+export const CHARGE_KINDS = ['provider_bill', 'bill'];
 
 /**
  * Build the body that pays an occurrence.
@@ -61,7 +61,7 @@ const CalendarClient = {
   },
 
   /**
-   * Pay or skip a derived (debt / provider) occurrence.
+   * Pay or skip a derived debt occurrence (provider bills pay through `ProviderBillsClient`).
    *
    * @param {object} context - The owner context.
    * @param {number|string} accountId - The source account id.

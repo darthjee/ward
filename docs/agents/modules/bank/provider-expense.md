@@ -36,25 +36,21 @@ CASCADE`, no owner columns):
 |---|---|---|
 | `forAccountant` | boolean, not null, default `true` | Whether the account's charges are business expenses |
 | `providerTaxId` | free text, at most 32 | The provider's tax id (CNPJ…); trimmed, blank → `null`, no format check; shown in full (a business's public identifier) |
-| `expectedAmount` | `BIGINT` minor units, > 0 | Typical charge; suggested by **Add charge**; the bill's expected amount |
-| `chargeFrequency` | `monthly` \| `yearly`, not null | Default `monthly` |
-| `dueDay` | int 1–31 | 29–31 clamp to the month's end (see [bills.md](bills.md#recurrence)) |
-| `dueMonth` | int 1–12 | Required when `yearly`, rejected when `monthly` |
 
-Plus the bill [schedule fields](bills.md#schedule-fields). `dueDay` / `dueMonth` mirror the
-debt names, so bills read one shape from both types.
+The provider carries **no schedule** since [#125](https://github.com/darthjee/ward/issues/125):
+the schedule (expected amount, frequency, due day/month, `bills_from`, `show_in_calendar`,
+paying account) lives on each of its provider bills (see
+[`specs/split-provider/model.md`](../../specs/split-provider/model.md)).
 
 ### Rules
 
 - A provider-expense account always has a details row (`for_accountant` `true`,
-  `charge_frequency` `monthly`, the rest `null`).
-- `for_accountant` and `charge_frequency` never accept `null`; every other field does, to clear
-  it.
-- The `charge_frequency` ↔ `due_month` pair is checked on the stored details (or the defaults,
-  on create) with the request merged on top; switching to `monthly` clears `due_month`
-  ([#54](https://github.com/darthjee/ward/issues/54)).
-- A currency change (only before any transaction) rescales the stored `expected_amount`
-  (`200.00` BRL → `200` JPY; `12.50` BRL → JPY → 400), unless the same PATCH sends one.
+  `provider_tax_id` `null`).
+- `for_accountant` never accepts `null`; `provider_tax_id` does, to clear it.
+- The nested `provider_expense` body accepts only `for_accountant` and `provider_tax_id`; any
+  other key (including a former schedule field such as `due_day`) → `400`.
+- A currency change (only before any transaction) rescales the provider's bills'
+  `expected_amount` (`200.00` BRL → `200` JPY; `12.50` BRL → JPY → 400).
 - On an archived account, any `provider_expense` field → 409 `ACCOUNT_ARCHIVED`.
 
 ## Accountant hand-off
@@ -149,15 +145,15 @@ library on the 512 MB free tier.
 
 ## Charges and bills
 
-Provider-expense create/PATCH writes the schedule through to the provider's single recurring
-`ProviderBill` (`bank_provider_bills`; `expectedAmount` ↔ `expected_amount`); clearing `dueDay`
-hides that bill instead of deleting it.
+A provider's schedule lives only on its `ProviderBill` rows (`bank_provider_bills`), managed
+through the provider-bills routes; there is no write-through from the provider since #125.
 
-Recurring charges become derived Calendar occurrences, and one-off bills always hang off a
-provider-expense account (see [bills.md](bills.md)). Paying a provider bill records a payment
-plus an optional charge ("Also record the charge"); that charge feeds the hand-off like any
-other. A provider exposes `expectedAmount`, `chargeFrequency`, `dueDay`, `dueMonth`,
-`forAccountant`, its balance, opening date and archived state; it stores no bill rows itself.
+Recurring provider bills become derived Calendar occurrences (`kind: 'provider_bill'`), and
+one-off bills always hang off a provider-expense account (see [bills.md](bills.md)). Paying a
+provider bill (per-bill route) records a payment plus an optional charge ("Also record the
+charge"); that charge feeds the hand-off like any other. A provider exposes `forAccountant`,
+`providerTaxId`, its balance, opening date and archived state. The **Add charge** shortcut
+prefills its amount from the provider's single recurring bill (empty with zero or several).
 
 ## Deferred
 
@@ -173,8 +169,8 @@ other. A provider exposes `expectedAmount`, `chargeFrequency`, `dueDay`, `dueMon
   the reply matches what is read back later.
 - The **CSV** uses CRLF line endings (the spec didn't say).
 
-## Transition rule (#122)
+## Transition rule (#122) — removed in #125
 
-With two or more recurring bills, a provider-expense `PATCH` sending a schedule field answers
-`409 PROVIDER_HAS_MULTIPLE_BILLS`; the schedule write-through only runs when a schedule field is
-sent and at most one recurring bill exists. A currency change rescales every bill.
+The write-through and `409 PROVIDER_HAS_MULTIPLE_BILLS` were removed in
+[#125](https://github.com/darthjee/ward/issues/125), together with the provider schedule
+columns. A currency change still rescales every bill.

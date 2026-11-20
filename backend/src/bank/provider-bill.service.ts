@@ -168,8 +168,8 @@ export class ProviderBillService {
   }
 
   /**
-   * Resolves a bill for writing with the provider-first lock order (as the
-   * provider write-through): ownership on an unlocked read, the provider row
+   * Resolves a bill for writing with the provider-first lock order:
+   * ownership on an unlocked read, the provider row
    * locked for a recurring bill, then the bill re-read under its own lock.
    */
   async #resolveForUpdate(owner: OwnerContext, id: number, manager: EntityManager): Promise<ResolvedProviderBill> {

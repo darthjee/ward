@@ -1,5 +1,5 @@
 import type { DataSource } from 'typeorm';
-import { tableNames } from './schema-inspection.js';
+import { columnInfo, tableNames } from './schema-inspection.js';
 import { createTestDataSource, MIGRATIONS, resetDatabase } from './test-data-source.js';
 
 describe('migrations round trip (MySQL)', () => {
@@ -59,5 +59,19 @@ describe('migrations round trip (MySQL)', () => {
       'bank_provider_expense_details',
       'bank_transactions',
     ]);
+  });
+
+  it('leaves bank_provider_expense_details without the provider-level schedule after a full up/down/up', async () => {
+    await ds.runMigrations();
+    for (let i = 0; i < MIGRATIONS.length; i++) {
+      await ds.undoLastMigration();
+    }
+    await ds.runMigrations();
+
+    expect(await columnInfo(ds, 'bank_provider_expense_details', 'for_accountant')).toBeDefined();
+    expect(await columnInfo(ds, 'bank_provider_expense_details', 'provider_tax_id')).toBeDefined();
+    for (const column of ['expected_amount', 'charge_frequency', 'due_day', 'due_month', 'bills_from', 'show_in_calendar', 'paying_account_id']) {
+      expect(await columnInfo(ds, 'bank_provider_expense_details', column)).toBeUndefined();
+    }
   });
 });

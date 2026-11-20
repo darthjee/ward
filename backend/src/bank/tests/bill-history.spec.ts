@@ -56,7 +56,6 @@ describe('BillHistoryService per provider bill', () => {
   const billA = recurring(21, 5, 'Plan A');
   const billB = recurring(22, 15, 'Plan B');
   const oneOff = Object.assign(new ProviderBill(), { id: 30, providerAccountId: 4, kind: 'one_off', description: 'Fix', dueDate: '2026-01-20' });
-  const feeSource = billSourceOf(fee, { chargeFrequency: 'monthly', dueDay: 5, billsFrom: '2026-01-01' });
   const build = (payments: BillPayment[], peeked = billA) => {
     const findAndCount = jest.fn(async () => [payments, payments.length]);
     const find = jest.fn(async () => [billA, billB, oneOff]);
@@ -64,7 +63,7 @@ describe('BillHistoryService per provider bill', () => {
     const service = new BillHistoryService(
       { findAndCount, manager: { getRepository: () => ({ find: async () => [] }) } } as never,
       { find } as never,
-      { resolve: async () => feeSource } as never,
+      {} as never,
       { peek } as never,
     );
 
@@ -94,27 +93,13 @@ describe('BillHistoryService per provider bill', () => {
     expect(findAndCount).toHaveBeenCalledWith(expect.objectContaining({ where: { billId: 30 } }));
     expect(result.payments[0]).toMatchObject({ off_schedule: false, bill: { id: 30 }, source_bill: { id: 30, description: 'Fix' } });
   });
-
-  it('checks each row of the account-wide history against its own bill, and orphans against the details row', async () => {
-    const { service, find } = build([
-      row({ id: 1, sourceAccountId: 4, providerBillId: 21, dueDate: '2026-02-05' }),
-      row({ id: 2, sourceAccountId: 4, providerBillId: 22, dueDate: '2026-02-05' }),
-      row({ id: 3, sourceAccountId: 4, providerBillId: null, dueDate: '2026-02-05' }),
-      row({ id: 4, sourceAccountId: 4, providerBillId: null, dueDate: '2026-02-06' }),
-    ]);
-
-    const result = await service.history(PERSONAL, 4, 1);
-
-    expect(result.payments.map(({ id, off_schedule: off, source_bill: sourceBill }) => [id, off, sourceBill?.id ?? null]))
-      .toEqual([[1, false, 21], [2, true, 22], [3, false, null], [4, true, null]]);
-    expect(find).toHaveBeenCalledTimes(1);
-  });
 });
 
 describe('BillSourceResolver', () => {
   it.each([
     ['an unknown account', null],
     ['a regular account', buildAccount({ type: 'regular' })],
+    ['a provider account (paid and listed per bill)', buildAccount({ type: 'provider_expense' })],
   ])('answers the uniform 404 for %s', async (_label, account) => {
     const resolver = new BillSourceResolver({ findOneBy: async () => account } as never, {} as never);
 

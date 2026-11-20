@@ -17,8 +17,6 @@ export interface AccountTypeContext {
   currency: string;
   /** The stored currency before the request; stored amounts are rescaled when it differs. */
   previousCurrency?: string;
-  /** The stored name before the request (PATCH only). */
-  previousName?: string;
 }
 
 /**
@@ -33,6 +31,11 @@ export interface AccountTypeHandler {
   readonly type: string;
   /** Whether accounts of this type carry a ledger (transactions, balance). */
   readonly carriesLedger: boolean;
+  /**
+   * Whether the type's details carry the bill schedule fields (`bills_from`,
+   * `show_in_calendar`, `paying_account_id`), checked by `AccountScheduleValidator`.
+   */
+  readonly hasSchedule?: boolean;
 
   /**
    * Checks the type's account-level rules on the account as it is about to

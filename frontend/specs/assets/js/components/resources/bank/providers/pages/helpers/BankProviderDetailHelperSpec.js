@@ -1,6 +1,7 @@
 import BankProviderDetailHelper from '../../../../../../../../../assets/js/components/resources/bank/providers/pages/helpers/BankProviderDetailHelper.jsx';
 import { initialLedgerForm } from '../../../../../../../../../assets/js/components/resources/bank/common/detail/hooks/useLedgerForm.js';
 import { formatDate, localToday } from '../../../../../../../../../assets/js/components/resources/bank/common/dates.js';
+import ProviderBillsClient from '../../../../../../../../../assets/js/client/ProviderBillsClient.js';
 import { renderedOutput } from '../../../../../../../../support/renderedOutput.js';
 
 const SENT_AT = '2026-03-02T15:00:00.000Z';
@@ -16,7 +17,7 @@ const PROVIDER = {
   archived_at: null,
   type: 'provider_expense',
   provider_expense: {
-    for_accountant: true, provider_tax_id: null, expected_amount: '200.00', charge_frequency: 'monthly', due_day: null, due_month: null,
+    for_accountant: true, provider_tax_id: null,
   },
 };
 const SENT_CHARGE = {
@@ -77,6 +78,20 @@ function findAll(node, predicate, acc = []) {
 }
 
 describe('BankProviderDetailHelper', () => {
+  beforeEach(() => {
+    spyOn(ProviderBillsClient, 'listProviderBills').and.resolveTo({ provider_bills: [], pagination: { total_count: 0 } });
+  });
+
+  it('hands the owner context to the shortcuts (for the recurring-bills fetch)', () => {
+    const context = { kind: 'organization', orgId: 5 };
+    const [shortcuts] = findAll(
+      BankProviderDetailHelper.render(state({ context }), HANDLERS),
+      (node) => node.props?.onStartNew && node.props?.account?.id === 4 && 'context' in node.props,
+    );
+
+    expect(shortcuts.props.context).toBe(context);
+  });
+
   it('renders the Bills block below the provider info and above the ledger', () => {
     expect(output().containsInOrder('Provider info', 'Bills', 'Ledger')).toBeTrue();
   });

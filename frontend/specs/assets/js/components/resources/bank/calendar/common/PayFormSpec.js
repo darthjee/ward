@@ -14,8 +14,7 @@ function render(kind, state = { fields: { amount: '10.00', record_charge: true }
 }
 
 describe('PayForm', () => {
-  it('shows the charge checkbox for provider and bill, checked', () => {
-    expect(render('provider').contains('Also record the charge')).toBeTrue();
+  it('shows the charge checkbox for provider bill and bill, checked', () => {
     expect(render('provider_bill').contains('Also record the charge')).toBeTrue();
     expect(render('bill').contains('Also record the charge')).toBeTrue();
     expect(render('bill').containsAttribute('checked', '')).toBeTrue();
@@ -23,6 +22,10 @@ describe('PayForm', () => {
 
   it('hides the charge checkbox for a debt', () => {
     expect(render('debt').contains('Also record the charge')).toBeFalse();
+  });
+
+  it('hides the charge checkbox for the removed provider kind', () => {
+    expect(render('provider').contains('Also record the charge')).toBeFalse();
   });
 
   it('offers only the accounts in the currency', () => {

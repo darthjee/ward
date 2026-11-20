@@ -410,7 +410,7 @@ const STORED_DEBT = {
   dueMonth: 3,
 };
 
-function setupDebt(account: Account = buildAccount({ type: 'debt' }), details: object[] = [STORED_DEBT]) {
+function setupDebt(account: Account = buildAccount({ type: 'debt' }), details: object[] = [STORED_DEBT], schedule: unknown = NO_SCHEDULE_CHECK) {
   const accountSave = jest.fn(async (saved: Account) => ({ ...saved, id: saved.id ?? 99 }));
   const detailsSave = jest.fn(async (row: object) => row);
   const detailsFind = jest.fn(async () => details.map((row) => Object.assign(new DebtDetails(), row)));
@@ -432,7 +432,7 @@ function setupDebt(account: Account = buildAccount({ type: 'debt' }), details: o
     hasTransactions: jest.fn(async () => false),
   };
   const registry = new AccountTypeRegistry([new RegularAccountHandler(), new DebtAccountHandler()]);
-  const service = new AccountService(accountRepository as never, registry, balances as never, { defaultCurrency: 'BRL' }, NO_SCHEDULE_CHECK);
+  const service = new AccountService(accountRepository as never, registry, balances as never, { defaultCurrency: 'BRL' }, schedule as never);
 
   return { service, accountRepository, balances, accountSave, detailsSave, detailsFind };
 }
@@ -787,20 +787,17 @@ const STORED_PROVIDER_EXPENSE = {
   ...defaultProviderExpenseState(),
   accountId: 1,
   providerTaxId: '12.345.678/0001-90',
-  expectedAmount: 20000n,
-  chargeFrequency: 'yearly',
-  dueDay: 10,
-  dueMonth: 3,
 };
 
 function setupProviderExpense(
   account: Account = buildAccount({ type: 'provider_expense' }),
   details: object[] = [STORED_PROVIDER_EXPENSE],
+  schedule: unknown = NO_SCHEDULE_CHECK,
 ) {
   const accountSave = jest.fn(async (saved: Account) => ({ ...saved, id: saved.id ?? 99 }));
   const detailsSave = jest.fn(async (row: object) => row);
   const detailsFind = jest.fn(async () => details.map((row) => Object.assign(new ProviderExpenseDetails(), row)));
-  const billsRepo = { find: jest.fn(async () => []), findOne: jest.fn(async () => null), create: jest.fn((fields: object) => fields), save: jest.fn(async (row: object) => row) };
+  const billsRepo = { find: jest.fn(async () => []), save: jest.fn(async (row: object) => row) };
   const repositoryFor = (entity: unknown) =>
     entity === Account ? { save: accountSave, findOne: jest.fn(async () => null), findOneBy: jest.fn(async () => null) } : entity === ProviderBill ? billsRepo : { save: detailsSave, find: detailsFind };
   const manager: { getRepository: jest.Mock; transaction: jest.Mock } = {
@@ -824,9 +821,9 @@ function setupProviderExpense(
     new InvestmentAccountHandler(),
     new ProviderExpenseAccountHandler(NO_BILLS_SUMMARY),
   ]);
-  const service = new AccountService(accountRepository as never, registry, balances as never, { defaultCurrency: 'BRL' }, NO_SCHEDULE_CHECK);
+  const service = new AccountService(accountRepository as never, registry, balances as never, { defaultCurrency: 'BRL' }, schedule as never);
 
-  return { service, registry, accountRepository, balances, accountSave, detailsSave, detailsFind, manager };
+  return { service, registry, accountRepository, balances, accountSave, detailsSave, detailsFind, manager, billsRepo };
 }
 
 describe('AccountService with provider-expense accounts', () => {
@@ -838,19 +835,7 @@ describe('AccountService with provider-expense accounts', () => {
 
       expect(detailsSave).toHaveBeenCalledWith({ ...defaultProviderExpenseState(), accountId: 99 });
       expect(result.type).toBe('provider_expense');
-      expect(result.provider_expense).toMatchObject({ for_accountant: true, charge_frequency: 'monthly', due_month: null });
-    });
-
-    it('parses the expected amount in the new account currency', async () => {
-      const { service, detailsSave } = setupProviderExpense();
-
-      await service.create(PERSONAL, createDto({
-        type: 'provider_expense',
-        currency: 'JPY',
-        provider_expense: { expected_amount: '200' },
-      } as Partial<CreateAccountDto>));
-
-      expect(detailsSave).toHaveBeenCalledWith(expect.objectContaining({ expectedAmount: 200n }));
+      expect(result.provider_expense).toEqual({ for_accountant: true, provider_tax_id: null });
     });
 
     it.each([
@@ -872,39 +857,15 @@ describe('AccountService with provider-expense accounts', () => {
         .rejects.toThrow(BadRequestException);
       expect(accountSave).not.toHaveBeenCalled();
     });
-
-    it('rejects yearly without due_month (rule on the defaults) with a 400', async () => {
-      const { service } = setupProviderExpense();
-
-      await expect(service.create(PERSONAL, createDto({
-        type: 'provider_expense',
-        provider_expense: { charge_frequency: 'yearly' },
-      } as Partial<CreateAccountDto>))).rejects.toThrow(BadRequestException);
-    });
   });
 
   describe('update', () => {
     it('merges the provider_expense object onto the stored details', async () => {
       const { service, detailsSave } = setupProviderExpense();
 
-      await service.update(PERSONAL, 1, updateDto({ provider_expense: { due_day: 15 } }));
+      await service.update(PERSONAL, 1, updateDto({ provider_expense: { for_accountant: false } }));
 
-      expect(detailsSave).toHaveBeenCalledWith(expect.objectContaining({
-        accountId: 1,
-        dueDay: 15,
-        chargeFrequency: 'yearly',
-        dueMonth: 3,
-        expectedAmount: 20000n,
-      }));
-    });
-
-    it('rejects clearing due_month on a yearly provider, on the merged state', async () => {
-      const { service, detailsSave } = setupProviderExpense();
-
-      await expect(service.update(PERSONAL, 1, updateDto({ provider_expense: { due_month: null } }))).rejects.toThrow(
-        BadRequestException,
-      );
-      expect(detailsSave).not.toHaveBeenCalled();
+      expect(detailsSave).toHaveBeenCalledWith({ accountId: 1, forAccountant: false, providerTaxId: '12.345.678/0001-90' });
     });
 
     it('rejects a provider_expense object on a regular account with a 400', async () => {
@@ -913,22 +874,38 @@ describe('AccountService with provider-expense accounts', () => {
       await expect(service.update(PERSONAL, 1, updateDto({ provider_expense: {} }))).rejects.toThrow(BadRequestException);
     });
 
-    it('rescales the stored expected amount on a currency change', async () => {
-      const { service, detailsSave } = setupProviderExpense();
+    it('rescales the provider bills on a currency change, keeping the details', async () => {
+      const { service, detailsSave, billsRepo } = setupProviderExpense();
 
       await service.update(PERSONAL, 1, updateDto({ currency: 'JPY' }));
 
-      expect(detailsSave).toHaveBeenCalledWith(expect.objectContaining({ expectedAmount: 200n }));
+      expect(detailsSave).toHaveBeenCalledWith({ accountId: 1, forAccountant: true, providerTaxId: '12.345.678/0001-90' });
+      expect(billsRepo.find).toHaveBeenCalledWith({ where: { providerAccountId: 1 }, lock: { mode: 'pessimistic_write' } });
+    });
+  });
+
+  describe('schedule validator gate', () => {
+    const scheduleCheck = () => ({ validate: jest.fn(async () => undefined) });
+
+    it('never runs the schedule validator for a provider, on create or update', async () => {
+      const schedule = scheduleCheck();
+      const { service } = setupProviderExpense(undefined, undefined, schedule);
+
+      await service.create(PERSONAL, createDto({ type: 'provider_expense' }));
+      await service.update(PERSONAL, 1, updateDto({ currency: 'JPY' }));
+
+      expect(schedule.validate).not.toHaveBeenCalled();
     });
 
-    it('rejects a currency change that cannot represent the expected amount (12.50 BRL to JPY)', async () => {
-      const { service, detailsSave } = setupProviderExpense(
-        buildAccount({ type: 'provider_expense' }),
-        [{ ...STORED_PROVIDER_EXPENSE, expectedAmount: 1250n }],
-      );
+    it('still runs the schedule validator for a debt, on create and update', async () => {
+      const schedule = scheduleCheck();
+      const { service } = setupDebt(undefined, undefined, schedule);
 
-      await expect(service.update(PERSONAL, 1, updateDto({ currency: 'JPY' }))).rejects.toThrow(BadRequestException);
-      expect(detailsSave).not.toHaveBeenCalled();
+      await service.create(PERSONAL, createDto({ type: 'debt' }));
+      await service.update(PERSONAL, 1, updateDto({ name: 'Renamed' }));
+
+      expect(schedule.validate).toHaveBeenCalledTimes(2);
+      expect(schedule.validate).toHaveBeenLastCalledWith(PERSONAL, expect.objectContaining({ currencyChanged: false }));
     });
   });
 
@@ -942,13 +919,6 @@ describe('AccountService with provider-expense accounts', () => {
       expect(result[0].provider_expense).toEqual({
         for_accountant: true,
         provider_tax_id: '12.345.678/0001-90',
-        expected_amount: '200.00',
-        charge_frequency: 'yearly',
-        due_day: 10,
-        due_month: 3,
-        bills_from: null,
-        show_in_calendar: true,
-        paying_account: null,
       });
     });
 

@@ -84,7 +84,7 @@ export class ProviderBillResolver {
 
   /**
    * Like {@link resolve} but never locks: lets a writer take the provider lock
-   * before the bill lock (the lock order of the provider write-through).
+   * before the bill lock (the provider-first lock order).
    * @param {OwnerContext} owner - The resolved owner.
    * @param {number} id - The bill id.
    * @param {EntityManager} [manager] - A transactional manager to read through.

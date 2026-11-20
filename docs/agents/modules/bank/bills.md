@@ -31,8 +31,10 @@ to [#89](https://github.com/darthjee/ward/issues/89); receipts on paid bills to
 
 ## Schedule fields
 
-Three fields on `bank_debt_details` and `bank_provider_expense_details` (migration
-`20261108120022-bank-add-schedule-fields.ts`):
+Three fields on `bank_debt_details` (migration
+`20261108120022-bank-add-schedule-fields.ts`; they were also on `bank_provider_expense_details`
+until [#125](https://github.com/darthjee/ward/issues/125) dropped the provider schedule — a
+provider's schedule now lives on each recurring provider bill):
 
 | Field | Type | Notes |
 |---|---|---|
@@ -40,7 +42,7 @@ Three fields on `bank_debt_details` and `bank_provider_expense_details` (migrati
 | `showInCalendar` | boolean, not null, default `true` | `false` → the account never produces occurrences |
 | `payingAccountId` | nullable, FK → `bank_accounts`, `ON DELETE SET NULL` | **Default paying account**: a `regular`, non-archived account of the same owner and currency; pre-fills the Pay dialog |
 
-- In the API they travel in the `debt` / `provider_expense` object: the request takes
+- In the API they travel in the `debt` object: the request takes
   `bills_from`, `show_in_calendar` and `paying_account_id`; the response returns `bills_from`,
   `show_in_calendar` and `paying_account: { id, name } | null` (never the raw id).
 - Setting `dueDay` for the first time while `billsFrom` is `null` and not sent sets `billsFrom`
@@ -107,7 +109,7 @@ The Calendar routes return derived occurrences and one-off bills in one `snake_c
 
 | Field | Notes |
 |---|---|
-| `kind` | `debt`, `provider` (derived) or `bill` (one-off) |
+| `kind` | `debt`, `provider_bill` (derived from a recurring provider bill) or `bill` (one-off) |
 | `source_account` | `{ id, name, type }`: the debt / provider (for a one-off, its provider) |
 | `bill` | `{ id, description }` for one-offs, `null` otherwise |
 | `nominal_date` / `effective_date` | See [Recurrence](#recurrence) |
@@ -178,8 +180,9 @@ Paying a bill as one linked operation is part of the *Linked transfers* epic
 
 ## Validation
 
-- **Path ids** (`:accountId`, `:id`) — the uniform 404, never 403. A path account that is not a
-  debt / provider → 404. A `:dueDate` that is not an occurrence (off-schedule, before
+- **Path ids** (`:accountId`, `:id`) — the uniform 404, never 403. On the account-level
+  occurrence payment and `bill-payments.json` routes, a path account that is not a debt → 404
+  (providers use the per-bill routes since #125, and get the same uniform 404 here). A `:dueDate` that is not an occurrence (off-schedule, before
   `billsFrom`, hidden or archived account) → 404.
 - **Body account ids** (`provider_account_id`, `paying_account_id`) that are unknown, another
   owner's, in the other context, of the wrong type or an archived paying account (or archived
@@ -195,7 +198,8 @@ Paying a bill as one linked operation is part of the *Linked transfers* epic
 
 ## Bill history
 
-`bill-payments.json` lists the payment rows of a debt / provider account, newest due date first,
+`bill-payments.json` lists the payment rows of a debt account (or, per bill, of a provider
+bill via `provider-bills/:id/bill-payments.json`), newest due date first,
 paginated. Each row says whether it is **off-schedule**: its due date is not a nominal
 occurrence of the account's **current** schedule pattern (`due_day`, `due_month`, frequency,
 `bills_from`; archived and `show_in_calendar` are ignored, and with no `due_day` every derived
@@ -281,3 +285,9 @@ On top of the [ownership contract](../bank.md#bank-ownership-contract):
 `PROVIDER_BILL_KIND_LOCKED`, `PROVIDER_BILL_PROVIDER_LOCKED`, `PROVIDER_BILL_NAME_TAKEN`,
 `PROVIDER_BILL_PAID`, `PROVIDER_BILL_LIMIT`. `bills.json` stays one-off only and now returns
 `kind: 'one_off'`. See `specs/split-provider/api/provider-bills.md`.
+
+## Contract step (#125)
+
+The provider schedule columns, the write-through, `409 PROVIDER_HAS_MULTIPLE_BILLS` and the
+account-level compatibility aliases for providers are gone; recurring provider-bill occurrences
+carry `kind: 'provider_bill'`. See `specs/split-provider/migration.md`.

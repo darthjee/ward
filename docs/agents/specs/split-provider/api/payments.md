@@ -29,9 +29,10 @@ by [#123](https://github.com/darthjee/ward/issues/123),
 - `POST/DELETE <base>/accounts/:accountId/occurrences/:dueDate/payment.json` and
   `GET <base>/accounts/:accountId/bill-payments.json` serve **`debt` only** after
   [#125](https://github.com/darthjee/ward/issues/125).
-- **Transition aliases** (#123 – #124): for a provider they resolve to its single recurring bill;
-  with zero or several → the uniform `404`. Same class and invalidation as the routes they
-  replace; removed in #125.
+- For a `provider_expense` account they answer the same uniform `404` as an unknown or foreign
+  account (same status and body).
+- **Transition aliases** (#123 – #124, **removed in #125**): for a provider they resolved to its
+  single recurring bill; with zero or several → the uniform `404`.
 
 ## Occurrence payload
 
@@ -50,16 +51,19 @@ by [#123](https://github.com/darthjee/ward/issues/123),
 
 ## `OccurrenceKind` staging
 
-`OccurrenceKind` is `'debt' | 'provider' | 'bill'` through #123 and #124 (recurring provider-bill
-occurrences keep `kind: 'provider'`; only `source_bill` is added). #124 makes the frontend accept
-both `provider` and `provider_bill` in `CHARGE_KINDS`. #125 renames to `'provider_bill'`.
+Since #125, `OccurrenceKind` is `'debt' | 'provider_bill' | 'bill'`: recurring provider-bill
+occurrences carry `kind: 'provider_bill'` and `source_bill`. The frontend `CHARGE_KINDS` is
+`['provider_bill', 'bill']`.
+
+History: through #123 and #124 it was `'debt' | 'provider' | 'bill'` (recurring provider-bill
+occurrences kept `kind: 'provider'`), and #124 made the frontend accept both values.
 
 ## Cache class (decided)
 
 | Route | Class | Header | Invalidation |
 |---|---|---|---|
-| `GET …/provider-bills/:id/bill-payments.json`, alias `GET …/accounts/:id/bill-payments.json` | `user-scoped` | `X-Cache-Allow` | — |
-| `POST` / `DELETE …/payment.json` (per-bill and alias) | `never` | `X-Skip-Cache` | `InvalidatesOwner()` (clears ledger, balances, calendar, history under the owner prefix) |
+| `GET …/provider-bills/:id/bill-payments.json`, `GET …/accounts/:id/bill-payments.json` (debt only) | `user-scoped` | `X-Cache-Allow` | — |
+| `POST` / `DELETE …/payment.json` (per-bill, and account-level for debts) | `never` | `X-Skip-Cache` | `InvalidatesOwner()` (clears ledger, balances, calendar, history under the owner prefix) |
 | `calendar.json`, `overdue.json` (existing) | `user-scoped` (unchanged) | `X-Cache-Allow` | — |
 
 Navi warms none of them.

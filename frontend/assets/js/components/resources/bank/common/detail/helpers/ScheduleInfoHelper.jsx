@@ -2,14 +2,14 @@ import DetailEntry from '../DetailEntry.jsx';
 import { formatDate } from '../../dates.js';
 
 /**
- * Rendering helper of the schedule values shared by the debt and provider detail pages.
+ * Rendering helper of the schedule values of the debt detail page.
  */
 const ScheduleInfoHelper = {
   /**
    * Render the schedule entries: Bills from, Show in Calendar (Yes / No) and Default paying
    * account (its name). Blank values show `—`; every value is rendered as escaped text.
    *
-   * @param {object|null} details - The account's nested object (`debt` / `provider_expense`).
+   * @param {object|null} details - The debt's nested `debt` object.
    * @returns {React.ReactElement} The entries, to be placed inside a definition list.
    */
   render(details) {

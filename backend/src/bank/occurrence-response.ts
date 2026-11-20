@@ -48,7 +48,7 @@ export interface OccurrenceInput {
   /** The source account (a one-off's provider). */
   account: Account;
   bill: ProviderBill | null;
-  /** The recurring provider bill behind a derived provider occurrence. */
+  /** The recurring provider bill behind a `provider_bill` occurrence. */
   sourceBill: ProviderBill | null;
   nominal: string;
   effective: string;
@@ -58,7 +58,7 @@ export interface OccurrenceInput {
 }
 
 /**
- * @param {BillSource} source - A debt / provider-expense source.
+ * @param {BillSource} source - A debt or recurring provider bill source.
  * @param {Occurrence} occurrence - One of its generated occurrences.
  * @param {BillPayment | undefined} payment - Its payment row, if any.
  * @returns {OccurrenceInput} The derived occurrence's input.

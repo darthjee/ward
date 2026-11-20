@@ -7,9 +7,9 @@ jest.mock('../ledger.query.js', () => jest.requireActual('./support/in-memory-le
 jest.mock('../account-balances.query.js', () => jest.requireActual('./support/in-memory-ledger.query.js'));
 jest.mock('../provider-bills-summary.query.js', () => jest.requireActual('./support/in-memory-provider-bills-summary.query.js'));
 
-// The bill schedule fields on the debt / provider_expense objects (bills.md, *Schedule fields on
-// source accounts*): bills_from lifecycle, show_in_calendar default and the paying_account_id
-// 422 rules, in both owner contexts.
+// The bill schedule fields on the debt object (bills.md, *Schedule fields on source accounts*;
+// providers carry their schedule on provider bills since #125): bills_from lifecycle,
+// show_in_calendar default and the paying_account_id 422 rules, in both owner contexts.
 
 type Body = Record<string, unknown>;
 
@@ -17,7 +17,7 @@ const ACCOUNT_NOT_FOUND = { error: { code: 'ACCOUNT_NOT_FOUND', message: 'accoun
 const CURRENCY_MISMATCH = { error: { code: 'CURRENCY_MISMATCH', message: 'currency mismatch' }, statusCode: 422 };
 
 const CONTEXTS: Array<[string, number | null]> = [['Personal', null], ['organization', ALICE_ORG]];
-const TYPES = ['debt', 'provider_expense'] as const;
+const TYPES = ['debt'] as const;
 
 const uniqueName = (label: string): string => `${label} ${Math.random().toString(36).slice(2)}`;
 
@@ -56,10 +56,7 @@ describe('schedule fields (e2e)', () => {
 
         await send(app, 'patch', path, ALICE, { [type]: { bills_from: '2026-01-01' } }).expect(200);
         const cleared = await send(app, 'patch', path, ALICE, { [type]: { due_day: null } }).expect(200);
-        // A provider's schedule is read from its recurring bill, which clearing `due_day` only hides.
-        expect(cleared.body[type]).toMatchObject(type === 'provider_expense'
-          ? { due_day: 10, bills_from: '2026-01-01', show_in_calendar: false }
-          : { due_day: null, bills_from: '2026-01-01' });
+        expect(cleared.body[type]).toMatchObject({ due_day: null, bills_from: '2026-01-01' });
       });
 
       it('round-trips the three fields through create, update, show and list', async () => {

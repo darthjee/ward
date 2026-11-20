@@ -6,13 +6,11 @@ import { undoPayment } from './bill-payment-undo.js';
 import { BillPaymentWriter, type PaymentTarget } from './bill-payment.writer.js';
 import { BillSourceResolver } from './bill-source.resolver.js';
 import { BillService } from './bill.service.js';
-import { ProviderBillPaymentService } from './provider-bill-payment.service.js';
 import type { OwnerContext } from '../core/owner-context.js';
 import { ownerNotFound } from '../core/parse-id.js';
 import type { PayOccurrenceDto } from './dto/pay-occurrence.dto.js';
 import { Account } from './entities/account.entity.js';
 import type { BillPayment } from './entities/bill-payment.entity.js';
-import { ProviderBill } from './entities/provider-bill.entity.js';
 import { isIsoDate, todayUtc } from './ledger-date.js';
 import { isNominalOccurrence, shiftWeekend } from './occurrence-generator.js';
 import { billInput, buildOccurrence, derivedInput, type OccurrenceInput, type OccurrenceResponse } from './occurrence-response.js';
@@ -20,8 +18,9 @@ import { PayingAccountResolver } from './paying-account.resolver.js';
 import { paymentCommand } from './payment-body.js';
 
 /**
- * Pay, skip and undo of bill occurrences (lazy `BankModule`, see
- * `docs/agents/modules/bank/bills.md`, *Paying, skipping and undoing*). Path ids answer the
+ * Pay, skip and undo of debt occurrences and one-off bills (lazy `BankModule`, see
+ * `docs/agents/modules/bank/bills.md`, *Paying, skipping and undoing*). Recurring
+ * provider bills are paid per bill by `ProviderBillPaymentService`. Path ids answer the
  * uniform 404; body account ids the generic 422; the writes are atomic (see
  * {@link BillPaymentWriter}).
  *
@@ -29,7 +28,7 @@ import { paymentCommand } from './payment-body.js';
  *
  * | # | Check                                                        | Answer |
  * |---|--------------------------------------------------------------|--------|
- * | 1 | `:accountId` not an owned debt / provider (`:id` not an owned bill of an active provider) | 404 |
+ * | 1 | `:accountId` not an owned debt (`:id` not an owned bill of an active provider) | 404 |
  * | 2 | `:dueDate` not a `YYYY-MM-DD` date                           | 404 |
  * | 3 | no payment row for the occurrence                            | 404 |
  * | 4 | a skip whose source account is archived                      | 404 |
@@ -46,7 +45,6 @@ export class BillPaymentService {
   private readonly bills: BillService;
   private readonly payingAccounts: PayingAccountResolver;
   private readonly writer: BillPaymentWriter;
-  private readonly providerBills: ProviderBillPaymentService;
 
   /**
    * @param {Repository<Account>} accountRepository - The account repository.
@@ -54,7 +52,6 @@ export class BillPaymentService {
    * @param {BillService} bills - Owner-scoped one-off bill lookups.
    * @param {PayingAccountResolver} payingAccounts - Resolves body paying accounts.
    * @param {BillPaymentWriter} writer - The atomic payment writes.
-   * @param {ProviderBillPaymentService} providerBills - The per-bill pay / undo the provider aliases delegate to.
    */
   constructor(
     @InjectRepository(Account) accountRepository: Repository<Account>,
@@ -62,32 +59,26 @@ export class BillPaymentService {
       bills: BillService,
       payingAccounts: PayingAccountResolver,
       writer: BillPaymentWriter,
-      providerBills: ProviderBillPaymentService,
   ) {
     this.accountRepository = accountRepository;
     this.sources = sources;
     this.bills = bills;
     this.payingAccounts = payingAccounts;
     this.writer = writer;
-    this.providerBills = providerBills;
   }
 
   /**
    * Pays or skips a derived occurrence.
    * @param {OwnerContext} owner - The resolved owner.
-   * @param {number} accountId - The debt / provider account.
+   * @param {number} accountId - The debt account.
    * @param {string} dueDate - The raw nominal due date.
    * @param {PayOccurrenceDto} dto - The validated body.
    * @returns {Promise<OccurrenceResponse>} The updated occurrence.
-   * @throws {NotFoundException} 404 for a foreign account or a date that is not an occurrence.
+   * @throws {NotFoundException} 404 for a foreign or non-debt account, or a date that is not an occurrence.
    * @throws {ConflictException} 409 when already paid or skipped.
    */
   async payOccurrence(owner: OwnerContext, accountId: number, dueDate: string, dto: PayOccurrenceDto): Promise<OccurrenceResponse> {
     const source = await this.sources.resolve(owner, accountId);
-
-    if (source.kind === 'provider') {
-      return this.providerBills.pay(owner, await this.#soleRecurringBillId(source.account.id), dueDate, dto);
-    }
 
     if (!isIsoDate(dueDate) || !isNominalOccurrence(source.schedule, dueDate)) {
       throw ownerNotFound();
@@ -128,18 +119,14 @@ export class BillPaymentService {
   /**
    * Undoes the payment or skip of a derived occurrence (see the checks table).
    * @param {OwnerContext} owner - The resolved owner.
-   * @param {number} accountId - The debt / provider account.
+   * @param {number} accountId - The debt account.
    * @param {string} dueDate - The raw nominal due date.
    * @returns {Promise<void>}
    * @throws {NotFoundException} 404 (checks 1–4).
    * @throws {ConflictException} 409 on an archived account (checks 5–6).
    */
   async undoOccurrence(owner: OwnerContext, accountId: number, dueDate: string): Promise<void> {
-    const { account, kind } = await this.sources.resolve(owner, accountId);
-
-    if (kind === 'provider') {
-      return this.providerBills.undo(owner, await this.#soleRecurringBillId(account.id), dueDate);
-    }
+    const { account } = await this.sources.resolve(owner, accountId);
 
     const payment = isIsoDate(dueDate)
       ? await this.writer.find({ sourceAccountId: account.id, billId: null, providerBillId: null, nominal: dueDate })
@@ -160,23 +147,6 @@ export class BillPaymentService {
     const { bill, provider } = await this.bills.findOwned(owner, id);
 
     await undoPayment(this.writer, this.accountRepository, provider, await this.writer.find({ sourceAccountId: provider.id, billId: bill.id, providerBillId: null, nominal: bill.dueDate as string }));
-  }
-
-  /**
-   * The id of the provider's only recurring bill, which the account-level routes are aliases
-   * of. Zero or several recurring bills (or none to pay) answer the uniform 404.
-   */
-  async #soleRecurringBillId(providerAccountId: number): Promise<number> {
-    const bills = await this.accountRepository.manager.getRepository(ProviderBill).find({
-      where: { providerAccountId, kind: 'recurring' },
-      take: 2,
-    });
-
-    if (bills.length !== 1) {
-      throw ownerNotFound();
-    }
-
-    return bills[0].id;
   }
 
   async #record(

@@ -29,6 +29,7 @@ import { todayUtc } from '../ledger-date.js';
 export class DebtAccountHandler implements AccountTypeHandler {
   readonly type = 'debt';
   readonly carriesLedger = true;
+  readonly hasSchedule = true;
 
   /**
    * No-op: debt accounts have no account-level rule.

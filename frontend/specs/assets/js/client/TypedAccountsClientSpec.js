@@ -32,27 +32,42 @@ describe('TypedAccountsClient', () => {
 
   const SCHEDULE = { bills_from: '2026-01-01', show_in_calendar: false, paying_account_id: 9 };
 
-  [
-    ['createDebt', 'debt'],
-    ['createProviderExpense', 'provider_expense'],
-  ].forEach(([method, key]) => {
-    it(`${method} passes the schedule fields through`, async () => {
-      await TypedAccountsClient[method](CONTEXT, { name: 'A', [key]: { ...SCHEDULE, paying_account: { id: 9 } } });
+  it('createDebt passes the schedule fields through', async () => {
+    await TypedAccountsClient.createDebt(CONTEXT, { name: 'A', debt: { ...SCHEDULE, paying_account: { id: 9 } } });
 
-      expect(ApiClient.postJson.calls.mostRecent().args[1][key]).toEqual(SCHEDULE);
+    expect(ApiClient.postJson.calls.mostRecent().args[1].debt).toEqual(SCHEDULE);
+  });
+
+  it('updateDebt keeps null schedule fields (they clear)', async () => {
+    await TypedAccountsClient.updateDebt(CONTEXT, 4, { debt: { bills_from: null, paying_account_id: null } });
+
+    expect(ApiClient.patchJson).toHaveBeenCalledWith('/bank/accounts/4.json', {
+      debt: { bills_from: null, paying_account_id: null },
     });
   });
 
-  [
-    ['updateDebt', 'debt'],
-    ['updateProviderExpense', 'provider_expense'],
-  ].forEach(([method, key]) => {
-    it(`${method} keeps null schedule fields (they clear)`, async () => {
-      await TypedAccountsClient[method](CONTEXT, 4, { [key]: { bills_from: null, paying_account_id: null } });
+  const PROVIDER_SCHEDULE = {
+    ...SCHEDULE, expected_amount: '200.00', charge_frequency: 'monthly', due_day: 10, due_month: 3,
+  };
+  const PROVIDER_DETAILS = { for_accountant: true, provider_tax_id: '12.345.678/0001-90' };
 
-      expect(ApiClient.patchJson).toHaveBeenCalledWith('/bank/accounts/4.json', {
-        [key]: { bills_from: null, paying_account_id: null },
-      });
+  it('createProviderExpense strips every schedule key from provider_expense', async () => {
+    await TypedAccountsClient.createProviderExpense(CONTEXT, { name: 'A', provider_expense: { ...PROVIDER_SCHEDULE, ...PROVIDER_DETAILS } });
+
+    expect(ApiClient.postJson.calls.mostRecent().args[1].provider_expense).toEqual(PROVIDER_DETAILS);
+  });
+
+  it('updateProviderExpense strips every schedule key from provider_expense', async () => {
+    await TypedAccountsClient.updateProviderExpense(CONTEXT, 4, { provider_expense: { ...PROVIDER_SCHEDULE, bills_from: null } });
+
+    expect(ApiClient.patchJson).toHaveBeenCalledWith('/bank/accounts/4.json', { provider_expense: {} });
+  });
+
+  it('updateProviderExpense passes for_accountant and provider_tax_id through, keeping null', async () => {
+    await TypedAccountsClient.updateProviderExpense(CONTEXT, 4, { provider_expense: { for_accountant: false, provider_tax_id: null } });
+
+    expect(ApiClient.patchJson).toHaveBeenCalledWith('/bank/accounts/4.json', {
+      provider_expense: { for_accountant: false, provider_tax_id: null },
     });
   });
 

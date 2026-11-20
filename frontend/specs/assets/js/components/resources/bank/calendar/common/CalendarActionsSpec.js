@@ -9,7 +9,7 @@ const HANDLERS = {
   onConfirm: noop, onCancel: noop, onFieldChange: noop, onRetry: noop, onDismiss: noop,
 };
 const OCC = {
-  kind: 'provider', currency: 'BRL', status: 'paid', source_account: { id: 1, name: 'Gym', type: 'provider_expense' },
+  kind: 'provider_bill', currency: 'BRL', status: 'paid', source_account: { id: 1, name: 'Gym', type: 'provider_expense' },
 };
 
 function build(state) {

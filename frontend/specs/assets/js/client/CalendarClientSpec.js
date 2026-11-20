@@ -33,8 +33,8 @@ describe('CalendarClient', () => {
   }
 
   describe('paymentBody', () => {
-    it('sends record_charge for providers, provider bills and bills', () => {
-      ['provider', 'provider_bill', 'bill'].forEach((kind) => {
+    it('sends record_charge for provider bills and bills', () => {
+      ['provider_bill', 'bill'].forEach((kind) => {
         expect(paymentBody({ kind }, FIELDS)).toEqual({
           status: 'paid', paid_on: '2026-11-10', amount: '10.00', paying_account_id: 4, record_charge: true,
         });
@@ -43,6 +43,10 @@ describe('CalendarClient', () => {
 
     it('drops record_charge for debts', () => {
       expect(paymentBody({ kind: 'debt' }, FIELDS).record_charge).toBeUndefined();
+    });
+
+    it('drops record_charge for the removed provider kind', () => {
+      expect(paymentBody({ kind: 'provider' }, FIELDS).record_charge).toBeUndefined();
     });
 
     it('skip body has only the status', () => {

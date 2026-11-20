@@ -11,7 +11,6 @@ import {
   send,
   withoutTimestamp,
 } from './support/build-bank-test-app.js';
-import { BillPayment } from '../entities/bill-payment.entity.js';
 import type { InMemoryBankRepos } from './support/in-memory-bank-repos.js';
 import { AccountBalancesQuery } from './support/in-memory-ledger.query.js';
 import { ProviderBillsSummaryQuery } from './support/in-memory-provider-bills-summary.query.js';
@@ -28,38 +27,29 @@ jest.mock('../provider-bills-summary.query.js', () => jest.requireActual('./supp
 type Method = 'get' | 'post' | 'patch' | 'delete';
 type Body = Record<string, unknown>;
 
-const DEFAULT_PROVIDER_EXPENSE = {
-  for_accountant: true,
-  provider_tax_id: null,
-  expected_amount: null,
-  charge_frequency: 'monthly',
-  due_day: null,
-  due_month: null,
-  bills_from: null,
-  show_in_calendar: true,
-  paying_account: null,
-};
+const DEFAULT_PROVIDER_EXPENSE = { for_accountant: true, provider_tax_id: null };
 
-const FULL_PROVIDER_EXPENSE = {
-  for_accountant: false,
-  provider_tax_id: '12.345.678/0001-90',
-  expected_amount: '200.00',
-  charge_frequency: 'yearly',
-  due_day: 10,
-  due_month: 3,
-  bills_from: '2026-01-01',
-  show_in_calendar: true,
-};
+const FULL_PROVIDER_EXPENSE = { for_accountant: false, provider_tax_id: '12.345.678/0001-90' };
 
-const FULL_PROVIDER_EXPENSE_RESPONSE = { ...FULL_PROVIDER_EXPENSE, paying_account: null };
+const FULL_PROVIDER_EXPENSE_RESPONSE = FULL_PROVIDER_EXPENSE;
 
-const MONTHLY_PROVIDER_EXPENSE = { ...FULL_PROVIDER_EXPENSE, charge_frequency: 'monthly', due_month: null };
+// The seven provider-level schedule keys dropped by the contract step (#125): each is a 400 when
+// nested in `provider_expense`, even with a valid value.
+const SCHEDULE_FIELDS: Array<[string, unknown]> = [
+  ['expected_amount', '200.00'],
+  ['charge_frequency', 'monthly'],
+  ['due_day', 10],
+  ['due_month', 3],
+  ['bills_from', '2026-01-01'],
+  ['show_in_calendar', true],
+  ['paying_account_id', null],
+];
 
 const CONTEXTS: Array<[string, number | null]> = [['Personal', null], ['organization', ALICE_ORG]];
 
 const PROVIDER_ROUTES: Array<[string, Method, (prefix: string, id: number | string) => string, object?]> = [
   ['GET detail', 'get', (prefix, id) => `${prefix}/accounts/${id}.json`],
-  ['PATCH provider_expense', 'patch', (prefix, id) => `${prefix}/accounts/${id}.json`, { provider_expense: { due_day: 5 } }],
+  ['PATCH provider_expense', 'patch', (prefix, id) => `${prefix}/accounts/${id}.json`, { provider_expense: { for_accountant: false } }],
   ['DELETE', 'delete', (prefix, id) => `${prefix}/accounts/${id}.json`],
   ['POST archive', 'post', (prefix, id) => `${prefix}/accounts/${id}/archive.json`],
   ['POST unarchive', 'post', (prefix, id) => `${prefix}/accounts/${id}/unarchive.json`],
@@ -69,20 +59,6 @@ const PROVIDER_ROUTES: Array<[string, Method, (prefix: string, id: number | stri
     amount: '-200.00',
     description: 'Charge',
   }],
-];
-
-// The issue's PATCH paired-rule table: stored state, PATCH object, expected status and fields.
-// Every row has 5 entries (`null` = no merged fields to check): a shorter row would make Jest
-// treat the callback's last parameter as `done`.
-const PAIRED_RULE_TABLE: Array<[string, Body, Body, number, Body | null]> = [
-  ['yearly, due_month 3', FULL_PROVIDER_EXPENSE, { due_day: 10 }, 200, { charge_frequency: 'yearly', due_month: 3 }],
-  ['yearly, due_month 3', FULL_PROVIDER_EXPENSE, { due_month: 7 }, 200, { charge_frequency: 'yearly', due_month: 7 }],
-  ['yearly, due_month 3', FULL_PROVIDER_EXPENSE, { due_month: null }, 400, null],
-  ['yearly, due_month 3', FULL_PROVIDER_EXPENSE, { charge_frequency: 'monthly' }, 200, { charge_frequency: 'monthly', due_month: null }],
-  ['yearly, due_month 3', FULL_PROVIDER_EXPENSE, { charge_frequency: 'monthly', due_month: 5 }, 400, null],
-  ['monthly', MONTHLY_PROVIDER_EXPENSE, { due_month: 5 }, 400, null],
-  ['monthly', MONTHLY_PROVIDER_EXPENSE, { charge_frequency: 'yearly' }, 400, null],
-  ['monthly', MONTHLY_PROVIDER_EXPENSE, { charge_frequency: 'yearly', due_month: 5 }, 200, { charge_frequency: 'yearly', due_month: 5 }],
 ];
 
 const uniqueName = (label: string): string => `${label} ${Math.random().toString(36).slice(2)}`;
@@ -110,197 +86,49 @@ describe('provider-expense accounts (e2e)', () => {
   describe.each(CONTEXTS)('in the %s context', (_context, orgId) => {
     const prefix = base(orgId);
 
-    describe('recurring provider bill write-through', () => {
-      const recurringOf = (id: number) => repos.bills.rows.filter((row) => row.providerAccountId === id && row.kind === 'recurring');
-
-      describe('reading the schedule fields from the recurring bills', () => {
-        const shown = async (id: number) => (await send(app, 'get', accountPath(orgId, id), ALICE).expect(200)).body.provider_expense;
-        const billsPath = (id: number) => `${base(orgId)}/accounts/${id}/provider-bills.json`;
-
-        it('reflects the single bill edited through provider-bills', async () => {
-          const created = await createProvider(orgId, { provider_expense: FULL_PROVIDER_EXPENSE });
-          const [bill] = recurringOf(created.id);
-
-          await send(app, 'patch', `${base(orgId)}/provider-bills/${bill.id}.json`, ALICE, { due_day: 21, expected_amount: '12.34', show_in_calendar: false }).expect(200);
-
-          expect(await shown(created.id)).toMatchObject({ due_day: 21, expected_amount: '12.34', show_in_calendar: false, for_accountant: false });
-        });
-
-        it('reads the details row when the provider has no recurring bill', async () => {
-          const created = await createProvider(orgId, { provider_expense: { expected_amount: '45.00' } });
-
-          expect(recurringOf(created.id)).toEqual([]);
-          expect(await shown(created.id)).toMatchObject({ expected_amount: '45.00', due_day: null, show_in_calendar: true });
-        });
-
-        it('answers null for all seven schedule fields with two recurring bills', async () => {
-          const created = await createProvider(orgId, { provider_expense: FULL_PROVIDER_EXPENSE });
-          await send(app, 'post', billsPath(created.id), ALICE, { kind: 'recurring', description: 'Second', due_day: 9 }).expect(201);
-
-          const nested = await shown(created.id);
-
-          expect(nested).toMatchObject({
-            expected_amount: null,
-            charge_frequency: null,
-            due_day: null,
-            due_month: null,
-            bills_from: null,
-            show_in_calendar: null,
-            paying_account: null,
-          });
-          expect(nested).toHaveProperty('for_accountant');
-        });
-      });
-
-      it('creates one recurring bill with the copied fields on create with due_day, and none without it', async () => {
-        const scheduled = await createProvider(orgId, { provider_expense: FULL_PROVIDER_EXPENSE });
-        const unscheduled = await createProvider(orgId);
-
-        expect(recurringOf(scheduled.id)).toEqual([
-          expect.objectContaining({
-            description: scheduled.name,
-            expectedAmount: 20000n,
-            chargeFrequency: 'yearly',
-            dueDay: 10,
-            dueMonth: 3,
-            billsFrom: '2026-01-01',
-            showInCalendar: true,
-            payingAccountId: null,
-            dueDate: null,
-          }),
-        ]);
-        expect(recurringOf(unscheduled.id)).toEqual([]);
-      });
-
-      it('creates the bill when a PATCH first sets due_day, then updates the same bill', async () => {
-        const created = await createProvider(orgId);
-
-        await patch(orgId, created.id, { provider_expense: { due_day: 5 } }).expect(200);
-        const [first] = recurringOf(created.id);
-        await patch(orgId, created.id, { provider_expense: { due_day: 6, expected_amount: '10.00' } }).expect(200);
-
-        expect(recurringOf(created.id)).toEqual([expect.objectContaining({ id: first.id, dueDay: 6, expectedAmount: 1000n })]);
-      });
-
-      it('hides the bill (kept, last due_day, payments intact) when due_day is cleared, and reuses it when set again', async () => {
-        const created = await createProvider(orgId, { provider_expense: FULL_PROVIDER_EXPENSE });
-        const [bill] = recurringOf(created.id);
-        const payment = await repos.billPayments.save(Object.assign(new BillPayment(), {
-          sourceAccountId: created.id,
-          billId: null,
-          providerBillId: bill.id,
-          dueDate: '2026-03-10',
-          status: 'skipped',
-          paidOn: null,
-          amount: null,
-          payingAccountId: null,
-          paymentTransactionId: null,
-          withdrawalTransactionId: null,
-          chargeTransactionId: null,
-        }));
-
-        const cleared = await patch(orgId, created.id, { provider_expense: { due_day: null, due_month: null, charge_frequency: 'monthly' } }).expect(200);
-        expect(cleared.body.provider_expense).toMatchObject({ due_day: 10, show_in_calendar: false });
-        expect(recurringOf(created.id)).toEqual([expect.objectContaining({ id: bill.id, dueDay: 10, showInCalendar: false })]);
-        expect(repos.billPayments.rows.some((row) => row.id === payment.id)).toBe(true);
-
-        await patch(orgId, created.id, { provider_expense: { due_day: 12, show_in_calendar: true } }).expect(200);
-        expect(recurringOf(created.id)).toEqual([expect.objectContaining({ id: bill.id, dueDay: 12, showInCalendar: true })]);
-      });
-
-      it('keeps the description equal to the name when the provider is renamed, leaving the response unchanged', async () => {
-        const created = await createProvider(orgId, { provider_expense: FULL_PROVIDER_EXPENSE });
-        const renamed = uniqueName('Renamed');
-
-        const response = await patch(orgId, created.id, { name: renamed }).expect(200);
-
-        expect(recurringOf(created.id)).toEqual([expect.objectContaining({ description: renamed })]);
-        expect(response.body.provider_expense).toEqual(FULL_PROVIDER_EXPENSE_RESPONSE);
-      });
-
-      const snapshot = (rows: object[]): string => JSON.stringify(rows, (_key, value) => (typeof value === 'bigint' ? value.toString() : value));
+    describe('schedule lives on the provider bills', () => {
       const billsPath = (id: number) => `${prefix}/accounts/${id}/provider-bills.json`;
-      const addRecurring = (id: number, description: string) =>
-        send(app, 'post', billsPath(id), ALICE, { kind: 'recurring', description, due_day: 15 }).expect(201);
-
-      it('does not write through on a PATCH without schedule field or rename, leaving /provider-bills edits alone', async () => {
-        const created = await createProvider(orgId, { provider_expense: FULL_PROVIDER_EXPENSE });
-        const [bill] = recurringOf(created.id);
-        await send(app, 'patch', `${prefix}/provider-bills/${bill.id}.json`, ALICE, { description: 'Custom', due_day: 20 }).expect(200);
-
-        await patch(orgId, created.id, { notes: 'n', provider_expense: { for_accountant: true, provider_tax_id: '1' } }).expect(200);
-
-        expect(recurringOf(created.id)).toEqual([expect.objectContaining({ id: bill.id, description: 'Custom', dueDay: 20 })]);
-      });
-
-      it('lets a schedule-only PATCH keep a description edited through /provider-bills, and a rename overwrite it', async () => {
-        const created = await createProvider(orgId, { provider_expense: FULL_PROVIDER_EXPENSE });
-        const [bill] = recurringOf(created.id);
-        await send(app, 'patch', `${prefix}/provider-bills/${bill.id}.json`, ALICE, { description: 'Custom' }).expect(200);
-
-        await patch(orgId, created.id, { provider_expense: { due_day: 11 } }).expect(200);
-        expect(recurringOf(created.id)).toEqual([expect.objectContaining({ description: 'Custom', dueDay: 11 })]);
-
-        const renamed = uniqueName('Renamed');
-        await patch(orgId, created.id, { name: renamed }).expect(200);
-        expect(recurringOf(created.id)).toEqual([expect.objectContaining({ description: renamed, dueDay: 11 })]);
-      });
-
-      it('re-creates a deleted only bill when due_day is set, but not on a name-only PATCH', async () => {
-        const created = await createProvider(orgId, { provider_expense: FULL_PROVIDER_EXPENSE });
-        const [bill] = recurringOf(created.id);
-        await send(app, 'delete', `${prefix}/provider-bills/${bill.id}.json`, ALICE).expect(204);
-
-        await patch(orgId, created.id, { name: uniqueName('Renamed') }).expect(200);
-        expect(recurringOf(created.id)).toEqual([]);
-
-        await patch(orgId, created.id, { provider_expense: { due_day: 12 } }).expect(200);
-        expect(recurringOf(created.id)).toEqual([expect.objectContaining({ dueDay: 12 })]);
-      });
-
-      it('answers 409 PROVIDER_HAS_MULTIPLE_BILLS for a schedule field with two recurring bills, writing nothing', async () => {
-        const created = await createProvider(orgId, { provider_expense: FULL_PROVIDER_EXPENSE });
-        await addRecurring(created.id, 'Second');
-        const before = snapshot(recurringOf(created.id));
-
-        for (const field of [
-          { expected_amount: '1.00' }, { charge_frequency: 'monthly', due_month: null }, { due_day: 3 }, { due_month: 4 },
-          { bills_from: '2026-02-01' }, { show_in_calendar: false }, { paying_account_id: null },
-        ]) {
-          const response = await patch(orgId, created.id, { provider_expense: field }).expect(409);
-          expect(response.body.error.code).toBe('PROVIDER_HAS_MULTIPLE_BILLS');
-        }
-        expect(snapshot(recurringOf(created.id))).toBe(before);
-        expect(detailsOf(created.id)).toMatchObject({ dueDay: 10 });
-      });
-
-      it('lets non-schedule fields through with several recurring bills, touching none of the bills', async () => {
-        const created = await createProvider(orgId, { provider_expense: FULL_PROVIDER_EXPENSE });
-        await addRecurring(created.id, 'Second');
-        const before = snapshot(recurringOf(created.id));
-
-        await patch(orgId, created.id, { name: uniqueName('Renamed'), notes: 'n' }).expect(200);
-        await patch(orgId, created.id, { provider_expense: { for_accountant: true, provider_tax_id: '9' } }).expect(200);
-
-        expect(snapshot(recurringOf(created.id))).toBe(before);
-      });
-
+      const recurringOf = (id: number) => repos.bills.rows.filter((row) => row.providerAccountId === id && row.kind === 'recurring');
+      const addRecurring = async (id: number, body: Body = {}) =>
+        (await send(app, 'post', billsPath(id), ALICE, { kind: 'recurring', description: 'Fee', due_day: 15, ...body }).expect(201)).body;
       const addOneOff = (id: number, amount: string) =>
         send(app, 'post', billsPath(id), ALICE, { kind: 'one_off', description: 'Fine', due_date: '2026-05-05', expected_amount: amount }).expect(201);
       const amountsOf = (id: number) => repos.bills.rows.filter((row) => row.providerAccountId === id).map((row) => row.expectedAmount);
 
+      it('answers no schedule keys, even with a single recurring bill', async () => {
+        const created = await createProvider(orgId, { provider_expense: FULL_PROVIDER_EXPENSE });
+        await addRecurring(created.id, { expected_amount: '12.34' });
+
+        const detail = await send(app, 'get', accountPath(orgId, created.id), ALICE).expect(200);
+
+        expect(detail.body.provider_expense).toEqual(FULL_PROVIDER_EXPENSE);
+        SCHEDULE_FIELDS.forEach(([key]) => expect(detail.body.provider_expense).not.toHaveProperty(key));
+        expect(detail.body.provider_expense).not.toHaveProperty('paying_account');
+      });
+
+      it('creates no bill on create and leaves the bills alone on a PATCH or a rename', async () => {
+        const created = await createProvider(orgId, { provider_expense: FULL_PROVIDER_EXPENSE });
+        expect(recurringOf(created.id)).toEqual([]);
+
+        const bill = await addRecurring(created.id, { description: 'Custom' });
+        await patch(orgId, created.id, { name: uniqueName('Renamed'), notes: 'n', provider_expense: { for_accountant: true } }).expect(200);
+
+        expect(recurringOf(created.id)).toEqual([expect.objectContaining({ id: bill.id, description: 'Custom', dueDay: 15 })]);
+      });
+
       it('rescales every bill (both kinds) on a currency change', async () => {
-        const created = await createProvider(orgId, { provider_expense: { ...FULL_PROVIDER_EXPENSE, expected_amount: '200.00' } });
+        const created = await createProvider(orgId);
+        await addRecurring(created.id, { expected_amount: '200.00' });
         await addOneOff(created.id, '50.00');
 
         await patch(orgId, created.id, { currency: 'JPY' }).expect(200);
 
         expect(amountsOf(created.id).sort()).toEqual([200n, 50n].sort());
-        expect(detailsOf(created.id)?.expectedAmount).toBe(200n);
       });
 
       it('rejects an unrepresentable bill amount with 400 (the transaction rolls the rest back)', async () => {
-        const created = await createProvider(orgId, { provider_expense: { ...FULL_PROVIDER_EXPENSE, expected_amount: '200.00' } });
+        const created = await createProvider(orgId);
+        await addRecurring(created.id, { expected_amount: '200.00' });
         await addOneOff(created.id, '12.50');
 
         await patch(orgId, created.id, { currency: 'JPY' }).expect(400);
@@ -309,10 +137,9 @@ describe('provider-expense accounts (e2e)', () => {
       });
 
       it('answers 422 when a bill\'s paying account does not fit the new currency', async () => {
-        const created = await createProvider(orgId, { provider_expense: FULL_PROVIDER_EXPENSE });
+        const created = await createProvider(orgId);
         const paying = await createAccount(app, ALICE, orgId, { name: uniqueName('Checking') });
-        const [bill] = recurringOf(created.id);
-        await send(app, 'patch', `${prefix}/provider-bills/${bill.id}.json`, ALICE, { paying_account_id: paying.id, expected_amount: '300.00' }).expect(200);
+        await addRecurring(created.id, { paying_account_id: paying.id, expected_amount: '300.00' });
 
         const response = await patch(orgId, created.id, { currency: 'USD' }).expect(422);
 
@@ -325,14 +152,7 @@ describe('provider-expense accounts (e2e)', () => {
         const created = await createProvider(orgId);
 
         expect(created).toMatchObject({ type: 'provider_expense', balance: '0.00', provider_expense: DEFAULT_PROVIDER_EXPENSE });
-        expect(detailsOf(created.id)).toMatchObject({
-          forAccountant: true,
-          providerTaxId: null,
-          expectedAmount: null,
-          dueDay: null,
-          chargeFrequency: 'monthly',
-          dueMonth: null,
-        });
+        expect(detailsOf(created.id)).toMatchObject({ forAccountant: true, providerTaxId: null });
 
         const detail = await send(app, 'get', accountPath(orgId, created.id), ALICE).expect(200);
         expect(detail.body.provider_expense).toEqual(DEFAULT_PROVIDER_EXPENSE);
@@ -343,7 +163,7 @@ describe('provider-expense accounts (e2e)', () => {
 
         expect(created.provider_expense).toEqual(FULL_PROVIDER_EXPENSE_RESPONSE);
         expect(created.notes).toBe('Monthly fee');
-        expect(detailsOf(created.id)).toMatchObject({ forAccountant: false, expectedAmount: 20000n, dueMonth: 3 });
+        expect(detailsOf(created.id)).toMatchObject({ forAccountant: false, providerTaxId: '12.345.678/0001-90' });
       });
 
       it('trims the tax id and stores a blank one as null', async () => {
@@ -352,13 +172,6 @@ describe('provider-expense accounts (e2e)', () => {
 
         expect(trimmed.provider_expense.provider_tax_id).toBe('123.456');
         expect(blank.provider_expense.provider_tax_id).toBeNull();
-      });
-
-      it('formats the expected amount in the account currency exponent', async () => {
-        const created = await createProvider(orgId, { currency: 'JPY', provider_expense: { expected_amount: '200' } });
-
-        expect(created.provider_expense.expected_amount).toBe('200');
-        expect(detailsOf(created.id)?.expectedAmount).toBe(200n);
       });
 
       it.each(['0.00', '150.00', '-80.00'])('accepts the opening balance %p', async (opening) => {
@@ -401,22 +214,10 @@ describe('provider-expense accounts (e2e)', () => {
 
     describe('validation', () => {
       it.each([
-        ['yearly without due_month', { charge_frequency: 'yearly' }],
-        ['due_month with the default monthly', { due_month: 3 }],
-        ['due_month with an explicit monthly', { charge_frequency: 'monthly', due_month: 3 }],
-        ['due_day 0', { due_day: 0 }],
-        ['due_day 32', { due_day: 32 }],
-        ['due_month 0', { charge_frequency: 'yearly', due_month: 0 }],
-        ['due_month 13', { charge_frequency: 'yearly', due_month: 13 }],
-        ['a zero expected_amount', { expected_amount: '0' }],
-        ['a negative expected_amount', { expected_amount: '-10.00' }],
-        ['an expected_amount over the bound', { expected_amount: '100000000000.01' }],
-        ['an expected_amount with too many decimals', { expected_amount: '1.001' }],
-        ['a malformed expected_amount', { expected_amount: 'abc' }],
-        ['a numeric expected_amount', { expected_amount: 200 }],
+        ...SCHEDULE_FIELDS.map(([key, value]): [string, Body] => [`the schedule key ${key}`, { [key]: value }]),
+        ['a schedule key next to an accountant field', { for_accountant: true, due_day: 5 }],
         ['a 33-character provider_tax_id', { provider_tax_id: 'x'.repeat(33) }],
-        ['a null charge_frequency', { charge_frequency: null }],
-        ['an unknown charge_frequency', { charge_frequency: 'weekly' }],
+        ['a numeric provider_tax_id', { provider_tax_id: 123 }],
         ['a null for_accountant', { for_accountant: null }],
         ['a string for_accountant', { for_accountant: 'yes' }],
         ['an unknown field inside provider_expense', { color: 'red' }],
@@ -432,15 +233,25 @@ describe('provider-expense accounts (e2e)', () => {
 
         const created = await createProvider(orgId);
         await patch(orgId, created.id, { provider_expense: providerExpense }).expect(400);
-        expect(detailsOf(created.id)).toMatchObject({ forAccountant: true, chargeFrequency: 'monthly', dueMonth: null });
+        expect(detailsOf(created.id)).toMatchObject({ forAccountant: true, providerTaxId: null });
       });
 
-      it('accepts a 32-character tax id and the amount bound', async () => {
-        const created = await createProvider(orgId, {
-          provider_expense: { provider_tax_id: 'x'.repeat(32), expected_amount: '100000000000.00' },
-        });
+      it('accepts a 32-character tax id', async () => {
+        const created = await createProvider(orgId, { provider_expense: { provider_tax_id: 'x'.repeat(32) } });
 
-        expect(created.provider_expense).toMatchObject({ provider_tax_id: 'x'.repeat(32), expected_amount: '100000000000.00' });
+        expect(created.provider_expense).toEqual({ for_accountant: true, provider_tax_id: 'x'.repeat(32) });
+      });
+
+      it('still accepts and returns the debt schedule fields', async () => {
+        const debt = await createAccount(app, ALICE, orgId, {
+          type: 'debt',
+          name: uniqueName('Loan'),
+          debt: { due_day: 5, bills_from: '2026-01-01', show_in_calendar: false },
+        });
+        expect(debt.debt).toMatchObject({ due_day: 5, bills_from: '2026-01-01', show_in_calendar: false, paying_account: null });
+
+        const patched = await patch(orgId, debt.id, { debt: { due_day: 7, show_in_calendar: true } }).expect(200);
+        expect(patched.body.debt).toMatchObject({ due_day: 7, bills_from: '2026-01-01', show_in_calendar: true });
       });
 
       it('rejects a null provider_expense object', async () => {
@@ -463,7 +274,7 @@ describe('provider-expense accounts (e2e)', () => {
           }).expect(400);
 
           const other = await createAccount(app, ALICE, orgId, { type });
-          await patch(orgId, other.id, { provider_expense: { due_day: 1 } }).expect(400);
+          await patch(orgId, other.id, { provider_expense: { for_accountant: true } }).expect(400);
         }
       });
 
@@ -482,37 +293,18 @@ describe('provider-expense accounts (e2e)', () => {
     });
 
     describe('PATCH', () => {
-      it('merges the object partially and clears optional fields sent as null', async () => {
+      it('merges the object partially and clears the tax id sent as null (round-trip)', async () => {
         const created = await createProvider(orgId, { provider_expense: FULL_PROVIDER_EXPENSE });
 
-        const merged = await patch(orgId, created.id, { provider_expense: { due_day: 20, for_accountant: true } }).expect(200);
-        expect(merged.body.provider_expense).toEqual({ ...FULL_PROVIDER_EXPENSE_RESPONSE, due_day: 20, for_accountant: true });
+        const merged = await patch(orgId, created.id, { provider_expense: { for_accountant: true } }).expect(200);
+        expect(merged.body.provider_expense).toEqual({ ...FULL_PROVIDER_EXPENSE, for_accountant: true });
 
-        const cleared = await patch(orgId, created.id, {
-          provider_expense: { provider_tax_id: null, expected_amount: null, due_day: null },
-        }).expect(200);
-        expect(cleared.body.provider_expense).toEqual({
-          ...FULL_PROVIDER_EXPENSE_RESPONSE,
-          for_accountant: true,
-          provider_tax_id: null,
-          // The schedule fields now come from the single recurring bill, which clearing `due_day` only hides.
-          expected_amount: '200.00',
-          due_day: 20,
-          show_in_calendar: false,
-        });
-      });
+        const cleared = await patch(orgId, created.id, { provider_expense: { provider_tax_id: null } }).expect(200);
+        expect(cleared.body.provider_expense).toEqual({ for_accountant: true, provider_tax_id: null });
 
-      it.each(PAIRED_RULE_TABLE)('stored %s + %#: answers the expected status', async (_stored, stored, body, status, expected) => {
-        const created = await createProvider(orgId, { provider_expense: stored });
-
-        const response = await patch(orgId, created.id, { provider_expense: body }).expect(status);
-
-        if (expected) {
-          expect(response.body.provider_expense).toMatchObject(expected);
-        } else {
-          const detail = await send(app, 'get', accountPath(orgId, created.id), ALICE).expect(200);
-          expect(detail.body.provider_expense).toEqual({ ...stored, paying_account: null });
-        }
+        const detail = await send(app, 'get', accountPath(orgId, created.id), ALICE).expect(200);
+        expect(detail.body.provider_expense).toEqual({ for_accountant: true, provider_tax_id: null });
+        expect(detailsOf(created.id)).toMatchObject({ forAccountant: true, providerTaxId: null });
       });
 
       it('rejects a type change', async () => {
@@ -522,35 +314,12 @@ describe('provider-expense accounts (e2e)', () => {
         await patch(orgId, created.id, { type: 'provider_expense' }).expect(400);
       });
 
-      it('rescales the expected amount on a currency change before any transaction', async () => {
-        const created = await createProvider(orgId, { provider_expense: { expected_amount: '200.00' } });
+      it('changes the currency of a provider without transactions, keeping the accountant fields', async () => {
+        const created = await createProvider(orgId, { provider_expense: FULL_PROVIDER_EXPENSE });
 
         const changed = await patch(orgId, created.id, { currency: 'JPY' }).expect(200);
 
-        expect(changed.body).toMatchObject({ currency: 'JPY', provider_expense: { expected_amount: '200' } });
-        expect(detailsOf(created.id)?.expectedAmount).toBe(200n);
-      });
-
-      it('rejects a currency that cannot represent the expected amount (12.50 BRL to JPY)', async () => {
-        const created = await createProvider(orgId, { provider_expense: { expected_amount: '12.50' } });
-
-        await patch(orgId, created.id, { currency: 'JPY' }).expect(400);
-
-        const detail = await send(app, 'get', accountPath(orgId, created.id), ALICE).expect(200);
-        expect(detail.body).toMatchObject({ currency: 'BRL', provider_expense: { expected_amount: '12.50' } });
-      });
-
-      it('validates an expected amount sent with a currency change against the new currency', async () => {
-        const created = await createProvider(orgId, { provider_expense: { expected_amount: '12.50' } });
-
-        await patch(orgId, created.id, { currency: 'JPY', provider_expense: { expected_amount: '12.5' } }).expect(400);
-        const replaced = await patch(orgId, created.id, { currency: 'JPY', provider_expense: { expected_amount: '13' } })
-          .expect(200);
-        expect(replaced.body).toMatchObject({ currency: 'JPY', provider_expense: { expected_amount: '13' } });
-
-        const other = await createProvider(orgId, { provider_expense: { expected_amount: '12.50' } });
-        const cleared = await patch(orgId, other.id, { currency: 'JPY', provider_expense: { expected_amount: null } }).expect(200);
-        expect(cleared.body).toMatchObject({ currency: 'JPY', provider_expense: { expected_amount: null } });
+        expect(changed.body).toMatchObject({ currency: 'JPY', provider_expense: FULL_PROVIDER_EXPENSE });
       });
 
       it('locks the currency once the provider account has transactions', async () => {
@@ -564,7 +333,7 @@ describe('provider-expense accounts (e2e)', () => {
 
     describe('ledger', () => {
       it('records charges (negative) and payments (positive) through the generic transaction routes', async () => {
-        const created = await createProvider(orgId, { opening_date: '2026-01-01', provider_expense: { expected_amount: '200.00' } });
+        const created = await createProvider(orgId, { opening_date: '2026-01-01' });
 
         await addTransaction(orgId, created.id, '-210.37').expect(201);
         let detail = await send(app, 'get', accountPath(orgId, created.id), ALICE).expect(200);
@@ -588,19 +357,20 @@ describe('provider-expense accounts (e2e)', () => {
         expect(renamed.body.provider_expense).toEqual(FULL_PROVIDER_EXPENSE_RESPONSE);
 
         for (const body of [
-          { provider_expense: { due_day: 5 } },
-          { provider_expense: { due_month: null } },
+          { provider_expense: { for_accountant: true } },
+          { provider_expense: { provider_tax_id: null } },
           { provider_expense: {} },
         ]) {
           const response = await patch(orgId, created.id, body).expect(409);
           expect(response.body.error.code).toBe('ACCOUNT_ARCHIVED');
         }
 
-        await patch(orgId, created.id, { provider_expense: { due_day: 0 } }).expect(400);
+        await patch(orgId, created.id, { provider_expense: { due_day: 5 } }).expect(400);
+        await patch(orgId, created.id, { provider_expense: { provider_tax_id: 'x'.repeat(33) } }).expect(400);
 
         const write = await addTransaction(orgId, created.id, '-10.00').expect(409);
         expect(write.body.error.code).toBe('ACCOUNT_ARCHIVED');
-        expect(detailsOf(created.id)?.dueDay).toBe(10);
+        expect(detailsOf(created.id)).toMatchObject({ forAccountant: false, providerTaxId: '12.345.678/0001-90' });
       });
     });
 
@@ -666,7 +436,7 @@ describe('provider-expense accounts (e2e)', () => {
         expect(await ids('?type=investment')).toEqual([investment.id]);
       });
 
-      it('loads balances and details with one batch each (no N+1)', async () => {
+      it('loads balances and details with one batch each (no N+1), and never reads the bills for the details', async () => {
         await createProvider(orgId);
         await createProvider(orgId);
         const balancesBefore = AccountBalancesQuery.groupedCalls;
@@ -678,7 +448,7 @@ describe('provider-expense accounts (e2e)', () => {
         expect(response.body.length).toBeGreaterThan(2);
         expect(AccountBalancesQuery.groupedCalls - balancesBefore).toBe(1);
         expect(repos.providerExpenseDetails.findCalls - detailsBefore).toBe(1);
-        expect((repos.bills as unknown as { findCalls: number }).findCalls - billsBefore).toBe(1);
+        expect((repos.bills as unknown as { findCalls: number }).findCalls - billsBefore).toBe(0);
       });
     });
 
@@ -811,7 +581,7 @@ describe('provider-expense accounts (e2e)', () => {
     it('changed nothing', () => {
       [fixtures.alicePersonal, fixtures.aliceOrg, fixtures.bobPersonal, fixtures.bobOrg].forEach((id) => {
         expect(repos.accounts.rows.find((row) => row.id === id)?.archivedAt).toBeNull();
-        expect(detailsOf(id)?.dueDay).toBeNull();
+        expect(detailsOf(id)).toMatchObject({ forAccountant: true, providerTaxId: null });
         expect(repos.transactions.rows.some((row) => row.accountId === id)).toBe(false);
       });
     });
@@ -832,7 +602,7 @@ describe('provider-expense accounts (e2e)', () => {
     it('marks writes as never', async () => {
       const created = await send(app, 'post', '/bank/accounts.json', ALICE, { type: 'provider_expense', name: uniqueName('Cache') })
         .expect(201);
-      const patched = await patch(null, created.body.id, { provider_expense: { due_day: 3 } }).expect(200);
+      const patched = await patch(null, created.body.id, { provider_expense: { for_accountant: false } }).expect(200);
 
       [created, patched].forEach((response) => {
         expect(response.headers['x-skip-cache']).toBe('true');

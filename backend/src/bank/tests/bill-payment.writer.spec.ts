@@ -258,7 +258,7 @@ describe('paymentCommand', () => {
   it('normalises a paid body, defaulting record_charge to true on providers and bills only', () => {
     const body = dto({ status: 'paid', paid_on: '2026-01-12', amount: '10.5', paying_account_id: 9 });
 
-    expect(paymentCommand(body, 'provider', 'BRL')).toEqual({ status: 'paid', paidOn: '2026-01-12', amount: 1050n, payingAccountId: 9, recordCharge: true });
+    expect(paymentCommand(body, 'provider_bill', 'BRL')).toEqual({ status: 'paid', paidOn: '2026-01-12', amount: 1050n, payingAccountId: 9, recordCharge: true });
     expect(paymentCommand(body, 'bill', 'BRL')).toMatchObject({ recordCharge: true });
     expect(paymentCommand({ ...body, record_charge: false }, 'bill', 'BRL')).toMatchObject({ recordCharge: false });
     expect(paymentCommand(body, 'debt', 'BRL')).toMatchObject({ recordCharge: false });
@@ -266,10 +266,10 @@ describe('paymentCommand', () => {
 
   it.each([
     ['record_charge on a debt', dto({ status: 'skipped', record_charge: true }), 'debt'],
-    ['a skip with an amount', dto({ status: 'skipped', amount: '1' }), 'provider'],
-    ['a paid body without paid_on', dto({ status: 'paid', amount: '1', paying_account_id: 1 }), 'provider'],
-    ['a zero amount', dto({ status: 'paid', paid_on: '2026-01-01', amount: '0', paying_account_id: 1 }), 'provider'],
-    ['a negative amount', dto({ status: 'paid', paid_on: '2026-01-01', amount: '-1', paying_account_id: 1 }), 'provider'],
+    ['a skip with an amount', dto({ status: 'skipped', amount: '1' }), 'provider_bill'],
+    ['a paid body without paid_on', dto({ status: 'paid', amount: '1', paying_account_id: 1 }), 'provider_bill'],
+    ['a zero amount', dto({ status: 'paid', paid_on: '2026-01-01', amount: '0', paying_account_id: 1 }), 'provider_bill'],
+    ['a negative amount', dto({ status: 'paid', paid_on: '2026-01-01', amount: '-1', paying_account_id: 1 }), 'provider_bill'],
   ] as const)('answers 400 for %s', (_label, body, kind) => {
     expect(() => paymentCommand(body, kind, 'BRL')).toThrow(BadRequestException);
   });

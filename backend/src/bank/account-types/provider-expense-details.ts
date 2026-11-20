@@ -1,29 +1,12 @@
-import { BadRequestException } from '@nestjs/common';
-import { convertAmountInput, parseAmountInput } from '../amount-input.js';
-import {
-  applyBillsFromLifecycle,
-  defaultScheduleState,
-  SCHEDULE_COPIED_FIELDS,
-  scheduleStateOf,
-  serializeScheduleFields,
-  type ScheduleState,
-  type WithPayingAccount,
-} from './schedule-fields.js';
-import type { AccountRef } from '../account-refs.js';
-import { formatAmount } from '../currency.js';
 import type { ProviderExpenseDetailsDto } from '../dto/provider-expense-details.dto.js';
-import type { ProviderBill } from '../entities/provider-bill.entity.js';
-import type { ProviderChargeFrequency, ProviderExpenseDetails } from '../entities/provider-expense-details.entity.js';
+import type { ProviderExpenseDetails } from '../entities/provider-expense-details.entity.js';
 
-// Pure helpers of the provider-expense account type: defaults, PATCH merge,
-// paired rule, currency rescale and serialization (see
-// `docs/agents/modules/bank/provider-expense.md`).
+// Pure helpers of the provider-expense account type: defaults, PATCH merge and
+// serialization (see `docs/agents/modules/bank/provider-expense.md`). The
+// schedule lives on the provider's bills, never on the details row.
 
 /** The provider-expense fields of a `bank_provider_expense_details` row (no key, no timestamps). */
-export type ProviderExpenseState = Pick<
-  ProviderExpenseDetails,
-  'forAccountant' | 'providerTaxId' | 'expectedAmount' | 'dueDay' | 'chargeFrequency' | 'dueMonth'
-> & ScheduleState;
+export type ProviderExpenseState = Pick<ProviderExpenseDetails, 'forAccountant' | 'providerTaxId'>;
 
 /**
  * The nested `provider_expense` response object (snake_case). A type alias
@@ -33,49 +16,20 @@ export type ProviderExpenseState = Pick<
 export type ProviderExpenseResponse = {
   for_accountant: boolean;
   provider_tax_id: string | null;
-  /** The seven schedule fields are `null` when the provider has two or more recurring bills. */
-  expected_amount: string | null;
-  charge_frequency: ProviderChargeFrequency | null;
-  due_day: number | null;
-  due_month: number | null;
-  bills_from: string | null;
-  show_in_calendar: boolean | null;
-  paying_account: AccountRef | null;
 };
 
-/** A loaded details row with its provider's recurring bills (each with its paying account's ref) attached. */
-export type LoadedProviderExpense = ProviderExpenseState & WithPayingAccount & {
-  recurringBills?: Array<ProviderBill & WithPayingAccount>;
-};
-
-/** The body field named in `expected_amount` errors. */
-export const EXPECTED_AMOUNT_FIELD = 'provider_expense.expected_amount';
-
-// Plain-copy fields: body key -> state property (`expected_amount` needs parsing).
+// Plain-copy fields: body key -> state property.
 const COPIED_FIELDS = [
   ['for_accountant', 'forAccountant'],
   ['provider_tax_id', 'providerTaxId'],
-  ['due_day', 'dueDay'],
-  ['charge_frequency', 'chargeFrequency'],
-  ['due_month', 'dueMonth'],
-  ...SCHEDULE_COPIED_FIELDS,
 ] as const;
 
 /**
  * @returns {ProviderExpenseState} The details of a provider account created
- *   without a `provider_expense` object: `for_accountant` `true`,
- *   `charge_frequency` `monthly`, every other field `null`.
+ *   without a `provider_expense` object: `for_accountant` `true`, no tax id.
  */
 export function defaultProviderExpenseState(): ProviderExpenseState {
-  return {
-    forAccountant: true,
-    providerTaxId: null,
-    expectedAmount: null,
-    dueDay: null,
-    chargeFrequency: 'monthly',
-    dueMonth: null,
-    ...defaultScheduleState(),
-  };
+  return { forAccountant: true, providerTaxId: null };
 }
 
 /**
@@ -89,67 +43,19 @@ export function providerExpenseStateOf(details: ProviderExpenseState | undefined
     return defaultProviderExpenseState();
   }
 
-  const { forAccountant, providerTaxId, expectedAmount, dueDay, chargeFrequency, dueMonth } = details;
+  const { forAccountant, providerTaxId } = details;
 
-  return { forAccountant, providerTaxId, expectedAmount, dueDay, chargeFrequency, dueMonth, ...scheduleStateOf(details) };
+  return { forAccountant, providerTaxId };
 }
 
 /**
- * Parses a `provider_expense.expected_amount` into minor units of `currency`.
- * @param {string} value - The decimal string.
- * @param {string} currency - The account's (final) currency.
- * @returns {bigint} The amount, in minor units.
- * @throws {BadRequestException} When malformed, with too many decimals, over
- *   the amount bound, or not strictly positive.
- */
-export function parseExpectedAmount(value: string, currency: string): bigint {
-  const amount = parseAmountInput(EXPECTED_AMOUNT_FIELD, value, currency);
-
-  if (amount <= 0n) {
-    throw new BadRequestException(`${EXPECTED_AMOUNT_FIELD} must be greater than zero`);
-  }
-
-  return amount;
-}
-
-/**
- * Re-expresses the stored `expectedAmount` in a new currency's exponent,
- * keeping its decimal value, exactly like `opening_balance`.
- * @param {ProviderExpenseState} state - The stored details.
- * @param {string} from - The current currency.
- * @param {string} to - The new currency.
- * @returns {ProviderExpenseState} The rescaled details (a copy).
- * @throws {BadRequestException} When the amount cannot be represented in `to`
- *   (e.g. `12.50` BRL to JPY).
- */
-export function rescaleProviderExpenseState(state: ProviderExpenseState, from: string, to: string): ProviderExpenseState {
-  if (state.expectedAmount === null || from === to) {
-    return { ...state };
-  }
-
-  return { ...state, expectedAmount: convertAmountInput(EXPECTED_AMOUNT_FIELD, state.expectedAmount, from, to) };
-}
-
-/**
- * Merges the sent `provider_expense` fields onto `base` (`null` clears a
- * field, an absent one is unchanged). A merged `monthly` frequency clears
- * `due_month`, unless the request sends a non-null `due_month` (→ 400).
- * Setting `due_day` for the first time sets an unset, unsent `bills_from` to
- * `today`.
+ * Merges the sent `provider_expense` fields onto `base` (`null` clears
+ * `provider_tax_id`, an absent field is unchanged).
  * @param {ProviderExpenseState} base - The stored (or default) details.
  * @param {ProviderExpenseDetailsDto} dto - The validated nested body.
- * @param {string} currency - The account's (final) currency.
- * @param {string} today - Today (UTC), `YYYY-MM-DD`.
  * @returns {ProviderExpenseState} The merged details.
- * @throws {BadRequestException} When `expected_amount` is invalid, or
- *   `due_month` is sent with a `monthly` frequency.
  */
-export function mergeProviderExpenseState(
-  base: ProviderExpenseState,
-  dto: ProviderExpenseDetailsDto,
-  currency: string,
-  today: string,
-): ProviderExpenseState {
+export function mergeProviderExpenseState(base: ProviderExpenseState, dto: ProviderExpenseDetailsDto): ProviderExpenseState {
   const merged: ProviderExpenseState = { ...base };
 
   for (const [field, property] of COPIED_FIELDS) {
@@ -158,99 +64,15 @@ export function mergeProviderExpenseState(
     }
   }
 
-  if (dto.expected_amount !== undefined) {
-    merged.expectedAmount = dto.expected_amount === null ? null : parseExpectedAmount(dto.expected_amount, currency);
-  }
-
-  if (merged.chargeFrequency === 'monthly') {
-    if (dto.due_month !== undefined && dto.due_month !== null) {
-      throw new BadRequestException('provider_expense.due_month is only accepted with a yearly charge_frequency');
-    }
-
-    merged.dueMonth = null;
-  }
-
-  applyBillsFromLifecycle(base, merged, dto, today);
-
   return merged;
 }
 
 /**
- * Checks the paired rule on the (merged) details.
- * @param {ProviderExpenseState} state - The details to check.
- * @returns {void}
- * @throws {BadRequestException} When a `yearly` frequency has no `due_month`.
- */
-export function assertProviderExpensePairs(state: ProviderExpenseState): void {
-  if (state.chargeFrequency === 'yearly' && state.dueMonth === null) {
-    throw new BadRequestException('provider_expense.due_month is required with a yearly charge_frequency');
-  }
-}
-
-/**
- * @param {ProviderExpenseState} state - The details.
- * @param {string} currency - The account currency.
- * @param {AccountRef | null} [payingAccount] - The default paying account's ref, if loaded.
+ * @param {ProviderExpenseState | undefined} details - The loaded details row, if any.
  * @returns {ProviderExpenseResponse} The nested `provider_expense` response object.
  */
-export function serializeProviderExpenseState(
-  state: ProviderExpenseState,
-  currency: string,
-  payingAccount: AccountRef | null = null,
-): ProviderExpenseResponse {
-  return {
-    for_accountant: state.forAccountant,
-    provider_tax_id: state.providerTaxId,
-    expected_amount: state.expectedAmount === null ? null : formatAmount(state.expectedAmount, currency),
-    charge_frequency: state.chargeFrequency,
-    due_day: state.dueDay,
-    due_month: state.dueMonth,
-    ...serializeScheduleFields(state, payingAccount),
-  };
-}
+export function serializeProviderExpense(details: ProviderExpenseState | undefined): ProviderExpenseResponse {
+  const state = providerExpenseStateOf(details);
 
-/**
- * Serializes the nested `provider_expense` object: `for_accountant` and
- * `provider_tax_id` always come from the details row; the seven schedule
- * fields come from the provider's recurring bills: the single bill as stored,
- * the details row when there is none, all `null` when there are two or more.
- * @param {LoadedProviderExpense | undefined} loaded - The loaded details row, with its recurring bills.
- * @param {string} currency - The account currency.
- * @returns {ProviderExpenseResponse} The nested `provider_expense` response object.
- */
-export function serializeProviderExpense(loaded: LoadedProviderExpense | undefined, currency: string): ProviderExpenseResponse {
-  const state = providerExpenseStateOf(loaded);
-  const bills = loaded?.recurringBills ?? [];
-
-  if (bills.length === 0) {
-    return serializeProviderExpenseState(state, currency, loaded?.payingAccount ?? null);
-  }
-
-  const common = { for_accountant: state.forAccountant, provider_tax_id: state.providerTaxId };
-
-  if (bills.length > 1) {
-    return {
-      ...common,
-      expected_amount: null,
-      charge_frequency: null,
-      due_day: null,
-      due_month: null,
-      bills_from: null,
-      show_in_calendar: null,
-      paying_account: null,
-    };
-  }
-
-  const [bill] = bills;
-
-  return {
-    ...common,
-    expected_amount: bill.expectedAmount === null ? null : formatAmount(bill.expectedAmount, currency),
-    charge_frequency: bill.chargeFrequency as ProviderChargeFrequency | null,
-    due_day: bill.dueDay,
-    due_month: bill.dueMonth,
-    bills_from: bill.billsFrom,
-    show_in_calendar: bill.showInCalendar,
-    paying_account: bill.payingAccountId === null ? null : bill.payingAccount ?? null,
-  };
+  return { for_accountant: state.forAccountant, provider_tax_id: state.providerTaxId };
 }

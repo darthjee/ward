@@ -7,7 +7,7 @@ import { payingAccountOptions } from '../controllers/scheduleFields.js';
 export const NO_PAYING_ACCOUNT = 'None';
 
 /**
- * Rendering helper of the schedule inputs shared by the debt and provider forms: Bills from,
+ * Rendering helper of the schedule inputs of the debt form: Bills from,
  * Show in Calendar and Default paying account.
  */
 const ScheduleFieldsHelper = {

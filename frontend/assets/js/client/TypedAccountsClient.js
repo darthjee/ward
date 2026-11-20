@@ -9,10 +9,7 @@ const DEBT_FIELDS = [
 
 const INVESTMENT_FIELDS = ['kind', 'yield_rate', 'yield_period', 'maturity_date', 'liquidity_days'];
 
-const PROVIDER_EXPENSE_FIELDS = [
-  'for_accountant', 'provider_tax_id', 'expected_amount', 'charge_frequency', 'due_day',
-  'due_month', 'bills_from', 'show_in_calendar', 'paying_account_id',
-];
+const PROVIDER_EXPENSE_FIELDS = ['for_accountant', 'provider_tax_id'];
 
 /**
  * Create a typed account: `type` with the common fields and the optional nested `key` object.

@@ -60,7 +60,7 @@ describe('provider bill schedule', () => {
   it('builds a provider source from a bill', () => {
     const source = billSourceOfProviderBill(bill(), provider(), { id: 2, name: 'Main' });
 
-    expect(source).toMatchObject({ kind: 'provider', expected: 1000n, defaultPayingAccount: { id: 2 } });
+    expect(source).toMatchObject({ kind: 'provider_bill', expected: 1000n, defaultPayingAccount: { id: 2 } });
     expect(source.bill?.id).toBe(5);
     expect(() => billSourceOfProviderBill(bill({ kind: 'one_off' }), provider(), null)).toThrow();
   });

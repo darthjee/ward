@@ -14,10 +14,6 @@ const PROVIDER = {
   provider_expense: {
     for_accountant: true,
     provider_tax_id: '12.345.678/0001-90',
-    expected_amount: '200.00',
-    charge_frequency: 'yearly',
-    due_day: 10,
-    due_month: 3,
   },
 };
 

@@ -16,7 +16,7 @@ const PROVIDERS = [
     balance: '-200.00',
     archived_at: null,
     provider_expense: {
-      for_accountant: true, provider_tax_id: '123', expected_amount: '200.00', charge_frequency: 'monthly', due_day: 10, due_month: null,
+      for_accountant: true, provider_tax_id: '123',
     },
     bills_summary: { count: 3, monthly: '250.00', yearly: '1200.00' },
   },
@@ -28,7 +28,7 @@ const PROVIDERS = [
     balance: '0',
     archived_at: '2026-01-01T00:00:00.000Z',
     provider_expense: {
-      for_accountant: false, provider_tax_id: null, expected_amount: '1500', charge_frequency: 'yearly', due_day: null, due_month: 3,
+      for_accountant: false, provider_tax_id: null,
     },
     bills_summary: { count: 1, monthly: null, yearly: '1500' },
   },
@@ -40,7 +40,7 @@ const PROVIDERS = [
     balance: '0.00',
     archived_at: null,
     provider_expense: {
-      for_accountant: false, provider_tax_id: null, expected_amount: null, charge_frequency: 'monthly', due_day: null, due_month: null,
+      for_accountant: false, provider_tax_id: null,
     },
     bills_summary: { count: 0, monthly: null, yearly: null },
   },
@@ -54,7 +54,7 @@ const LEGACY = {
   balance: '0.00',
   archived_at: null,
   provider_expense: {
-    for_accountant: true, provider_tax_id: null, expected_amount: null, charge_frequency: 'monthly', due_day: null, due_month: null,
+    for_accountant: true, provider_tax_id: null,
   },
 };
 
