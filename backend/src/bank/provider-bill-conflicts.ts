@@ -56,16 +56,6 @@ export function providerBillLimit(): ConflictException {
 }
 
 /**
- * @returns {ConflictException} 409: schedule fields cannot be edited on the provider with several recurring bills.
- */
-export function providerHasMultipleBills(): ConflictException {
-  return new ConflictException({
-    code: ErrorCodes.PROVIDER_HAS_MULTIPLE_BILLS,
-    message: 'The provider has several recurring bills; edit them through provider-bills',
-  });
-}
-
-/**
  * Runs a write, mapping a recurring-description unique violation to 409.
  * @param {() => Promise<T>} write - The write.
  * @returns {Promise<T>} The write's result.

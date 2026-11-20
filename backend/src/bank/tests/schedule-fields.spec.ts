@@ -1,28 +1,19 @@
 import { debtStateOf, defaultDebtState, mergeDebtState } from '../account-types/debt-details.js';
-import {
-  defaultProviderExpenseState,
-  mergeProviderExpenseState,
-  providerExpenseStateOf,
-} from '../account-types/provider-expense-details.js';
 import { applyBillsFromLifecycle, defaultScheduleState, scheduleStateOf } from '../account-types/schedule-fields.js';
 import type { DebtDetailsDto } from '../dto/debt-details.dto.js';
-import type { ProviderExpenseDetailsDto } from '../dto/provider-expense-details.dto.js';
 
 const TODAY = '2026-11-10';
 
 type State = Record<string, unknown>;
-type Merge = (base: State, fields: Partial<DebtDetailsDto & ProviderExpenseDetailsDto>) => State;
+type Merge = (base: State, fields: Partial<DebtDetailsDto>) => State;
 
 const debtMerge: Merge = (base, fields) => mergeDebtState(base as never, fields as DebtDetailsDto, 'BRL', TODAY);
-const providerMerge: Merge = (base, fields) =>
-  mergeProviderExpenseState(base as never, fields as ProviderExpenseDetailsDto, 'BRL', TODAY);
 
 describe('schedule fields', () => {
   describe('defaultScheduleState / scheduleStateOf', () => {
     it('defaults show_in_calendar to true and the rest to null', () => {
       expect(defaultScheduleState()).toEqual({ billsFrom: null, showInCalendar: true, payingAccountId: null });
       expect(defaultDebtState()).toMatchObject(defaultScheduleState());
-      expect(defaultProviderExpenseState()).toMatchObject(defaultScheduleState());
     });
 
     it('keeps only the schedule fields of a row', () => {
@@ -30,7 +21,6 @@ describe('schedule fields', () => {
 
       expect(scheduleStateOf(row)).toEqual({ billsFrom: '2026-01-01', showInCalendar: false, payingAccountId: 3 });
       expect(debtStateOf({ ...defaultDebtState(), ...row })).toMatchObject({ billsFrom: '2026-01-01', showInCalendar: false, payingAccountId: 3 });
-      expect(providerExpenseStateOf({ ...defaultProviderExpenseState(), ...row })).toMatchObject({ payingAccountId: 3 });
     });
   });
 
@@ -56,7 +46,6 @@ describe('schedule fields', () => {
 
   describe.each<[string, () => State, Merge]>([
     ['debt', defaultDebtState, debtMerge],
-    ['provider_expense', defaultProviderExpenseState, providerMerge],
   ])('%s merge', (_type, defaults, merge) => {
     const base = defaults();
 

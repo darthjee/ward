@@ -143,33 +143,22 @@ describe('serializeAccount', () => {
       .not.toHaveProperty('investment');
   });
 
-  it('serializes a provider account\'s provider_expense object in snake_case, with the amount as a decimal string', () => {
+  it('serializes a provider account\'s provider_expense object in snake_case, without schedule fields', () => {
     const provider = buildAccount({ type: 'provider_expense', currency: 'BRL' });
     const details = Object.assign(new ProviderExpenseDetails(), {
       accountId: provider.id,
       forAccountant: true,
       providerTaxId: '12.345.678/0001-90',
-      expectedAmount: 20000n,
-      dueDay: 10,
-      chargeFrequency: 'monthly',
-      dueMonth: null,
     });
-    const nested = new ProviderExpenseAccountHandler(NO_BILLS_SUMMARY).serialize(details, provider);
+    const nested = new ProviderExpenseAccountHandler(NO_BILLS_SUMMARY).serialize(details);
 
     const response = serializeAccount(provider, { balance: -20000n, mask: false, nested });
 
     expect(response).toMatchObject({
       type: 'provider_expense',
       balance: '-200.00',
-      provider_expense: {
-        for_accountant: true,
-        provider_tax_id: '12.345.678/0001-90',
-        expected_amount: '200.00',
-        charge_frequency: 'monthly',
-        due_day: 10,
-        due_month: null,
-      },
     });
+    expect(response.provider_expense).toEqual({ for_accountant: true, provider_tax_id: '12.345.678/0001-90' });
     expect(response).not.toHaveProperty('debt');
     expect(response).not.toHaveProperty('investment');
   });

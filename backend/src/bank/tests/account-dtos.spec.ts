@@ -236,20 +236,16 @@ describe('nested provider_expense object', () => {
   const FULL_PROVIDER_EXPENSE = {
     for_accountant: false,
     provider_tax_id: '12.345.678/0001-90',
-    expected_amount: '200.00',
-    charge_frequency: 'yearly',
-    due_day: 10,
-    due_month: 3,
   };
 
   it('transforms provider_expense into a ProviderExpenseDetailsDto on create and update', async () => {
     const created = await create({ name: 'Accountant', type: 'provider_expense', provider_expense: FULL_PROVIDER_EXPENSE });
-    const updated = await update({ provider_expense: { due_day: 1 } });
+    const updated = await update({ provider_expense: { for_accountant: true } });
 
     expect(created.provider_expense).toBeInstanceOf(ProviderExpenseDetailsDto);
     expect(created.provider_expense).toMatchObject(FULL_PROVIDER_EXPENSE);
     expect(updated.provider_expense).toBeInstanceOf(ProviderExpenseDetailsDto);
-    expect(updated.provider_expense?.expected_amount).toBeUndefined();
+    expect(updated.provider_expense?.provider_tax_id).toBeUndefined();
   });
 
   it('trims the tax id and blanks it to null', async () => {
@@ -262,17 +258,11 @@ describe('nested provider_expense object', () => {
 
   it.each([
     ['an empty object', {}],
-    ['every nullable field cleared', { provider_tax_id: null, expected_amount: null, due_day: null, due_month: null }],
+    ['the tax id cleared', { provider_tax_id: null }],
     ['for_accountant true', { for_accountant: true }],
     ['for_accountant false', { for_accountant: false }],
     ['a 32-character tax id', { provider_tax_id: 'x'.repeat(32) }],
     ['a 32-code-point tax id with accents', { provider_tax_id: 'é'.repeat(32) }],
-    ['a monthly frequency', { charge_frequency: 'monthly' }],
-    ['a yearly frequency', { charge_frequency: 'yearly' }],
-    ['due_day 1', { due_day: 1 }],
-    ['due_day 31', { due_day: 31 }],
-    ['due_month 1', { due_month: 1 }],
-    ['due_month 12', { due_month: 12 }],
   ])('accepts %s', async (_label, provider_expense) => {
     await expect(update({ provider_expense })).resolves.toBeInstanceOf(UpdateAccountDto);
     await expect(create({ name: 'a', provider_expense })).resolves.toBeInstanceOf(CreateAccountDto);
@@ -289,18 +279,14 @@ describe('nested provider_expense object', () => {
     ['a numeric for_accountant', { for_accountant: 1 }],
     ['a 33-character tax id', { provider_tax_id: 'x'.repeat(33) }],
     ['a numeric tax id', { provider_tax_id: 12345678 }],
-    ['a numeric expected_amount', { expected_amount: 200 }],
-    ['a null charge_frequency', { charge_frequency: null }],
-    ['an unknown charge_frequency', { charge_frequency: 'weekly' }],
-    ['an upper-case charge_frequency', { charge_frequency: 'MONTHLY' }],
-    ['due_day 0', { due_day: 0 }],
-    ['due_day 32', { due_day: 32 }],
-    ['a fractional due_day', { due_day: 1.5 }],
-    ['a string due_day', { due_day: '10' }],
-    ['due_month 0', { due_month: 0 }],
-    ['due_month 13', { due_month: 13 }],
-    ['a fractional due_month', { due_month: 2.5 }],
-    ['a string due_month', { due_month: '3' }],
+    ['a schedule expected_amount', { expected_amount: '200.00' }],
+    ['a schedule charge_frequency', { charge_frequency: 'monthly' }],
+    ['a schedule due_day', { due_day: 10 }],
+    ['a null schedule due_day', { due_day: null }],
+    ['a schedule due_month', { due_month: 3 }],
+    ['a schedule bills_from', { bills_from: '2026-01-01' }],
+    ['a schedule show_in_calendar', { show_in_calendar: true }],
+    ['a schedule paying_account_id', { paying_account_id: 1 }],
   ])('rejects %s with a 400', async (_label, provider_expense) => {
     await expect(update({ provider_expense })).rejects.toThrow(BadRequestException);
     await expect(create({ name: 'a', provider_expense })).rejects.toThrow(BadRequestException);

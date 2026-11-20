@@ -10,7 +10,7 @@ import { serializeProviderBill } from './provider-bill-response.js';
 
 /**
  * Locks the provider account row `FOR UPDATE`, so recurring creates / renames
- * of one provider (and the provider write-through) serialize.
+ * of one provider (and a provider currency rescale) serialize.
  * @param {EntityManager} manager - The transactional manager.
  * @param {number} providerAccountId - The provider account id.
  * @returns {Promise<void>}

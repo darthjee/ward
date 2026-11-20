@@ -1,9 +1,11 @@
 import { Transform } from 'class-transformer';
 import { IsBoolean, IsIn, IsInt, IsNotEmpty, IsOptional, IsString, Max, Min } from 'class-validator';
-import { DESCRIPTION_MAX_LENGTH, IsCalendarDate, IsOptionalNonNull, MAX_INT_COLUMN, NOTES_MAX_LENGTH } from './field-validators.js';
-import { PROVIDER_CHARGE_FREQUENCIES } from './provider-expense-details.dto.js';
+import { DESCRIPTION_MAX_LENGTH, IsCalendarDate, IsOptionalNonNull, MAX_INT_COLUMN, NOTES_MAX_LENGTH, RATE_PERIODS } from './field-validators.js';
 import { MaxCodePoints, trimString } from '../../core/string-validators.js';
 import type { ProviderChargeFrequency } from '../entities/provider-bill.entity.js';
+
+/** The frequencies a recurring provider bill accepts. */
+export const PROVIDER_CHARGE_FREQUENCIES = RATE_PERIODS;
 
 /** The accepted provider bill kinds. */
 export const PROVIDER_BILL_KINDS = ['recurring', 'one_off'] as const;

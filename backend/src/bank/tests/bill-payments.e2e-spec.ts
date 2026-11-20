@@ -46,13 +46,20 @@ describe('bill payments (e2e)', () => {
       debt: { due_day: 10, instalment_amount: '500.00', bills_from: '2026-01-01', ...nested },
       ...fields,
     });
-  const provider = (orgId: number | null, nested: Body = {}, fields: Body = {}, user = ALICE) =>
-    createAccount(app, user, orgId, {
-      type: 'provider_expense',
-      name: uniqueName('Vivo'),
-      provider_expense: { due_day: 5, expected_amount: '200.00', bills_from: '2026-01-01', ...nested },
-      ...fields,
-    });
+  // A provider with one recurring bill named after it (none when `due_day` is null), added through
+  // `/provider-bills.json`: the provider itself carries no schedule.
+  const provider = async (orgId: number | null, schedule: Body = {}, fields: Body = {}, user = ALICE) => {
+    const account = await createAccount(app, user, orgId, { type: 'provider_expense', name: uniqueName('Vivo'), ...fields });
+    const bill = Object.fromEntries(Object.entries({ due_day: 5, expected_amount: '200.00', bills_from: '2026-01-01', ...schedule })
+      .filter(([, value]) => value !== null));
+
+    if (bill.due_day !== undefined) {
+      await send(app, 'post', `${base(orgId)}/accounts/${account.id}/provider-bills.json`, user, { kind: 'recurring', description: account.name, ...bill })
+        .expect(201);
+    }
+
+    return account;
+  };
   const occurrencePath = (orgId: number | null, accountId: number | string, dueDate: string) =>
     `${base(orgId)}/accounts/${accountId}/occurrences/${dueDate}/payment.json`;
   const billPaymentPath = (orgId: number | null, id: number | string) => `${base(orgId)}/bills/${id}/payment.json`;

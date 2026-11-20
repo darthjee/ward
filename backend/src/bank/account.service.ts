@@ -5,7 +5,7 @@ import { AccountBalancesQuery } from './account-balances.query.js';
 import { accountArchived, accountHasTransactions, currencyLocked, mapNameClash } from './account-conflicts.js';
 import { accountOwnerWhere, copyEditableFields, nestedObject, ownerColumns, presentFields } from './account-fields.js';
 import type { AccountResponse } from './account-response.js';
-import { AccountScheduleValidator } from './account-schedule.validator.js';
+import { AccountScheduleValidator, type ScheduleCheck } from './account-schedule.validator.js';
 import { AccountPresenter } from './account.presenter.js';
 import type { OwnerContext } from '../core/owner-context.js';
 import { ownerNotFound } from '../core/parse-id.js';
@@ -133,7 +133,7 @@ export class AccountService {
     const currency = dto.currency ?? this.config.defaultCurrency;
     const nested = nestedObject(dto, handler.type);
     const prepared = handler.validateCreate(nested, { currency });
-    await this.schedule.validate(owner, { nested, prepared, currency, currencyChanged: false });
+    await this.#validateSchedule(owner, handler, { nested, prepared, currency, currencyChanged: false });
     const account = this.accountRepository.create({
       ...ownerColumns(owner),
       type: handler.type,
@@ -178,8 +178,8 @@ export class AccountService {
     const stored = (await this.registry.loadDetails([account], this.accountRepository.manager)).get(account.id);
     const nested = nestedObject(dto, handler.type);
     const { currency } = account;
-    const prepared = handler.validateUpdate(nested, stored, { currency, previousCurrency, previousName: account.name });
-    await this.schedule.validate(owner, { nested, prepared, currency, currencyChanged: currency !== previousCurrency });
+    const prepared = handler.validateUpdate(nested, stored, { currency, previousCurrency });
+    await this.#validateSchedule(owner, handler, { nested, prepared, currency, currencyChanged: currency !== previousCurrency });
 
     copyEditableFields(account, dto);
 
@@ -269,6 +269,12 @@ export class AccountService {
     }
 
     account.currency = dto.currency;
+  }
+
+  async #validateSchedule(owner: OwnerContext, handler: AccountTypeHandler, check: ScheduleCheck): Promise<void> {
+    if (handler.hasSchedule) {
+      await this.schedule.validate(owner, check);
+    }
   }
 
   async #saveWithDetails(account: Account, handler: AccountTypeHandler, prepared: unknown): Promise<Account> {

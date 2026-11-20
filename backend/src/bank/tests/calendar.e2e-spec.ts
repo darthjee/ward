@@ -41,8 +41,20 @@ describe('calendar (e2e)', () => {
     createAccount(app, user, orgId, { type, name: uniqueName(type), [type]: nested, ...fields });
   const debt = (orgId: number | null, nested: Body = {}, fields: Body = {}) =>
     source(orgId, 'debt', { due_day: 10, instalment_amount: '500.00', bills_from: '2026-01-01', ...nested }, fields);
-  const provider = (orgId: number | null, nested: Body = {}, fields: Body = {}) =>
-    source(orgId, 'provider_expense', { due_day: 5, expected_amount: '200.00', bills_from: '2026-01-01', ...nested }, fields);
+  // A provider with one recurring bill named after it (none when `due_day` is null), added through
+  // `/provider-bills.json`: the provider itself carries no schedule.
+  const provider = async (orgId: number | null, schedule: Body = {}, fields: Body = {}) => {
+    const account = await createAccount(app, ALICE, orgId, { type: 'provider_expense', name: uniqueName('provider_expense'), ...fields });
+    const bill = Object.fromEntries(Object.entries({ due_day: 5, expected_amount: '200.00', bills_from: '2026-01-01', ...schedule })
+      .filter(([, value]) => value !== null));
+
+    if (bill.due_day !== undefined) {
+      await send(app, 'post', `${base(orgId)}/accounts/${account.id}/provider-bills.json`, ALICE, { kind: 'recurring', description: account.name, ...bill })
+        .expect(201);
+    }
+
+    return account;
+  };
   const calendar = (orgId: number | null, query = JANUARY, user = ALICE) =>
     send(app, 'get', `${base(orgId)}/calendar.json?${query}`, user);
   const overdue = (orgId: number | null, user = ALICE) => send(app, 'get', `${base(orgId)}/calendar/overdue.json`, user);
