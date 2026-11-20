@@ -24,7 +24,9 @@ function singleRecurringAmount(recurringPage) {
  * @returns {{direction: string, description: string, amount: string}} The form preset.
  */
 export function chargePreset(recurringPage) {
-  return { direction: 'out', description: 'Charge', amount: singleRecurringAmount(recurringPage) };
+  const amount = singleRecurringAmount(recurringPage);
+
+  return { direction: 'out', description: 'Charge', amount };
 }
 
 /**
