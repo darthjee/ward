@@ -108,7 +108,7 @@ describe('bills calendar reads (MySQL)', () => {
 
     const calendar = await service.calendar(ALICE, { from: '2026-01-01', to: '2026-01-31' });
     expect(calendar.occurrences.map(({ kind, status, nominal_date: nominal }) => [kind, status, nominal])).toEqual([
-      ['provider', 'skipped', '2026-01-05'],
+      ['provider_bill', 'skipped', '2026-01-05'],
       ['bill', 'skipped', '2026-01-20'],
     ]);
   });
