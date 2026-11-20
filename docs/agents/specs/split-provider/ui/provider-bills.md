@@ -31,6 +31,7 @@ archiving; see the README's Future epics).
 
 Replaces "expected amount with frequency" with a right-aligned **Bills** column: the count of
 bills plus the recurring sums split by frequency, read from the list payload's `bills_summary`
+([API](../api/provider-bills.md#bills_summary-on-the-provider-list))
 (no per-row request), e.g. `3 bills · R$ 250,00 / month + R$ 1.200,00 / year`.
 
 - Singular `1 bill`, plural `N bills`.

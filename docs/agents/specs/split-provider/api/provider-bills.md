@@ -52,6 +52,29 @@ currency. A provider currency change (only before any transaction) rescales ever
 | 409 | `PROVIDER_HAS_MULTIPLE_BILLS` | Transition only: provider-expense PATCH sends a schedule field with ≥ 2 recurring bills |
 | 422 | `ACCOUNT_NOT_FOUND` / `CURRENCY_MISMATCH` | `paying_account_id` fails `PayingAccountResolver` (generic body) |
 
+## `bills_summary` on the provider list
+
+Added by [#133](https://github.com/darthjee/ward/issues/133).
+`GET <base>/accounts.json?type=provider_expense` (active and archived lists) gives every
+`provider_expense` account a top-level field:
+
+```json
+"bills_summary": { "count": 3, "monthly": "250.00", "yearly": "1200.00" }
+```
+
+- `count` (number): every bill of the provider, recurring and one-off.
+- `monthly` / `yearly`: the sum of `expected_amount` over `kind = 'recurring'` bills with that
+  `charge_frequency`, as a decimal string in the provider's currency. One-offs and bills with a
+  null `expected_amount` are excluded.
+- Never `null`: nothing to sum is zero at the currency's exponent (`"0.00"` in BRL, `"0"` in
+  JPY). A provider with no bills gets `{ "count": 0, "monthly": "0.00", "yearly": "0.00" }`.
+- **List only**: absent on `accounts/:accountId.json`, on write responses and on other account
+  types. Holds only aggregates, never owner or organization ids.
+- Computed in one grouped query over all listed provider accounts (`accounts.json` is not
+  paginated), no N+1.
+- Cache: the list stays `user-scoped`; provider-bill writes already invalidate `/bank` or
+  `/orgs/:id/bank`, which covers `accounts.json` (see [Cache class](#cache-class-decided)).
+
 ## `bills.json` compatibility projection
 
 `GET/POST <base>/bills.json` stays: it filters `kind = 'one_off'` implicitly and creates only
