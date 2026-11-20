@@ -1,7 +1,7 @@
 # Bank — UI
 
-The bank pages: the Bank menu, one submenu per account type, Add / edit bill, Bill history, the
-accountant hand-off and the Calendar. Part of the [Bank module](../bank.md). The cross-cutting
+The bank pages: the Bank menu, one submenu per account type, the provider bills, Add / edit
+bill, Bill history, the accountant hand-off and the Calendar. Part of the [Bank module](../bank.md). The cross-cutting
 frontend mechanics (context in the URL, router tables, section registry, remembered context)
 are in [Frontend → Owner context](../../architecture/frontend.md#owner-context-organizations).
 Code: `frontend/assets/js/components/resources/bank/` and
@@ -94,22 +94,43 @@ account number, currency, balance.
 
 ## Providers
 
-`<ui>/providers…`: `provider_expense` accounts.
+`<ui>/providers…`: `provider_expense` accounts. A provider holds N
+[provider bills](bills.md#provider-bills) (epic [#119](https://github.com/darthjee/ward/issues/119)).
 
-- List columns: name, provider, balance, expected amount with its frequency ("200,00 / month",
-  "—" when unset), for-accountant marker, currency. **New provider** button and an **Accountant
-  hand-off** link.
-- Detail: a provider info block (tax id, expected amount, frequency, due day / month when set,
-  for-accountant flag) and the [schedule block](#schedule-fields-and-bill-history). **Add
-  charge** (Out, "Charge", amount from `expected_amount`) and **Add payment** (In, "Payment")
-  pre-fill the inline form; hidden on an archived account. An **Add bill** button opens
-  `<ui>/bills/new?provider=:id`.
+- **List** — columns name, provider, balance, **Bills**, for-accountant marker, currency (no total
+  row). **New provider** button and an **Accountant hand-off** link. The right-aligned **Bills**
+  column is read from the list payload's `bills_summary` (no per-row request), e.g.
+  `3 bills · R$ 250,00 / month + R$ 1.200,00 / year`:
+  - singular `1 bill`, plural `N bills`;
+  - a zero sum is omitted (`null` and `"0.00"` both count as zero);
+  - one-offs and recurring bills without an expected amount count toward N but not the sums;
+  - `count: 0` → `—`; a missing `bills_summary` → an **empty** cell, not `—`;
+  - the sums are in the provider's single currency;
+  - each part (`3 bills`, `R$ 250,00 / month`, `R$ 1.200,00 / year`) stays whole on one line; the
+    cell wraps only between parts (at ` · ` and ` + `);
+  - archived providers follow the same rules (the row is muted, with the archived badge).
+- **Detail**:
+  - A provider info block with the tax id and the for-accountant flag (no expected amount,
+    frequency or due day: those live on the bills).
+  - A **Bills** block below the header, paginated ("No bills yet." when empty): one row per bill
+    with description, **kind badge** (Recurring / One-off), expected amount (with its frequency
+    for recurring bills, `—` when unset) and due (`Day N` or `Day N of <Month>` for recurring,
+    the due date for one-offs). Actions: **Add bill** (`<ui>/bills/new?provider=:id`, also in the
+    shortcut bar), **Edit**, **Delete** (with confirmation) and **History**. A delete refused
+    with `PROVIDER_BILL_PAID` says, for a recurring bill, to untick *Show in calendar* instead,
+    and for a one-off to undo the payment first.
+  - On an archived provider, Add bill, Edit and Delete are hidden, but every row (one-offs
+    included) keeps its **History** link, which opens the read-only per-bill history (Undo
+    hidden).
+  - **Add charge** (Out, "Charge") and **Add payment** (In, "Payment") pre-fill the inline form;
+    hidden on an archived account. Add charge prefills the amount from the provider's **single**
+    recurring bill; with zero or several it stays empty.
 - **Sent charges** show "Sent <local date>" under the description and a **Mark as unsent** link
   (no confirmation; still visible on an archived account). Saving an edit of a sent charge first
   asks for confirmation; deleting one adds the warning to the delete confirmation.
-- Create / Edit: "Bank" is **Provider**, the account number **Customer / contract number**;
-  provider fields For accountant (on by default), Provider tax id, Expected amount, Frequency,
-  Due day, Due month (yearly only).
+- **Create / Edit** — "Bank" is **Provider**, the account number **Customer / contract number**;
+  the provider fields are only **For accountant** (on by default) and **Provider tax id**. No
+  schedule field is shown or sent.
 
 ### Accountant hand-off
 
@@ -132,28 +153,46 @@ account number, currency, balance.
 
 ## Schedule fields and Bill history
 
-On the Debts and Providers pages:
+**Debts** keep the account-level schedule:
 
 - **Create / Edit** gain **Bills from** (filled with today when a due day is first entered),
   **Show in Calendar** (on by default) and **Default paying account** (the owner's non-archived
   `regular` accounts in the account's currency; optional).
 - **Detail** shows those three values and a **Bill history**: payments and skips, newest first,
-  paginated, with an **Off-schedule** badge and an **Undo** action per row.
-  - Undo asks for confirmation; it is hidden when the account is archived.
-  - For paid provider and one-off payments, the confirmation always warns that the recorded
-    charge may already have been sent to the accountant.
+  paginated, with an **Off-schedule** badge and an **Undo** action per row. Undo asks for
+  confirmation; it is hidden when the account is archived.
+
+**Providers** have a **per-bill history** at `<ui>/bills/:billId/history`, reached from the bill
+row (`provider-bills/:id/bill-payments.json`). It lists only that bill's payments and skips, with
+the same badges and Undo. The page has a back link to the provider and a header
+`<description> — <provider name>` with the kind badge (and the expected amount with its
+frequency for recurring bills). Undo is hidden on an archived provider, whose history stays
+readable. For paid provider-bill payments, the Undo confirmation always warns that the recorded
+charge may already have been sent to the accountant.
 
 ## Add / edit bill
 
-`<ui>/bills/new` (optionally `?provider=:id`), `<ui>/bills/:billId/edit`
+`<ui>/bills/new` (optionally `?provider=:id`), `<ui>/bills/:billId/edit`; `<ui>/bills` redirects to
+the Providers list.
 
-- Fields: provider (the owner's non-archived provider-expense accounts), paying account (the
-  owner's non-archived `regular` accounts in the provider's currency, refreshed when the provider
-  changes, **required on create and edit**), due date (past allowed, defaulting to the local
-  today), amount, description, notes.
-- A 422 from the server is shown on the form without revealing more than the server says; 409
-  `BILL_PAID` is shown on save (a provider change on a paid bill) and on delete ("undo the
-  payment first").
+- A **Kind** selector (One-off / Recurring; a new form starts on One-off), **disabled on edit**:
+  `kind` is never sent on a PATCH. The provider select is also disabled when editing a recurring
+  bill (a recurring bill never moves to another provider).
+- **One-off** fields: provider (the owner's non-archived provider-expense accounts), paying
+  account (the owner's non-archived `regular` accounts in the provider's currency, refreshed when
+  the provider changes, **required on create and edit**), due date (past allowed, defaulting to
+  the local today), amount, description, notes.
+- **Recurring** fields: provider, description, expected amount (optional), frequency (monthly by
+  default), due day, due month (yearly only), bills from (filled with today when a due day is
+  first entered), **Show in calendar** (on by default) and default paying account (optional).
+- Next to *Show in calendar* the form says "Untick to stop this bill. Its payment history is
+  kept.": there is no per-bill archiving yet (*Archive an individual provider bill*,
+  [#141](https://github.com/darthjee/ward/issues/141)).
+- **Server errors** — `PROVIDER_BILL_NAME_TAKEN` on the description, `CURRENCY_MISMATCH` and
+  `ACCOUNT_NOT_FOUND` on the paying account; `PROVIDER_BILL_LIMIT`, `ACCOUNT_ARCHIVED`,
+  `PROVIDER_BILL_KIND_LOCKED`, `PROVIDER_BILL_PROVIDER_LOCKED`, `PROVIDER_BILL_PAID` and
+  `BILL_PAID` ("undo the payment first") in the form alert. A 422 never reveals more than the
+  server says; a 404 (including a bill of an archived provider) renders Not found.
 - **Delete** asks for confirmation.
 - Save, cancel and delete return to the provider's detail page (or the Providers list).
 - An unavailable `?provider=` (unknown, archived, other owner) is silently dropped from the
@@ -177,14 +216,18 @@ The Calendar lists the occurrences of debts, providers and one-off bills
   from any past month up to **12 months ahead** (a later `m` is clamped, an invalid one means
   the current month); overdue highlighted, paid / skipped muted; one `calendar.json` request per
   month; per-currency totals.
-- **Entry** — source name (account name, or bill description), expected amount (or none), the
-  effective date plus the nominal one when the weekend shift moved it ("due Sat 14, moved to Mon
-  16"), and the status. It links to the debt / provider detail page, or to the bill's edit
-  page.
-- **Pay** dialog (open / overdue) — amount (pre-filled from the expected amount, required when
-  there is none), paid on (default today, not after today), paying account (pre-filled from the
-  default, required when that is null or archived), and **Also record the charge** for provider
-  entries only, on by default. A 409 reloads the entry.
+- **Entry** — the label is `<source_bill.description> / <provider name>` for provider bills, so
+  three bills of one provider read "Internet / Vivo", "Telefone / Vivo", "Móvel / Vivo"; a debt
+  shows its account name. Then the expected amount (or none), the effective date plus the
+  nominal one when the weekend shift moved it ("due Sat 14, moved to Mon 16"), and the status.
+  It links to the debt / provider detail page, or to the one-off bill's edit page.
+- **Pay** dialog (open / overdue) — amount (pre-filled from the expected amount, required; empty
+  when there is none), paid on (default today, not after today), paying account (pre-filled from
+  the default, required when that is null or archived), and **Also record the charge** for
+  `provider_bill` and `bill` entries, on by default. Pay, Skip and Undo target the per-bill route
+  (`provider-bills/:id/occurrences/:dueDate/payment.json`) for provider bills,
+  `bills/:id/payment.json` for one-off `bill` entries, and the account route for debts. A 409
+  reloads the entry.
 - **Skip** (open / overdue) and **Undo** (paid / skipped) ask for confirmation.
 
 Decisions:
@@ -226,6 +269,13 @@ app, *Calendar feed (iCal / `.ics`)* ([#102](https://github.com/darthjee/ward/is
   badge.
 - **"Bills from" autofill** uses the browser's local today, while the backend fallback uses UTC
   today.
+- **Calendar label** — one combined `<bill> / <provider>` link text, not separately styled primary
+  and secondary labels (split-provider spec, [#124](https://github.com/darthjee/ward/issues/124)).
+- **Pay amount** is required on every entry, not only when the expected amount is `null`.
+- **Provider bills** — the per-bill history page has a header and a back link; the Bills block
+  shows the expected amount on one-off rows too and is paginated; a refused delete gets a
+  kind-specific message; the provider select is locked when editing a recurring bill; Add bill
+  also appears in the shortcut bar.
 - **Stale remembered context** is checked against the loaded `/orgs.json` list (no 404
   request), and only at the entry hash; a direct stale URL renders `NotFound` with "Go to
   Personal".

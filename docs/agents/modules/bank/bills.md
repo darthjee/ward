@@ -1,23 +1,27 @@
 # Bank — Bills
 
-A **bill** is something to pay on a due date. Ward uses a **hybrid model**: recurring bills are
-derived from debt and provider-expense accounts, and the few bills no account models are stored
-as one-off `Bill` rows. The Calendar merges both. Part of the [Bank module](../bank.md); the
+A **bill** is something to pay on a due date. Ward uses a **hybrid model**: a debt's bills are
+derived from the debt account's own schedule, and a provider-expense account holds N stored
+[provider bills](#provider-bills), each `recurring` (a schedule) or `one_off` (one due date). The
+Calendar merges both. Part of the [Bank module](../bank.md); the
 pages are in [ui.md](ui.md).
 
-Endpoints: [Routes — Bank → Bills and calendar](../../backend/routes/bank.md#bills-and-calendar).
+Endpoints: [Routes — Bank → Bills and calendar](../../backend/routes/bank.md#bills-and-calendar)
+and [Provider bills](../../backend/routes/bank.md#provider-bills).
 
 ## Scope
 
-- **Recurring bills are derived, never stored.** Debt and provider-expense accounts are the
-  **only** recurring sources. Their **occurrences** are computed per request from the schedule
-  the account already carries (instalment / expected amount, frequency, `dueDay`, `dueMonth`)
-  plus the [schedule fields](#schedule-fields). The schedule lives only on the account: no
-  copy, no sync.
-- **No standalone recurring bills** — a recurring payment always means a provider-expense (or
-  debt) account. Decided against, not deferred.
-- **One-off bills** are a small `Bill` entity for what no account models (a yearly tax, a fine,
-  a repair). Each one references a provider-expense account, which gives it its owner.
+- **Debt schedules are derived, never stored.** A debt's **occurrences** are computed per
+  request from the schedule the account already carries (instalment, frequency, `dueDay`,
+  `dueMonth`) plus the [schedule fields](#schedule-fields). No copy, no sync.
+- **Provider schedules are stored on recurring provider bills.** A provider (one tax id, one
+  ledger) may hold **several recurring bills** (an ISP's internet, phone and mobile), each with
+  its own schedule; their occurrences are computed per request from each bill.
+- **Every bill belongs to an account** — there is no bill without a provider (or debt) account.
+  Epic [#119](https://github.com/darthjee/ward/issues/119) reversed the earlier "no standalone
+  recurring bills" decision only in that a provider may now hold several recurring bills.
+- **One-offs** are provider bills with `kind = one_off`, for what no schedule models (a yearly
+  tax, a fine, a repair).
 - Only `monthly` and `yearly` periods; other periods are decided against.
 - **Auto-pay or payment execution is out of the product**: Ward records what happens, it never
   moves money.
@@ -29,12 +33,107 @@ bills ([#104](https://github.com/darthjee/ward/issues/104)). Card statements as 
 to [#89](https://github.com/darthjee/ward/issues/89); receipts on paid bills to
 [#96](https://github.com/darthjee/ward/issues/96).
 
+## Provider bills
+
+Entity `ProviderBill`, table `bank_provider_bills` (renamed from `bank_bills`, so one-off ids
+survived). One row per charge; many rows per provider. Managed through the provider-bills routes
+([Routes — Bank → Provider bills](../../backend/routes/bank.md#provider-bills)).
+
+| Column | Type | Null | Notes |
+|---|---|---|---|
+| `id` | int PK | no | |
+| `provider_account_id` | int | no | Real FK to `bank_accounts`, `ON DELETE CASCADE`. **No owner column**: the owner is the provider account's |
+| `kind` | varchar(16) | no | `recurring` or `one_off`; immutable (see [Kinds](#kinds)) |
+| `description` | varchar(255) | no | Required on both kinds; trimmed |
+| `paying_account_id` | int | yes | Per-bill **default paying account**: a non-archived `regular` account of the provider's owner and currency; FK, `ON DELETE SET NULL` |
+| `expected_amount` | bigint | yes | Minor units of the provider's currency, `> 0` when set |
+| `notes` | text | yes | At most 2000 characters; never exposed in occurrence payloads |
+| `charge_frequency`, `due_day`, `due_month`, `bills_from`, `show_in_calendar` | | yes | The recurring group (see [Schedule fields](#schedule-fields)) |
+| `due_date` | date | yes | The one-off group |
+| `created_at`, `updated_at` | datetime | no | |
+
+- **Description uniqueness** — unique per provider **among recurring bills only**,
+  case- and accent-insensitive (`"Água"` = `"agua"`), via the **virtual** generated column
+  `recurring_description = IF(kind = 'recurring', description, NULL)` and
+  `UNIQUE (provider_account_id, recurring_description)`; the column is not mapped by the
+  entity. Violation → `409 PROVIDER_BILL_NAME_TAKEN`. One-off descriptions may repeat, and a
+  one-off may share a description with a recurring bill.
+- **Cap** — at most **50 recurring bills per provider** → `409 PROVIDER_BILL_LIMIT`, counted
+  and inserted in one transaction under a lock on the provider row. One-offs are uncapped; the
+  list is paginated.
+- **Indexes** — `(provider_account_id, kind, description)` serves the list, the calendar source
+  query and the uniqueness lookup; `(provider_account_id, due_date)` serves one-offs; history by
+  bill uses the `bank_bill_payments.provider_bill_id` FK index.
+- **The ledger is unchanged** — a provider keeps one ledger and one balance; a charge or payment
+  is a plain `Transaction` on the provider account and **nothing links a transaction to a
+  bill** (the bill is a schedule, not a sub-ledger). A per-transaction link is the
+  *Per-transaction bill link* epic ([#140](https://github.com/darthjee/ward/issues/140)).
+
+Edge cases:
+
+- **Provider archived** — its bills leave the Calendar; the list, the single `GET` and the
+  per-bill history stay readable; create (`409 ACCOUNT_ARCHIVED`), `PATCH`, `DELETE` and pay /
+  skip (uniform `404`) are refused. They return on unarchive.
+- **Provider deleted** — bills cascade, and their payment rows cascade through the bill.
+- **Currency change on the provider** (only before any transaction) — rescales every bill's
+  `expected_amount` in one transaction with row locks; an amount not representable in the new
+  exponent → `400` and the whole PATCH fails.
+- **`show_in_calendar: false`** — no occurrence, but the bill stays editable and keeps its
+  history.
+- **Renaming a recurring bill** — only labels change; payment identity is `provider_bill_id`, so
+  history is kept.
+- **No per-bill archiving** — `ProviderBill` has no `archived` column; a bill leaves the list
+  and Calendar only with its provider. To stop one bill, delete it (when it has no paid payment)
+  or set `show_in_calendar: false`; the add / edit form says so. Archiving one bill is the
+  *Archive an individual provider bill* epic ([#141](https://github.com/darthjee/ward/issues/141)).
+
+### Kinds
+
+- `recurring` bills produce derived occurrences through `occurrence-generator.ts` (one schedule
+  per recurring bill).
+- `one_off` bills produce exactly one occurrence, on `due_date` (no weekend shift).
+- **`kind` is immutable** — a `PATCH` sending a different value → `409
+  PROVIDER_BILL_KIND_LOCKED`. Converting means delete + create.
+- **Provider lock** — `provider_account_id` is immutable on recurring bills → `409
+  PROVIDER_BILL_PROVIDER_LOCKED`, checked **before** resolving any target provider (no probing
+  through 404-vs-409). A one-off may move to another provider of the same owner unless paid
+  (`409 PROVIDER_BILL_PAID`); the target must be active (`409 ACCOUNT_ARCHIVED`) and of the same
+  currency (`422 CURRENCY_MISMATCH`). Its skipped payment row follows it.
+- **Delete** — `409 PROVIDER_BILL_PAID` when any payment row is `paid`; otherwise the bill goes
+  with its skipped rows.
+
+Validation runs on the **merged state** (stored row plus the patch); `null` clears a field and
+an absent field leaves it unchanged. A violation, or a field of the other group, → `400`, never
+silently ignored:
+
+| Column | `recurring` | `one_off` |
+|---|---|---|
+| `description` | required | required |
+| `expected_amount` | optional (`> 0` when set) | **required** (`> 0`) |
+| `paying_account_id` | optional | optional |
+| `notes` | optional | optional |
+| `charge_frequency` | required, default `monthly` | must be `null` |
+| `due_day` | required (1–31) | must be `null` |
+| `due_month` | required only when `yearly`, otherwise `null` | must be `null` |
+| `bills_from` | required, default UTC today | must be `null` |
+| `show_in_calendar` | required, default `true` | must be `null` |
+| `due_date` | must be `null` | required |
+
+A recurring bill without `expected_amount` still shows in the Calendar; its Pay dialog then
+requires an explicit amount.
+
 ## Schedule fields
 
-Three fields on `bank_debt_details` (migration
-`20261108120022-bank-add-schedule-fields.ts`; they were also on `bank_provider_expense_details`
-until [#125](https://github.com/darthjee/ward/issues/125) dropped the provider schedule — a
-provider's schedule now lives on each recurring provider bill):
+A schedule lives in two places:
+
+- **Recurring provider bills** — `expected_amount`, `charge_frequency`, `due_day`,
+  `due_month`, `bills_from`, `show_in_calendar` and the per-bill `paying_account_id` (see
+  [Provider bills](#provider-bills)). The provider itself carries no schedule (its seven
+  schedule columns were dropped by [#125](https://github.com/darthjee/ward/issues/125)), and
+  there is no provider-level default paying account: one default could not serve bills with
+  different paying accounts.
+- **Debt accounts** — the instalment, frequency, `dueDay` and `dueMonth` on the debt, plus three
+  fields on `bank_debt_details` (migration `20261108120022-bank-add-schedule-fields.ts`):
 
 | Field | Type | Notes |
 |---|---|---|
@@ -51,41 +150,46 @@ provider's schedule now lives on each recurring provider bill):
 - A bad `paying_account_id` → 422 (see [Validation](#validation)). A currency-changing account
   PATCH re-checks a stored default (422 `CURRENCY_MISMATCH` when it no longer matches).
 - The migration backfilled `bills_from` = the migration date for accounts that already had a
-  `due_day`, so existing schedules appeared without a phantom overdue backlog.
+  `due_day`, so existing schedules appeared without a phantom overdue backlog. Payments of
+  providers that had no schedule were backfilled onto **hidden** recurring bills
+  (`show_in_calendar = false`) until a schedule is set.
 
 ## One-off bills
 
-`ProviderBill` with `kind = one_off` (table `bank_provider_bills`, renamed from `bank_bills`; the API field `amount` maps to column `expected_amount`). The legacy `bills.json` routes only see one-offs; a recurring bill id answers 404:
+The `one_off` kind. Besides the provider-bills routes, the older `bills.json` routes remain a
+**compatibility projection** that only sees one-offs (a recurring bill id answers 404, a
+recurring field in the body → 400) and keeps the API field `amount`, mapped to
+`expected_amount`:
 
 | Field | Required | Notes |
 |---|---|---|
 | `providerAccountId` | yes | A `provider_expense` account of the active owner; FK, `ON DELETE CASCADE` |
-| `payingAccountId` | yes on create | A `regular`, non-archived account of the same owner and the provider's currency; FK, `ON DELETE SET NULL` (then the Pay dialog requires a choice) |
+| `payingAccountId` | yes on create (`bills.json`) | A `regular`, non-archived account of the same owner and the provider's currency; FK, `ON DELETE SET NULL` (then the Pay dialog requires a choice) |
 | `dueDate` | yes | `DATE`, any date (an already overdue bill can be entered); **no weekend shift** |
 | `amount` | yes | `BIGINT` minor units, > 0, in the provider's currency, within the amount bound |
 | `description` | yes | Trimmed, at most 255 characters |
 | `notes` | no | At most 2000 characters |
 
-- No owner columns: the owner is the provider account's owner.
 - Changing the provider re-checks the paying account's currency (422) and rescales the stored
   amount into the new currency's exponent (400 when it can't be represented).
 - **Editing a bill with a payment row** — changing the provider of a `paid` bill → 409
-  `BILL_PAID` (undo first). Otherwise the payment row follows the bill (source account and due
-  date) in the same DB transaction.
-- **Deleting** a `paid` bill → 409 `BILL_PAID`. An unpaid or skipped bill is deleted with its
-  payment row.
-- A bill whose provider is **archived** is hidden: it leaves the list and the Calendar, and
-  `GET`, `PATCH` and `DELETE` on it answer 404. It comes back on unarchive. An archived
-  provider in a bill body → 422 `ACCOUNT_NOT_FOUND`.
-- Index on `bank_provider_bills (provider_account_id, due_date)`.
+  `BILL_PAID` on `bills.json` (`PROVIDER_BILL_PAID` on the provider-bills route; undo first).
+  Otherwise the payment row follows the bill (source account and due date) in the same DB
+  transaction.
+- **Deleting** a `paid` bill → 409 `BILL_PAID` (`PROVIDER_BILL_PAID`). An unpaid or skipped bill
+  is deleted with its payment row.
+- On `bills.json`, a bill whose provider is **archived** is hidden: it leaves the list, and
+  `GET`, `PATCH` and `DELETE` on it answer 404 (the provider-bills `GET` still reads it). It
+  comes back on unarchive. An archived provider in a bill body → 422 `ACCOUNT_NOT_FOUND`.
 
 ## Recurrence
 
-Applies to occurrences derived from debt and provider-expense accounts (pure helper
-`occurrence-generator.ts`):
+Applies to occurrences derived from debt accounts and recurring provider bills (pure helper
+`occurrence-generator.ts`). Each recurring bill is its own series: a provider with three
+recurring bills produces three series.
 
 - **A schedule exists** when `dueDay` **and** `billsFrom` are set, `showInCalendar` is `true`
-  and the account is not archived.
+  and the account (for a bill, its provider) is not archived.
 - **Start** — the first occurrence is the first due date on or after `billsFrom`. The opening
   date is not used, so an old loan produces no backlog of phantom overdue instalments.
 - **End** — open-ended. `instalmentCount` and a zero balance are not stop conditions; only
@@ -109,15 +213,21 @@ The Calendar routes return derived occurrences and one-off bills in one `snake_c
 
 | Field | Notes |
 |---|---|
-| `kind` | `debt`, `provider_bill` (derived from a recurring provider bill) or `bill` (one-off) |
+| `kind` | `OccurrenceKind`: `debt`, `provider_bill` (derived from a recurring provider bill) or `bill` (one-off) |
 | `source_account` | `{ id, name, type }`: the debt / provider (for a one-off, its provider) |
+| `source_bill` | `{ id, description }` of the provider bill (recurring or one-off), `null` for debts; never `notes` |
 | `bill` | `{ id, description }` for one-offs, `null` otherwise |
 | `nominal_date` / `effective_date` | See [Recurrence](#recurrence) |
-| `expected_amount` | Decimal string, or `null` when the account has none (the Pay dialog then requires an amount) |
+| `expected_amount` | Decimal string, or `null` when the bill / account has none (the Pay dialog then requires an amount) |
 | `currency` | The source account's currency |
 | `status` | `open`, `overdue`, `paid` or `skipped` |
 | `payment` | `{ id, status, paid_on, amount, paying_account }` for paid / skipped, else `null` |
 | `default_paying_account` | `{ id, name }` or `null` |
+
+Sort: `effective_date`, then `kind`, then the **bill id before the source account id**, so two
+bills of one provider on the same day order deterministically. The 366-day range and the
+1000-occurrence caps count **total** occurrences across all bills, and `overdue.json` is bounded
+the same way, listing each recurring bill's unpaid occurrences independently.
 
 Accounts are exposed by id and name only. Totals are one entry per currency, never summed; the
 exact envelopes are in the [routes page](../../backend/routes/bank.md#calendar-envelope-and-totals).
@@ -128,8 +238,9 @@ One `bank_bill_payments` row per occurrence:
 
 | Column | Notes |
 |---|---|
-| `sourceAccountId` | The debt / provider (for a one-off, its provider); FK, `ON DELETE CASCADE` |
-| `billId` | Set for one-offs; FK to `bank_bills`, `ON DELETE CASCADE` |
+| `sourceAccountId` | The debt / provider (for a bill, its provider); FK, `ON DELETE CASCADE` |
+| `providerBillId` | Set for recurring provider bills; indexed FK to `bank_provider_bills`, `ON DELETE CASCADE` |
+| `billId` | Set for one-offs; FK to `bank_provider_bills`, `ON DELETE CASCADE` |
 | `dueDate` | The **nominal** due date |
 | `status` | `paid` \| `skipped` |
 | `paidOn` | `paid` only; at most UTC today + 1 day |
@@ -137,17 +248,36 @@ One `bank_bill_payments` row per occurrence:
 | `payingAccountId` | `paid` only; FK, `ON DELETE SET NULL` |
 | `paymentTransactionId`, `withdrawalTransactionId`, `chargeTransactionId` | The transactions the payment created; FKs, `ON DELETE SET NULL` |
 
-- **Uniqueness** — one row per derived occurrence, `UNIQUE (source_account_id,
-  derived_due_date)` on an indexed **virtual** generated column (`due_date` when `bill_id` is
-  null; MySQL refuses a stored generated column over a cascading FK); one row per one-off,
-  `UNIQUE (bill_id)`. Paying twice → 409 `OCCURRENCE_ALREADY_PAID`.
+- Paying twice → 409 `OCCURRENCE_ALREADY_PAID`; two different bills of one provider paid on
+  the same date both succeed (see [Payment keys](#payment-keys)).
 - No owner columns: the row inherits the owner from its source account.
+
+### Payment keys
+
+Every payment row falls under exactly one unique key:
+
+| Payments of | Identity | Key |
+|---|---|---|
+| Debt occurrences | `(source_account_id, due_date)` | `UNIQUE (source_account_id, derived_due_date)`, `derived_due_date = IF(bill_id IS NULL AND provider_bill_id IS NULL, due_date, NULL)` |
+| Recurring provider bills | `(provider_bill_id, due_date)` | `UNIQUE (provider_bill_id, provider_bill_due_date)`, `provider_bill_due_date = IF(provider_bill_id IS NOT NULL, due_date, NULL)` |
+| One-off bills | `(bill_id)` | `UNIQUE (bill_id)` |
+
+- The debt key is **narrowed** to rows with neither bill id; otherwise it would also cover
+  recurring provider-bill payments (which keep `bill_id NULL`) and reject two bills of one
+  provider paid on the same date.
+- **Pitfall** — both generated columns must stay **VIRTUAL** and **unmapped** by the entity
+  (TypeORM never writes them): MySQL refuses a STORED generated column over a cascading FK.
+  `due_date` remains the real, mapped column.
+- The payment writer locks the `ProviderBill` row `FOR UPDATE` and re-checks the payment in the
+  same transaction (the unique keys stay the final guard), so the lock is per bill.
+- The calendar's payment-map key is `${providerBillId}:${nominal}` for provider bills and
+  `${sourceAccountId}:${nominal}` for debts.
 
 **Paid** — the row and its ledger transactions are written in **one DB transaction**; if any
 part fails, nothing is saved:
 
 - **debt** — a payment (+) on the debt and a withdrawal (−) on the paying account;
-- **provider** (derived or one-off) — a payment (+) on the provider and a withdrawal (−) on the
+- **provider bill** (recurring or one-off, paid per bill) — a payment (+) on the provider and a withdrawal (−) on the
   paying account, plus, with **"Also record the charge"** (`record_charge`, default `true`), an
   unsent charge (−) on the provider that feeds the [accountant
   hand-off](provider-expense.md#accountant-hand-off).
@@ -198,32 +328,38 @@ Paying a bill as one linked operation is part of the *Linked transfers* epic
 
 ## Bill history
 
-`bill-payments.json` lists the payment rows of a debt account (or, per bill, of a provider
-bill via `provider-bills/:id/bill-payments.json`), newest due date first,
+`accounts/:accountId/bill-payments.json` lists the payment rows of a debt account, and
+`provider-bills/:id/bill-payments.json` those of **one** provider bill, newest due date first,
 paginated. Each row says whether it is **off-schedule**: its due date is not a nominal
-occurrence of the account's **current** schedule pattern (`due_day`, `due_month`, frequency,
-`bills_from`; archived and `show_in_calendar` are ignored, and with no `due_day` every derived
-row is off-schedule).
+occurrence of the **current** schedule pattern of that debt or that bill (`due_day`,
+`due_month`, frequency, `bills_from`; archived and `show_in_calendar` are ignored, and with no
+`due_day` every derived row is off-schedule). Editing one bill never marks another bill's
+payments off-schedule.
 
 **Schedule edits after payments** are always allowed. Payments that no longer match are kept,
 never deleted: they show as off-schedule in the history, not on the Calendar, and come back if
-the schedule changes back. An archived account's history stays readable.
+the schedule changes back. An archived account's (or provider's) history stays readable.
 
 ## Data sensitivity and ownership
 
 On top of the [ownership contract](../bank.md#bank-ownership-contract):
 
-1. A one-off `Bill` inherits its owner from its provider account; a payment row from its source
-   account. No row stores an owner copy.
+1. Provider bills are **personal financial data**. A `ProviderBill` inherits its owner from its
+   provider account; a payment row from its source account. No row stores an owner copy, and
+   an owner / organization id is never taken from a request body.
 2. **Same owner only** — the paying account must belong to the source account's owner. Paying
    an organization's bill from a personal account stays two manual transactions.
 3. **The Calendar is per context** — Personal shows personal bills only, an organization only
    its own. One view across owners is the *Combined calendar across owners* epic
    ([#101](https://github.com/darthjee/ward/issues/101)).
-4. Every member of an organization sees and pays every bill of it (roles not enforced; see
-   [#81](https://github.com/darthjee/ward/issues/81)).
-5. Responses carry no owner fields; accounts by id and name only.
-6. Descriptions and notes are financial data; bodies are never logged.
+4. **Personal context**: owner only; the global admin gets **no** access. **Organization
+   context**: every member sees, edits and pays every bill of it (roles not enforced until
+   [#81](https://github.com/darthjee/ward/issues/81)). A non-member, including a global admin
+   who is not a member, gets the uniform `404`.
+5. Every `409` comes only **after** the owner-scoped resolve, so no code leaks the existence of a
+   foreign record; the uniform `404` also covers a non-numeric id and a malformed `:dueDate`.
+6. Responses carry no owner fields; accounts by id and name only.
+7. Descriptions and notes are financial data; bodies are never logged.
 
 ## Owning module
 
@@ -231,8 +367,10 @@ On top of the [ownership contract](../bank.md#bank-ownership-contract):
   cost, no new dependency (the date maths is a small pure helper).
 - **Paying a bill is an in-module service call** in one DB transaction: **no event** is emitted
   or consumed.
-- **Performance** — occurrences are computed in memory per request with three queries (the
-  owner's scheduled accounts, the payments in the range, the one-off bills in the range). The
+- **Performance** — occurrences are computed in memory per request with a few batched queries:
+  the owner's scheduled debts, the recurring bills of the owner's non-archived providers in
+  **one** query (`provider_account_id IN (…) AND kind = 'recurring'`, no N+1), the payments in
+  the range and the one-off bills in the range. The
   366-day cap bounds the work. Overdue goes back to `billsFrom` and only grows with occurrences
   left open, which is fine at personal scale. Index `bank_bill_payments (source_account_id,
   due_date)`.
@@ -246,8 +384,7 @@ On top of the [ownership contract](../bank.md#bank-ownership-contract):
 
 1. **Archived paying account** — can't be chosen for a new payment (422); if it is the stored
    default, the Pay dialog requires another choice. Existing payments are unaffected.
-2. **Archived provider** — its one-off bills disappear with its derived occurrences, and come
-   back on unarchive.
+2. **Archived provider** — all its bills leave the Calendar, and come back on unarchive.
 3. **Linked transaction edited or deleted by hand** — the payment row stays; undo removes only
    the transactions that still exist.
 4. **Deleted paying account** — `ON DELETE SET NULL` on the default and on payment rows; the
@@ -258,6 +395,8 @@ On top of the [ownership contract](../bank.md#bank-ownership-contract):
 ## Deferred
 
 - Linked transfers (paying as one linked operation): [#86](https://github.com/darthjee/ward/issues/86)
+- Per-transaction bill link: [#140](https://github.com/darthjee/ward/issues/140)
+- Archive an individual provider bill: [#141](https://github.com/darthjee/ward/issues/141)
 - Currency conversion (Calendar totals across currencies): [#88](https://github.com/darthjee/ward/issues/88)
 - Cross-module calendar: [#98](https://github.com/darthjee/ward/issues/98)
 - Bill reminders / notifications: [#99](https://github.com/darthjee/ward/issues/99)
@@ -275,19 +414,9 @@ On top of the [ownership contract](../bank.md#bank-ownership-contract):
   whose provider is archived (the spec only said such bills leave the Calendar).
 - **A schedule needs `bills_from`** — a `null` `bills_from` with `due_day` set means no
   schedule ([#56](https://github.com/darthjee/ward/issues/56)).
+- **Provider bills** ([#119](https://github.com/darthjee/ward/issues/119)) — the provider-bills
+  `GET` reads a bill of an archived provider (one place of the split-provider spec said `404`);
+  `PATCH` / `DELETE` still answer `404`. `source_bill` is also set on one-off (`bill`)
+  occurrences, not only recurring ones.
 - The other details decided in #56 (the virtual generated column, undo codes, envelopes,
   totals, pagination, description truncation, the `paid_on` limit) are recorded above.
-
-## Provider bills API (#122)
-
-`GET/POST /accounts/:accountId/provider-bills.json` and `GET/PATCH/DELETE /provider-bills/:id.json`
-(both `/bank` and `/orgs/:orgId/bank`) manage recurring and one-off provider bills. Error codes:
-`PROVIDER_BILL_KIND_LOCKED`, `PROVIDER_BILL_PROVIDER_LOCKED`, `PROVIDER_BILL_NAME_TAKEN`,
-`PROVIDER_BILL_PAID`, `PROVIDER_BILL_LIMIT`. `bills.json` stays one-off only and now returns
-`kind: 'one_off'`. See `specs/split-provider/api/provider-bills.md`.
-
-## Contract step (#125)
-
-The provider schedule columns, the write-through, `409 PROVIDER_HAS_MULTIPLE_BILLS` and the
-account-level compatibility aliases for providers are gone; recurring provider-bill occurrences
-carry `kind: 'provider_bill'`. See `specs/split-provider/migration.md`.

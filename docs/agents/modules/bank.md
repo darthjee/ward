@@ -19,7 +19,8 @@ user (Personal) or an organization (see
 frontend [#49](https://github.com/darthjee/ward/issues/49), [#51](https://github.com/darthjee/ward/issues/51),
 [#53](https://github.com/darthjee/ward/issues/53), [#55](https://github.com/darthjee/ward/issues/55),
 [#57](https://github.com/darthjee/ward/issues/57) and [#77](https://github.com/darthjee/ward/issues/77)
-(Calendar views, still open).
+(Calendar views, still open). Provider bills (a provider holding N recurring / one-off bills)
+came with Epic [#119](https://github.com/darthjee/ward/issues/119).
 
 ## Index
 
@@ -30,8 +31,8 @@ frontend [#49](https://github.com/darthjee/ward/issues/49), [#51](https://github
 | [bank/debt.md](bank/debt.md) | Debt accounts: fields, sign rules, payments and interest, instalments as bills |
 | [bank/investment.md](bank/investment.md) | Investment accounts: ledger as current value, movements, informational fields |
 | [bank/provider-expense.md](bank/provider-expense.md) | Provider-expense accounts: payable ledger, provider fields, the accountant hand-off |
-| [bank/bills.md](bank/bills.md) | Hybrid bill model, schedule fields, recurrence, paying / skipping / undoing |
-| [bank/ui.md](bank/ui.md) | The Bank menu, per-type submenus, Add / edit bill, Bill history, Calendar |
+| [bank/bills.md](bank/bills.md) | Hybrid bill model, provider bills and their kinds, schedule fields, recurrence, paying / skipping / undoing, payment keys |
+| [bank/ui.md](bank/ui.md) | The Bank menu, per-type submenus, provider bills, Add / edit bill, Bill history, Calendar |
 
 The per-endpoint reference is [Routes — Bank](../backend/routes/bank.md).
 
@@ -44,7 +45,7 @@ The per-endpoint reference is [Routes — Bank](../backend/routes/bank.md).
 | `DebtDetails` | `bank_debt_details` | 1:1 with a `debt` account (`account_id` PK and FK, `ON DELETE CASCADE`) |
 | `InvestmentDetails` | `bank_investment_details` | 1:1 with an `investment` account, same pattern |
 | `ProviderExpenseDetails` | `bank_provider_expense_details` | 1:1 with a `provider_expense` account, same pattern |
-| `Bill` | `bank_bills` | One-off bills, always on a provider-expense account |
+| `ProviderBill` | `bank_provider_bills` | Recurring and one-off bills of a provider-expense account (`kind`) |
 | `BillPayment` | `bank_bill_payments` | One row per paid or skipped occurrence |
 
 Every FK between these tables is real (same module). Column detail lives in each concern page.
@@ -72,7 +73,7 @@ Every FK between these tables is real (same module). Column detail lives in each
 - **Owner lookup indexes** — the two unique active-name indexes
   `(user_id, active_name_key)` and `(organization_id, active_name_key)` double as the owner
   indexes (see [accounts.md](bank/accounts.md#name-uniqueness)).
-- **Child records** (transactions, the three details tables, `bank_bills`,
+- **Child records** (transactions, the three details tables, `bank_provider_bills`,
   `bank_bill_payments`) **inherit the owner through their account** and never store a copy.
 - **Route prefixes** — every bank controller is declared with
   `@OwnerScopedController('bank')`, so it is mounted under both:
@@ -98,9 +99,10 @@ organization ([#94](https://github.com/darthjee/ward/issues/94)).
 
 ## Routes
 
-See [Routes — Bank](../backend/routes/bank.md). Seven thin resident controllers
+See [Routes — Bank](../backend/routes/bank.md). Nine thin resident controllers
 (`AccountsController`, `TransactionsController`, `SettingsController`,
-`AccountantController`, `CalendarController`, `BillsController`, `BillPaymentsController`)
+`AccountantController`, `CalendarController`, `BillsController`, `BillPaymentsController`,
+`ProviderBillsController`, `ProviderBillPaymentsController`)
 load the lazy `BankModule` on the first bank request and delegate to its services.
 `settings.json` reads the resident `BANK_CONFIG` and does not load the module.
 

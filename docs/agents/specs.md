@@ -65,7 +65,7 @@ this file changes.
 
 | Feature | Spec | Epic |
 |---|---|---|
-| Split provider: a provider holds N recurring / one-off provider bills | [specs/split-provider/](specs/split-provider/README.md) | [#119](https://github.com/darthjee/ward/issues/119) |
+| none | | |
 
 ## Completed specs
 
@@ -73,6 +73,7 @@ Features whose specs were folded into the permanent docs, and where their defini
 
 | Feature | Folded into | Epic | Follow-up epics |
 |---|---|---|---|
+| Split provider: a provider holds N recurring / one-off provider bills; specs were `specs/split-provider/`, removed by #126 | [modules/bank/bills.md](modules/bank/bills.md), [modules/bank/provider-expense.md](modules/bank/provider-expense.md), [modules/bank/ui.md](modules/bank/ui.md), [backend/routes/bank.md](backend/routes/bank.md), [product.md](product.md) | [#119](https://github.com/darthjee/ward/issues/119) | [#140](https://github.com/darthjee/ward/issues/140), [#141](https://github.com/darthjee/ward/issues/141), [#101](https://github.com/darthjee/ward/issues/101) |
 | Deployment (Render backend, SSH-hosted proxy and frontend, tag-driven CircleCI release); specs were `specs/deploy/`, removed by #16 | [deployment.md](deployment.md), [environment-variables.md](environment-variables.md) §4 | [#10](https://github.com/darthjee/ward/issues/10) | — |
 | Bank module (`bank`: accounts, business expenses, bills); specs were the `banking` feature folder, removed by #58 | [modules/bank.md](modules/bank.md) and [modules/bank/](modules/bank/), [backend/routes/bank.md](backend/routes/bank.md), [product.md](product.md) | [#26](https://github.com/darthjee/ward/issues/26) | [#85](https://github.com/darthjee/ward/issues/85), [#86](https://github.com/darthjee/ward/issues/86), [#87](https://github.com/darthjee/ward/issues/87), [#88](https://github.com/darthjee/ward/issues/88), [#89](https://github.com/darthjee/ward/issues/89), [#90](https://github.com/darthjee/ward/issues/90), [#91](https://github.com/darthjee/ward/issues/91), [#92](https://github.com/darthjee/ward/issues/92), [#93](https://github.com/darthjee/ward/issues/93), [#94](https://github.com/darthjee/ward/issues/94), [#95](https://github.com/darthjee/ward/issues/95), [#96](https://github.com/darthjee/ward/issues/96), [#97](https://github.com/darthjee/ward/issues/97), [#98](https://github.com/darthjee/ward/issues/98), [#99](https://github.com/darthjee/ward/issues/99), [#100](https://github.com/darthjee/ward/issues/100), [#101](https://github.com/darthjee/ward/issues/101), [#102](https://github.com/darthjee/ward/issues/102), [#103](https://github.com/darthjee/ward/issues/103), [#104](https://github.com/darthjee/ward/issues/104) |
 | Organizations (`auth` module; a dependency of `bank`); specs were the `auth` feature folder, removed by #58 | [modules/auth/organizations.md](modules/auth/organizations.md) and [modules/auth.md](modules/auth.md), [backend/routes/auth.md](backend/routes/auth.md#organization-routes), [product.md](product.md) | [#26](https://github.com/darthjee/ward/issues/26) | [#81](https://github.com/darthjee/ward/issues/81), [#82](https://github.com/darthjee/ward/issues/82), [#83](https://github.com/darthjee/ward/issues/83), [#84](https://github.com/darthjee/ward/issues/84) |
