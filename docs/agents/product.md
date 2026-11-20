@@ -78,7 +78,8 @@ More modules will follow. Each one gets its own page under `modules/` once speci
 ### `bank`
 
 Tracks bank accounts, business expenses handed to the accountant, and bills to pay. Decided by
-Epic [#26](https://github.com/darthjee/ward/issues/26) and documented in
+Epics [#26](https://github.com/darthjee/ward/issues/26) and
+[#119](https://github.com/darthjee/ward/issues/119) (provider bills) and documented in
 [Bank](modules/bank.md):
 
 - one `Account` entity with four types (`regular`, `debt`, `investment`, `provider_expense`),
@@ -87,8 +88,11 @@ Epic [#26](https://github.com/darthjee/ward/issues/26) and documented in
   never summed;
 - business expenses are the charges of `forAccountant` provider-expense accounts, handed off as
   a client-side CSV and marked as sent;
-- bills are derived from debt / provider-expense schedules, plus one-off bills; paying one
-  writes ledger transactions in one DB transaction;
+- a provider-expense account holds N **provider bills** (recurring or one-off, with an
+  immutable `kind`), each with its own schedule and default paying account; one provider still
+  has one ledger, one balance and one accountant flag;
+- debt bills are derived from the debt's schedule, and paying any bill writes ledger
+  transactions in one DB transaction;
 - user-or-organization-owned (see Domain data ownership above).
 
 The concerns it deferred are open GitHub epics, linked from each `modules/bank/` page.

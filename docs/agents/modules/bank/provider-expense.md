@@ -1,7 +1,9 @@
 # Bank — Provider-expense accounts
 
 A provider-expense account is an `Account` with `type` `provider_expense`: **one account per
-provider** (an energy company, an ISP, a software vendor), tracking what the provider charges
+provider** (one tax id, one ledger: an energy company, an ISP, a software vendor), which may
+hold several [provider bills](bills.md#provider-bills) (an ISP's internet, phone and mobile),
+tracking what the provider charges
 and what is paid to it. It also carries the **business expenses for the accountant**. It reuses
 [accounts.md](accounts.md) and [transactions.md](transactions.md). Part of the
 [Bank module](../bank.md).
@@ -37,10 +39,10 @@ CASCADE`, no owner columns):
 | `forAccountant` | boolean, not null, default `true` | Whether the account's charges are business expenses |
 | `providerTaxId` | free text, at most 32 | The provider's tax id (CNPJ…); trimmed, blank → `null`, no format check; shown in full (a business's public identifier) |
 
-The provider carries **no schedule** since [#125](https://github.com/darthjee/ward/issues/125):
-the schedule (expected amount, frequency, due day/month, `bills_from`, `show_in_calendar`,
-paying account) lives on each of its provider bills (see
-[`specs/split-provider/model.md`](../../specs/split-provider/model.md)).
+The provider carries **no schedule**: the schedule (expected amount, frequency, due day / month,
+`bills_from`, `show_in_calendar`) and the **default paying account** live on each of its
+provider bills (see [bills.md § Provider bills](bills.md#provider-bills)).
+`forAccountant` stays on the provider because it classifies the relationship, not one charge.
 
 ### Rules
 
@@ -49,9 +51,24 @@ paying account) lives on each of its provider bills (see
 - `for_accountant` never accepts `null`; `provider_tax_id` does, to clear it.
 - The nested `provider_expense` body accepts only `for_accountant` and `provider_tax_id`; any
   other key (including a former schedule field such as `due_day`) → `400`.
-- A currency change (only before any transaction) rescales the provider's bills'
-  `expected_amount` (`200.00` BRL → `200` JPY; `12.50` BRL → JPY → 400).
+- A currency change (only before any transaction) rescales every bill's `expected_amount` in
+  one transaction with row locks (`200.00` BRL → `200` JPY; `12.50` BRL → JPY → 400, and the
+  whole PATCH fails), and re-checks every bill's `paying_account_id`.
 - On an archived account, any `provider_expense` field → 409 `ACCOUNT_ARCHIVED`.
+
+## Data sensitivity and ownership
+
+- Provider bills are **personal financial data** and inherit their owner through the provider
+  account; no bill stores an owner.
+- **Personal context** (`/bank`): owner only. The global admin gets **no** access.
+- **Organization context** (`/orgs/:orgId/bank`): every member has full read and write access,
+  because roles are stored but not enforced until
+  [#81](https://github.com/darthjee/ward/issues/81).
+- A non-member and a global admin who is not a member both get the uniform `404`.
+- Every provider and provider-bill route sits under `@OwnerScopedController` and takes bodies
+  only through `@StrictBody()` (an owner field in a body → `400`).
+- Every `409` comes only after the owner-scoped resolve succeeds, so no code leaks the existence
+  of a foreign record.
 
 ## Accountant hand-off
 
@@ -146,12 +163,12 @@ library on the 512 MB free tier.
 ## Charges and bills
 
 A provider's schedule lives only on its `ProviderBill` rows (`bank_provider_bills`), managed
-through the provider-bills routes; there is no write-through from the provider since #125.
-
-Recurring provider bills become derived Calendar occurrences (`kind: 'provider_bill'`), and
-one-off bills always hang off a provider-expense account (see [bills.md](bills.md)). Paying a
-provider bill (per-bill route) records a payment plus an optional charge ("Also record the
-charge"); that charge feeds the hand-off like any other. A provider exposes `forAccountant`,
+through the provider-bills routes. Recurring bills become derived Calendar occurrences
+(`kind: 'provider_bill'`) and one-offs single ones (`kind: 'bill'`); see [bills.md](bills.md).
+Paying a provider bill (per-bill route) records a payment plus an optional charge ("Also record
+the charge"); that charge feeds the hand-off like any other. The ledger has no link from a
+transaction to the bill that produced it: the *Per-transaction bill link* epic
+([#140](https://github.com/darthjee/ward/issues/140)). A provider exposes `forAccountant`,
 `providerTaxId`, its balance, opening date and archived state. The **Add charge** shortcut
 prefills its amount from the provider's single recurring bill (empty with zero or several).
 
@@ -162,15 +179,10 @@ prefills its amount from the provider's single recurring bill (empty with zero o
 - Refunds via categories: [#89](https://github.com/darthjee/ward/issues/89)
 - Reconciliation locks on sent charges: [#85](https://github.com/darthjee/ward/issues/85)
 - Linked transfers: [#86](https://github.com/darthjee/ward/issues/86)
+- Per-transaction bill link: [#140](https://github.com/darthjee/ward/issues/140)
 
 ## Differences from the original spec
 
 - The **mark timestamp** is truncated to whole seconds, as stored by the `DATETIME` column, so
   the reply matches what is read back later.
 - The **CSV** uses CRLF line endings (the spec didn't say).
-
-## Transition rule (#122) — removed in #125
-
-The write-through and `409 PROVIDER_HAS_MULTIPLE_BILLS` were removed in
-[#125](https://github.com/darthjee/ward/issues/125), together with the provider schedule
-columns. A currency change still rescales every bill.

@@ -1,9 +1,9 @@
 # Routes — Bank
 
-Routes of the lazy `bank` module (`backend/src/bank/`), served by seven thin resident
+Routes of the lazy `bank` module (`backend/src/bank/`), served by nine thin resident
 controllers: `AccountsController`, `TransactionsController`, `SettingsController`,
-`AccountantController`, `CalendarController`, `BillsController` and
-`BillPaymentsController`. Each is
+`AccountantController`, `CalendarController`, `BillsController`, `BillPaymentsController`,
+`ProviderBillsController` and `ProviderBillPaymentsController`. Each is
 declared with `@OwnerScopedController('bank')`, so every route is mounted under **both** base
 paths (the external `/api` prefix is added by the proxy):
 
@@ -13,8 +13,9 @@ paths (the external `/api` prefix is added by the proxy):
 The controllers parse the ids, load the lazy `BankModule` on the first bank request
 (`BankModuleLoader` → `LazyModuleLoaderService#loadOnFirstRequest()`) and delegate to its
 `AccountService` / `TransactionService` / `AccountantService` / `CalendarService` /
-`BillService` / `BillPaymentService` / `BillHistoryService` (the debt and provider handlers
-resolve the default paying account through `PayingAccountResolver`). `settings.json` reads the
+`BillService` / `BillPaymentService` / `BillHistoryService` / `ProviderBillService` /
+`ProviderBillPaymentService` (provider bills resolve owner-scoped through
+`ProviderBillResolver`; default paying accounts go through `PayingAccountResolver`). `settings.json` reads the
 resident `BANK_CONFIG` and does not load the module. The rules behind these routes (ownership,
 ledger, currency, account types, the accountant hand-off, bills) are in the
 [Bank module](../../modules/bank.md) and its `modules/bank/` pages; this page is the
@@ -134,11 +135,25 @@ rules are in [Bank — Debt accounts](../../modules/bank/debt.md).
   unknown, another owner's, in the other context, not `regular` or archived → `422
   ACCOUNT_NOT_FOUND` (one generic body); a visible account of another currency → `422
   CURRENCY_MISMATCH`. A currency-changing account PATCH re-checks the stored default.
-- **`bills_summary`** (list only) — every `provider_expense` row of `GET <base>/accounts.json`
-  (active and archived) carries a top-level `bills_summary: { count, monthly, yearly }`,
-  computed in one grouped query over all listed providers (no N+1). It is absent on the
-  single-account GET, the write responses and other types. Rules in
-  [Split provider — Provider-bills API](../../specs/split-provider/api/provider-bills.md#bills_summary-on-the-provider-list).
+- **`bills_summary`** (list only, [#133](https://github.com/darthjee/ward/issues/133)) — every
+  `provider_expense` row of `GET <base>/accounts.json` (active and archived) carries a
+  top-level field:
+
+  ```json
+  "bills_summary": { "count": 3, "monthly": "250.00", "yearly": "1200.00" }
+  ```
+
+  - `count` (number): every bill of the provider, recurring and one-off;
+  - `monthly` / `yearly`: the sum of `expected_amount` over `kind = 'recurring'` bills with that
+    `charge_frequency`, as a decimal string in the provider's currency; one-offs and bills with
+    a `null` `expected_amount` are excluded;
+  - never `null`: nothing to sum is zero at the currency's exponent (`"0.00"` in BRL, `"0"` in
+    JPY); a provider with no bills gets `{ "count": 0, "monthly": "0.00", "yearly": "0.00" }`;
+  - list only: absent on `accounts/:accountId.json`, on write responses and on other account
+    types; aggregates only, never owner ids;
+  - computed in one grouped query over all listed providers (no N+1);
+  - cache: the list stays `user-scoped`; provider-bill writes invalidate the owner prefix, which
+    covers `accounts.json`.
 
 ### Investment object
 
@@ -187,7 +202,7 @@ transaction routes unchanged.
   (no N+1). Since [#125](https://github.com/darthjee/ward/issues/125) the provider carries no
   schedule: the former schedule keys (`expected_amount`, `charge_frequency`, `due_day`,
   `due_month`, `bills_from`, `show_in_calendar`, `paying_account`) are **absent**. The schedule
-  lives on each provider bill (see [Provider bills](#provider-bills-122)).
+  lives on each provider bill (see [Provider bills](#provider-bills)).
 - **Create** — optional; without it a row is still created (`for_accountant` `true`,
   `provider_tax_id` `null`).
 - **PATCH** — merged partially (omitted fields unchanged, `null` clears `provider_tax_id`).
@@ -331,7 +346,7 @@ the lazy `CalendarService`, `BillService`, `BillPaymentService` and `BillHistory
 rules are in [Bank — Bills](../../modules/bank/bills.md). Occurrences are computed in memory per request
 (pure `occurrence-generator.ts`: monthly / yearly, `bills_from` start, clamp to the month's last
 day, Saturday / Sunday → Monday); nothing is generated ahead of time. Tables:
-`bank_bills` (one-off bills) and `bank_bill_payments`.
+`bank_provider_bills` (here, the one-off bills) and `bank_bill_payments`.
 
 | Method | Route | Body | Success | Errors | Cache class |
 |---|---|---|---|---|---|
@@ -352,8 +367,9 @@ The account-level `occurrences/:dueDate/payment.json` and `bill-payments.json` r
 **debt accounts only** since #125: a `provider_expense` account answers the same uniform `404`
 as an unknown or foreign account. Providers are paid and listed per bill via
 `<base>/provider-bills/:id/occurrences/:dueDate/payment.json` and
-`<base>/provider-bills/:id/bill-payments.json` (see
-`specs/split-provider/api/payments.md`).
+`<base>/provider-bills/:id/bill-payments.json` (see [Provider bills](#provider-bills)). The
+`bills.json` and `bills/:id/payment.json` routes remain as the one-off compatibility projection
+(they filter `kind = 'one_off'` and keep `amount`).
 
 ### Calendar envelope and totals
 
@@ -362,6 +378,7 @@ as an unknown or foreign account. Providers are paid and listed per bill via
   "occurrences": [
     {
       "kind": "provider_bill", "source_account": { "id": 12, "name": "Vivo Fibra", "type": "provider_expense" },
+      "source_bill": { "id": 31, "description": "Internet" },
       "bill": null, "nominal_date": "2026-11-08", "effective_date": "2026-11-09",
       "expected_amount": "149.90", "currency": "BRL", "status": "open", "payment": null,
       "default_paying_account": { "id": 3, "name": "Nubank" }
@@ -371,11 +388,14 @@ as an unknown or foreign account. Providers are paid and listed per bill via
 }
 ```
 
-- `kind` is `debt`, `provider_bill` or `bill` (recurring provider-bill occurrences also carry
-  `source_bill: { id, description }`); `status` is `open`, `overdue`, `paid` or `skipped`;
+- `kind` is the `OccurrenceKind`: `debt`, `provider_bill` (recurring provider bill) or `bill`
+  (one-off); `provider_bill` was named `provider` until
+  [#125](https://github.com/darthjee/ward/issues/125). `source_bill: { id, description }` is set
+  for both provider kinds and `null` for debts; `notes` never appears. `status` is `open`, `overdue`, `paid` or `skipped`;
   `payment` is `{ id, status, paid_on, amount, paying_account: { id, name } | null }` or `null`.
 - `calendar.json` lists the occurrences whose **effective** date is in `[from, to]`, sorted by
-  `effective_date`, then `kind`, source account id and bill id. `overdue.json` lists every
+  `effective_date`, then `kind`, the source bill id, the source account id and the one-off bill
+  id. `overdue.json` lists every
   open occurrence with an effective date before UTC today, oldest first.
 - **Totals** — one entry per currency (sorted by code), never summed across currencies; an
   empty range answers `totals: []`. `calendar.json`: `{ currency, expected, paid, open }`
@@ -427,14 +447,15 @@ a debt → `400`. Check order: path `404`, body `400`, paying account `422`, the
 
 ### Bill history
 
-`bill-payments.json` lists the payment rows of a debt account (per-bill for providers), newest `due_date`
-first, then `id`, with the ledger `pagination` block:
+`bill-payments.json` lists the payment rows of a debt account (per bill for providers, see
+[Provider bills](#provider-bills)), newest `due_date` first, then `id`, with the ledger
+`pagination` block:
 
 ```json
 {
   "payments": [ { "id": 4, "status": "paid", "paid_on": "2026-11-09", "amount": "149.90",
                   "paying_account": { "id": 3, "name": "Nubank" }, "due_date": "2026-11-08",
-                  "bill": null, "off_schedule": false } ],
+                  "bill": null, "source_bill": null, "off_schedule": false } ],
   "pagination": { "page": 1, "per_page": 50, "total_pages": 1, "total_count": 1 }
 }
 ```
@@ -449,8 +470,87 @@ schedule pattern (`due_day`, `due_month`, frequency, `bills_from`; archived and
 |---|---|---|---|---|
 | GET | `<base>/settings.json` | `200 { "default_currency": "BRL" }` from `BANK_DEFAULT_CURRENCY` (same value under both prefixes) | `404` non-member `:orgId` | `user-scoped` |
 
-## Provider bills (#122)
+## Provider bills
 
-`GET/POST /accounts/:accountId/provider-bills.json`, `GET/PATCH/DELETE /provider-bills/:id.json`
-on both bases. GETs are `user-scoped` (`X-Cache-Allow`); writes are `never` (`X-Skip-Cache`) and
-invalidate the owner. Details: `specs/split-provider/api/provider-bills.md`.
+Served by `ProviderBillsController` and `ProviderBillPaymentsController`, delegating to the lazy
+`ProviderBillService`, `ProviderBillPaymentService` and `BillHistoryService`; bills resolve
+through `ProviderBillResolver`. The rules (kinds, validation matrix, payment keys, ownership)
+are in [Bank — Bills → Provider bills](../../modules/bank/bills.md#provider-bills).
+
+| Method | Route | Body | Success | Errors | Cache class |
+|---|---|---|---|---|---|
+| GET | `<base>/accounts/:accountId/provider-bills.json?kind=&page=` | — | `200 { provider_bills, pagination }` (archived provider allowed) | `400` invalid `page`; `404` | `user-scoped` |
+| POST | `<base>/accounts/:accountId/provider-bills.json` | create body | `201` provider bill | `400`; `404`; `409 ACCOUNT_ARCHIVED`, `PROVIDER_BILL_NAME_TAKEN`, `PROVIDER_BILL_LIMIT`; `422` | `never` |
+| GET | `<base>/provider-bills/:id.json` | — | `200` provider bill (archived provider allowed) | `404` | `user-scoped` |
+| PATCH | `<base>/provider-bills/:id.json` | update body | `200` provider bill | `400`; `404` (also when the provider is archived); `409 PROVIDER_BILL_KIND_LOCKED`, `PROVIDER_BILL_PROVIDER_LOCKED`, `PROVIDER_BILL_NAME_TAKEN`, `PROVIDER_BILL_PAID` (moving a paid one-off), `ACCOUNT_ARCHIVED` (archived move target); `422` | `never` |
+| DELETE | `<base>/provider-bills/:id.json` | — | `204` (skipped payment rows go with it) | `404` (also when the provider is archived); `409 PROVIDER_BILL_PAID` | `never` |
+| GET | `<base>/provider-bills/:id/bill-payments.json?page=` | — | `200 { payments, pagination }`, that bill only (archived provider allowed) | `400` invalid `page`; `404` | `user-scoped` |
+| POST | `<base>/provider-bills/:id/occurrences/:dueDate/payment.json` | payment body | `201` occurrence | `404`; `400`; `422`; `409 OCCURRENCE_ALREADY_PAID` | `never` |
+| DELETE | `<base>/provider-bills/:id/occurrences/:dueDate/payment.json` | — | `204` | `404`; `409 ACCOUNT_ARCHIVED` (paid row on an archived provider or paying account) | `never` |
+
+- **Create body** (`@StrictBody()`) — `kind` (required, `recurring` | `one_off`), `description`
+  (required, trimmed, at most 255), and optionally `expected_amount` (decimal string, `> 0`),
+  `paying_account_id`, `notes` (at most 2000), the recurring group (`charge_frequency`,
+  `due_day`, `due_month`, `bills_from`, `show_in_calendar`) and `due_date`, following the
+  [validation matrix](../../modules/bank/bills.md#kinds). The body never accepts `id`,
+  `created_at` or an owner.
+- **Update body** — the same fields, all optional (`null` clears), validated on the merged
+  state, plus `kind` (accepted only when equal to the stored value, otherwise `409`) and
+  `provider_account_id` (moves a one-off; a recurring bill → `409 PROVIDER_BILL_PROVIDER_LOCKED`,
+  checked before the target is resolved).
+- **Response** — `{ id, provider_account_id, kind, description, paying_account_id,
+  expected_amount, notes, charge_frequency, due_day, due_month, bills_from, show_in_calendar,
+  due_date, created_at, updated_at }`. `paying_account_id` is the raw id (not `{ id, name }`);
+  `expected_amount` is a decimal string in the provider's currency or `null`. Never an owner or
+  organization id. Full bill fields appear only on these routes.
+- **List** — 50 per page (ledger `pagination` block): recurring bills first by `description`
+  (case- and accent-insensitive, then `id`), then one-offs by newest `due_date`, then `id`.
+  `kind` filters; an unknown value answers an empty list, never `400` / `404`.
+- **History rows** — as in [Bill history](#bill-history); `source_bill` is set, `bill` only on
+  one-off rows. `off_schedule` is computed against that bill's own schedule.
+- **Payment body** — as in [Pay, skip and undo](#pay-skip-and-undo); `record_charge` is accepted
+  for both kinds. Check order: path `404`, `:dueDate` `404`, body `400`, paying account `422`,
+  then `409`. Paying writes the row keyed by `(provider_bill_id, due_date)` (one-offs by
+  `bill_id`) and the same transactions as any provider payment; two bills of one provider pay on
+  the same date independently. A bill with a `null` `expected_amount` needs an explicit amount.
+- **`:dueDate`** — strictly parsed `YYYY-MM-DD` (impossible dates → `404`). **Pay / skip**: a real
+  nominal occurrence of that bill (generator check for `recurring`, only inside the 366-day
+  window and only while it has a schedule, `show_in_calendar` is `true` and the provider is
+  active; equality with `due_date` for `one_off`), otherwise `404`. **Undo** finds the row with
+  no schedule check, so off-schedule payments can be undone.
+- **404** — the uniform body for an unknown, non-numeric, foreign, other-context or debt id.
+
+### Error codes
+
+| Status | Code | When |
+|---|---|---|
+| 400 | `VALIDATION_FAILED` / validation | Violation of the matrix; a field of the other group; bad `due_month` pairing; non-whitelisted field |
+| 404 | `NOT_FOUND` | Uniform: unknown, foreign, other-context or debt id; malformed or not-an-occurrence `:dueDate`; a write on an archived provider's bill |
+| 409 | `PROVIDER_BILL_KIND_LOCKED` | PATCH sends a different `kind` |
+| 409 | `PROVIDER_BILL_PROVIDER_LOCKED` | PATCH moves a recurring bill to another provider |
+| 409 | `PROVIDER_BILL_NAME_TAKEN` | Recurring `description` already used on the provider |
+| 409 | `PROVIDER_BILL_PAID` | DELETE, or moving a one-off, with a paid payment |
+| 409 | `PROVIDER_BILL_LIMIT` | 51st recurring bill on a provider |
+| 409 | `ACCOUNT_ARCHIVED` | Create under an archived provider; archived move target; undo of a paid row on an archived account |
+| 409 | `OCCURRENCE_ALREADY_PAID` | Paying or skipping an occurrence that already has a row |
+| 422 | `ACCOUNT_NOT_FOUND` / `CURRENCY_MISMATCH` | `paying_account_id` (or a one-off's move target currency) fails the checks; generic body |
+
+### Removed routes
+
+[#125](https://github.com/darthjee/ward/issues/125) removed the provider-level schedule:
+
+- the account-level provider aliases for pay / undo / history
+  (`accounts/:accountId/occurrences/:dueDate/payment.json`, `accounts/:accountId/bill-payments.json`)
+  now answer the uniform `404` for a `provider_expense` account; they remain for **debts only**;
+- the former schedule keys on the `provider_expense` object now answer `400`;
+- `409 PROVIDER_HAS_MULTIPLE_BILLS` no longer exists.
+
+`bills.json`, `bills/:id.json` and `bills/:id/payment.json` remain, for **one-offs only**.
+
+### Caching
+
+- GETs are `user-scoped` (`X-Cache-Allow`), set by `@OwnerScopedController('bank')`.
+- Writes are `never` (`@CachePolicy(CacheClass.Never)`, `X-Skip-Cache`), and the class-level
+  `InvalidatesOwner()` clears `/bank` or `/orgs/:id/bank`, which covers `accounts.json`
+  (`bills_summary`), the calendar, overdue and the history routes.
+- Navi warms none of them. The proxy needs no change: the `*.json` rule covers these paths.
