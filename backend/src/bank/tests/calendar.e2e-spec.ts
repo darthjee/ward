@@ -104,7 +104,7 @@ describe('calendar (e2e)', () => {
 
         expect(response.body.occurrences).toEqual([
           {
-            kind: 'provider',
+            kind: 'provider_bill',
             source_account: { id: fee.id, name: fee.name, type: 'provider_expense' },
             bill: null,
             source_bill: { id: (await recurringOf(fee.id)).id, description: expect.any(String) },

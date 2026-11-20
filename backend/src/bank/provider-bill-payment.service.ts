@@ -76,7 +76,7 @@ export class ProviderBillPaymentService {
       label: bill.description,
       currency: provider.currency,
     };
-    const command = paymentCommand(dto, recurring ? 'provider' : 'bill', provider.currency);
+    const command = paymentCommand(dto, recurring ? 'provider_bill' : 'bill', provider.currency);
 
     if (command.status === 'paid') {
       await this.payingAccounts.resolve(owner, command.payingAccountId, provider.currency);

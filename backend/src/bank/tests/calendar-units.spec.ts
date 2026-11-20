@@ -135,23 +135,23 @@ describe('compareOccurrences', () => {
     } }) as unknown as OccurrenceView;
 
   it('breaks ties between two bills of one provider by source bill id', () => {
-    const rows = [entry('2026-01-12', 'provider', 4, null, 22), entry('2026-01-12', 'provider', 4, null, 21)];
+    const rows = [entry('2026-01-12', 'provider_bill', 4, null, 22), entry('2026-01-12', 'provider_bill', 4, null, 21)];
 
     expect(rows.sort(compareOccurrences).map(({ response }) => response.source_bill?.id)).toEqual([21, 22]);
   });
 
   it('sorts by effective date, then kind, source account id and bill id', () => {
     const rows = [
-      entry('2026-01-12', 'provider', 1, null),
+      entry('2026-01-12', 'provider_bill', 1, null),
       entry('2026-01-12', 'debt', 5, null),
       entry('2026-01-12', 'debt', 2, null),
       entry('2026-01-12', 'bill', 1, 9),
       entry('2026-01-12', 'bill', 1, 3),
-      entry('2026-01-11', 'provider', 9, null),
+      entry('2026-01-11', 'provider_bill', 9, null),
     ];
 
     expect(rows.sort(compareOccurrences).map(({ response }) => [response.kind, response.source_account.id, response.bill?.id ?? null]))
-      .toEqual([['provider', 9, null], ['bill', 1, 3], ['bill', 1, 9], ['debt', 2, null], ['debt', 5, null], ['provider', 1, null]]);
+      .toEqual([['provider_bill', 9, null], ['bill', 1, 3], ['bill', 1, 9], ['debt', 2, null], ['debt', 5, null], ['provider_bill', 1, null]]);
   });
 });
 

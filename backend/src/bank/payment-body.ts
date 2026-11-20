@@ -24,7 +24,8 @@ function invalidBody(message: string): BadRequestException {
  * - `skipped` accepts no other field;
  * - `paid` requires `paid_on`, `amount` (> 0, in the source currency) and
  *   `paying_account_id`; `record_charge` defaults to `true`, and is refused
- *   on a debt occurrence (debts record no charge).
+ *   on a debt occurrence (debts record no charge); it applies to both
+ *   provider bill kinds (`provider_bill` and `bill`).
  * @param {PayOccurrenceDto} dto - The validated body.
  * @param {OccurrenceKind} kind - The occurrence's kind.
  * @param {string} currency - The source account's currency.
@@ -33,7 +34,7 @@ function invalidBody(message: string): BadRequestException {
  */
 export function paymentCommand(dto: PayOccurrenceDto, kind: OccurrenceKind, currency: string): PaymentCommand {
   if (dto.record_charge !== undefined && kind === 'debt') {
-    throw invalidBody('record_charge is only accepted on provider occurrences');
+    throw invalidBody('record_charge is only accepted on provider bill occurrences');
   }
 
   if (dto.status === 'skipped') {

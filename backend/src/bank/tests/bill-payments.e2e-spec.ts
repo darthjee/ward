@@ -492,7 +492,7 @@ describe('bill payments (e2e)', () => {
 
         expect(response.headers['cache-control']).toBe('no-store');
         expect(response.headers['x-cache-invalidate']).toBe(base(orgId));
-        expect(response.body).toMatchObject({ kind: 'provider', status: 'paid', source_bill: { id: recurring.id }, bill: null });
+        expect(response.body).toMatchObject({ kind: 'provider_bill', status: 'paid', source_bill: { id: recurring.id }, bill: null });
         expect(ledgerOf(fee.id)[0].description).toBe(`${recurring.description} — 2026-01-05`);
         expect(repos.billPayments.rows.find((row) => row.providerBillId === recurring.id)).toMatchObject({ billId: null, dueDate: '2026-01-05' });
         await payBill(orgId, recurring.id, '2026-01-05', { status: 'skipped' }).expect(409);

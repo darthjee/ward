@@ -11,13 +11,16 @@ export const DEBT_TYPE = 'debt';
 export const PROVIDER_TYPE = 'provider_expense';
 export const BILL_SOURCE_TYPES = [DEBT_TYPE, PROVIDER_TYPE];
 
-/** The `kind` of an occurrence. */
-export type OccurrenceKind = 'debt' | 'provider' | 'bill';
+/**
+ * The `kind` of an occurrence: a debt instalment, a recurring provider bill's
+ * occurrence, or a one-off provider bill.
+ */
+export type OccurrenceKind = 'debt' | 'provider_bill' | 'bill';
 
 /** A debt account, or one recurring provider bill, with what the occurrences need. */
 export interface BillSource {
   account: Account;
-  kind: 'debt' | 'provider';
+  kind: 'debt' | 'provider_bill';
   schedule: BillSchedule;
   /** The debt's `instalmentAmount` / the bill's `expectedAmount`, minor units; `null` when unset. */
   expected: bigint | null;
@@ -67,5 +70,5 @@ export function billSourceOfProviderBill(bill: ProviderBill, provider: Account, 
     throw new Error('A one-off provider bill has no schedule');
   }
 
-  return { account: provider, kind: 'provider', schedule, expected: bill.expectedAmount, defaultPayingAccount: defaultPayingRef, bill };
+  return { account: provider, kind: 'provider_bill', schedule, expected: bill.expectedAmount, defaultPayingAccount: defaultPayingRef, bill };
 }
