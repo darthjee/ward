@@ -75,6 +75,8 @@ describe('bill payments (e2e)', () => {
     send(app, 'delete', perBillPath(orgId, id, dueDate), user);
   const recurringOf = (providerId: number) =>
     repos.bills.rows.filter((row) => row.providerAccountId === providerId && row.kind === 'recurring');
+  // The id of the provider's only recurring bill (added by `provider()`).
+  const billOf = (providerId: number): number => recurringOf(providerId)[0].id;
   const addRecurring = async (orgId: number | null, providerId: number, fields: Body = {}) =>
     (await send(app, 'post', `${base(orgId)}/accounts/${providerId}/provider-bills.json`, ALICE, {
       kind: 'recurring', description: uniqueName('Plan'), due_day: 5, bills_from: '2026-01-01', ...fields,
@@ -149,9 +151,9 @@ describe('bill payments (e2e)', () => {
         const loan = await debt(orgId);
         const recurring = repos.bills.rows.find((row) => row.providerAccountId === vivo.id && row.kind === 'recurring') as { id: number };
 
-        await pay(orgId, vivo.id, '2026-02-05', { status: 'skipped' }).expect(201);
+        await payBill(orgId, recurring.id, '2026-02-05', { status: 'skipped' }).expect(201);
         await pay(orgId, loan.id, '2026-02-10', { status: 'skipped' }).expect(201);
-        await pay(orgId, vivo.id, '2026-02-05', { status: 'skipped' }).expect(409);
+        await payBill(orgId, recurring.id, '2026-02-05', { status: 'skipped' }).expect(409);
 
         const rows = repos.billPayments.rows;
         expect(rows.find((row) => row.sourceAccountId === vivo.id)).toMatchObject({ billId: null, providerBillId: recurring.id });
@@ -176,7 +178,7 @@ describe('bill payments (e2e)', () => {
         const checking = await regular(orgId);
         const fee = await provider(orgId);
 
-        await pay(orgId, fee.id, '2026-01-05', paid(checking.id, { paid_on: '2026-01-06', amount: '200.00' })).expect(201);
+        await payBill(orgId, billOf(fee.id), '2026-01-05', paid(checking.id, { paid_on: '2026-01-06', amount: '200.00' })).expect(201);
 
         expect(ledgerOf(fee.id).map(({ amount }) => amount)).toEqual([20000n, -20000n]);
         expect(ledgerOf(checking.id).map(({ amount }) => amount)).toEqual([-20000n]);
@@ -190,7 +192,7 @@ describe('bill payments (e2e)', () => {
         const checking = await regular(orgId);
         const fee = await provider(orgId);
 
-        await pay(orgId, fee.id, '2026-01-05', paid(checking.id, { record_charge: false })).expect(201);
+        await payBill(orgId, billOf(fee.id), '2026-01-05', paid(checking.id, { record_charge: false })).expect(201);
 
         expect(ledgerOf(fee.id).map(({ amount }) => amount)).toEqual([49000n]);
       });
@@ -300,12 +302,12 @@ describe('bill payments (e2e)', () => {
 
         const bodies = [];
         for (const id of [999999, otherContext.id, bobs.id, nonRegular.id, archived.id]) {
-          bodies.push(withoutTimestamp(await pay(orgId, fee.id, '2026-01-05', paid(id)).expect(422)));
+          bodies.push(withoutTimestamp(await payBill(orgId, billOf(fee.id), '2026-01-05', paid(id)).expect(422)));
         }
         bodies.forEach((body) => expect(body).toEqual(ACCOUNT_NOT_FOUND));
 
         const usd = await regular(orgId, { currency: 'USD' });
-        const mismatch = await pay(orgId, fee.id, '2026-01-05', paid(usd.id)).expect(422);
+        const mismatch = await payBill(orgId, billOf(fee.id), '2026-01-05', paid(usd.id)).expect(422);
         expect(mismatch.body.error).toEqual({ code: 'CURRENCY_MISMATCH', message: 'currency mismatch' });
         expect(repos.billPayments.rows.some((row) => row.sourceAccountId === fee.id)).toBe(false);
       });
@@ -374,11 +376,11 @@ describe('bill payments (e2e)', () => {
           amount: '-1.00',
           description: 'Manual',
         }).expect(201)).body.id;
-        await pay(orgId, fee.id, '2026-01-05', paid(checking.id)).expect(201);
+        await payBill(orgId, billOf(fee.id), '2026-01-05', paid(checking.id)).expect(201);
         const withdrawal = repos.transactions.rows.find((row) => row.accountId === checking.id)?.id as number;
         await send(app, 'delete', `${base(orgId)}/accounts/${checking.id}/transactions/${withdrawal}.json`, ALICE).expect(204);
 
-        const response = await undo(orgId, fee.id, '2026-01-05').expect(204);
+        const response = await undoBill(orgId, billOf(fee.id), '2026-01-05').expect(204);
 
         expect(response.headers['cache-control']).toBe('no-store');
         expect(response.headers['x-cache-invalidate']).toBe(base(orgId));
@@ -390,11 +392,11 @@ describe('bill payments (e2e)', () => {
       it('deletes a charge already sent to the accountant', async () => {
         const checking = await regular(orgId);
         const fee = await provider(orgId);
-        await pay(orgId, fee.id, '2026-01-05', paid(checking.id)).expect(201);
+        await payBill(orgId, billOf(fee.id), '2026-01-05', paid(checking.id)).expect(201);
         const charge = repos.transactions.rows.find((row) => row.accountId === fee.id && row.amount < 0n);
         if (charge) charge.sentToAccountantAt = new Date();
 
-        await undo(orgId, fee.id, '2026-01-05').expect(204);
+        await undoBill(orgId, billOf(fee.id), '2026-01-05').expect(204);
 
         expect(ledgerOf(fee.id)).toEqual([]);
       });
@@ -589,23 +591,26 @@ describe('bill payments (e2e)', () => {
         await repos.accounts.delete({ id: fee.id });
       });
 
-      it('makes the account-level routes aliases of the single recurring bill, and 404 for zero or several', async () => {
+      it('answers the account-level occurrence routes and bill-payments.json with the foreign-account 404 for a provider', async () => {
         const fee = await provider(orgId);
-        const [recurring] = recurringOf(fee.id);
+        const foreign = (await debt(null, {}, {}, BOB)).id;
+        const routes: Array<[string, (id: number) => ReturnType<typeof send>]> = [
+          ['GET bill-payments.json', (id) => send(app, 'get', `${base(orgId)}/accounts/${id}/bill-payments.json`, ALICE)],
+          ['POST payment.json', (id) => pay(orgId, id, '2026-01-05', { status: 'skipped' })],
+          ['DELETE payment.json', (id) => undo(orgId, id, '2026-01-05')],
+        ];
 
-        const aliased = await pay(orgId, fee.id, '2026-01-05', { status: 'skipped' }).expect(201);
-        expect(aliased.body.source_bill).toEqual({ id: recurring.id, description: recurring.description });
-        await undoBill(orgId, recurring.id, '2026-01-05').expect(204);
-        await pay(orgId, fee.id, '2026-01-05', { status: 'skipped' }).expect(201);
-        await undo(orgId, fee.id, '2026-01-05').expect(204);
+        for (const [, call] of routes) {
+          const reference = await call(foreign).expect(404);
+          const response = await call(fee.id).expect(404);
 
-        const second = await addRecurring(orgId, fee.id);
-        await pay(orgId, fee.id, '2026-01-05', { status: 'skipped' }).expect(404);
-        await undo(orgId, fee.id, '2026-01-05').expect(404);
-        await send(app, 'delete', `${base(orgId)}/provider-bills/${second.id}.json`, ALICE).expect(204);
-        await send(app, 'delete', `${base(orgId)}/provider-bills/${recurring.id}.json`, ALICE).expect(204);
-        await pay(orgId, fee.id, '2026-01-05', { status: 'skipped' }).expect(404);
+          expect(response.status).toBe(reference.status);
+          expect(withoutTimestamp(response)).toEqual(withoutTimestamp(reference));
+          expect(response.body).toEqual(NOT_FOUND_BODY);
+        }
+        expect(repos.billPayments.rows.some((row) => row.sourceAccountId === fee.id)).toBe(false);
         await repos.accounts.delete({ id: fee.id });
+        await repos.accounts.delete({ id: foreign });
       });
     });
 
@@ -640,26 +645,25 @@ describe('bill payments (e2e)', () => {
         expect(await calendarRow(orgId, loan.id)).toMatchObject({ nominal_date: '2026-01-10', status: 'paid' });
       });
 
-      it('lists derived and one-off rows of a provider, newest due date first, with no owner fields', async () => {
+      it('lists a provider\'s recurring bill rows per bill, newest due date first, with no owner fields', async () => {
         const checking = await regular(orgId);
         const fee = await provider(orgId);
-        const bill = await createBill(orgId, fee.id, checking.id, { due_date: '2026-03-01' });
-        await pay(orgId, fee.id, '2026-01-05', { status: 'skipped' }).expect(201);
-        await pay(orgId, fee.id, '2026-02-05', paid(checking.id)).expect(201);
-        await send(app, 'post', billPaymentPath(orgId, bill.id), ALICE, { status: 'skipped' }).expect(201);
+        const recurring = billOf(fee.id);
+        await payBill(orgId, recurring, '2026-01-05', { status: 'skipped' }).expect(201);
+        await payBill(orgId, recurring, '2026-02-05', paid(checking.id)).expect(201);
 
-        const response = await history(fee.id).expect(200);
+        const response = await send(app, 'get', `${base(orgId)}/provider-bills/${recurring}/bill-payments.json`, ALICE).expect(200);
 
         expect(response.body.payments.map((row: Body) => [row.due_date, row.status, row.bill, row.off_schedule])).toEqual([
-          ['2026-03-01', 'skipped', { id: bill.id, description: 'IPVA' }, false],
           ['2026-02-05', 'paid', null, false],
           ['2026-01-05', 'skipped', null, false],
         ]);
-        expect(response.body.pagination).toEqual({ page: 1, per_page: 50, total_pages: 1, total_count: 3 });
+        expect(response.body.pagination).toEqual({ page: 1, per_page: 50, total_pages: 1, total_count: 2 });
         expect(response.headers['x-cache-allow']).toBe('true');
         expect(response.headers['x-skip-cache']).toBeUndefined();
         expect(response.headers['cache-control']).toBe('private, no-store');
         expect(ownerKeysIn(response.body)).toEqual([]);
+        expect((await history(fee.id).expect(404)).body).toEqual(NOT_FOUND_BODY);
       });
 
       it('lists one provider bill\'s history per bill, flags only that bill\'s drift, and survives an archived provider', async () => {
@@ -674,13 +678,11 @@ describe('bill payments (e2e)', () => {
 
         const firstRows = (await send(app, 'get', path(first.id), ALICE).expect(200)).body;
         const secondRows = (await send(app, 'get', path(second.id), ALICE).expect(200)).body;
-        const wide = (await history(fee.id).expect(200)).body.payments as Body[];
 
         expect(firstRows.payments).toHaveLength(1);
         expect(firstRows.payments[0]).toMatchObject({ due_date: '2026-01-05', off_schedule: true, bill: null, source_bill: { id: first.id } });
         expect(secondRows.payments).toHaveLength(1);
         expect(secondRows.payments[0]).toMatchObject({ off_schedule: false, source_bill: { id: second.id } });
-        expect(wide.map((row) => [(row.source_bill as Body).id, row.off_schedule]).sort()).toEqual([[first.id, true], [second.id, false]].sort());
         expect(ownerKeysIn(firstRows)).toEqual([]);
         expect(JSON.stringify(firstRows)).not.toContain('notes');
 

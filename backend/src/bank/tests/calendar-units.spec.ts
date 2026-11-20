@@ -1,5 +1,5 @@
 import { buildAccount, PERSONAL } from './account.test-support.js';
-import { billSourceOf } from '../bill-schedule.js';
+import { billSourceOf, billSourceOfProviderBill } from '../bill-schedule.js';
 import { calendarTotals, overdueTotals } from '../calendar-totals.js';
 import { CalendarQuery } from '../calendar.query.js';
 import { CalendarService } from '../calendar.service.js';
@@ -50,18 +50,12 @@ const view = (currency: string, status: string, expected: bigint | null, paid: b
   ({ response: { currency, status }, expected, paid }) as unknown as OccurrenceView;
 
 describe('billSourceOf', () => {
-  it('reads the debt and provider schedules, expected amounts and default paying accounts', () => {
+  it('reads the debt schedule, instalment amount and default paying account', () => {
     expect(debtSource).toMatchObject({
       kind: 'debt',
       expected: 50000n,
       defaultPayingAccount: { id: 9, name: 'Checking' },
       schedule: { frequency: 'monthly', dueDay: 10, billsFrom: '2026-01-01', showInCalendar: true, archived: false },
-    });
-    expect(billSourceOf(providerAccount, { chargeFrequency: 'yearly', dueMonth: 3, expectedAmount: null })).toMatchObject({
-      kind: 'provider',
-      expected: null,
-      defaultPayingAccount: null,
-      schedule: { frequency: 'yearly', dueMonth: 3, dueDay: null },
     });
   });
 
@@ -259,8 +253,8 @@ describe('CalendarQuery', () => {
 });
 
 describe('source_bill', () => {
-  const recurring = bill({ id: 21, kind: 'recurring', dueDate: null, description: 'Plan', notes: 'secret' });
-  const providerSource = { ...billSourceOf(providerAccount, { chargeFrequency: 'monthly', dueDay: 5, billsFrom: '2026-01-01' }), bill: recurring };
+  const recurring = bill({ id: 21, kind: 'recurring', dueDate: null, description: 'Plan', notes: 'secret', chargeFrequency: 'monthly', dueDay: 5, billsFrom: '2026-01-01' });
+  const providerSource = billSourceOfProviderBill(recurring, providerAccount, null);
   const refs = new Map();
 
   it('names the recurring bill, the one-off bill, and is null for debts', () => {
@@ -274,10 +268,11 @@ describe('source_bill', () => {
 });
 
 describe('CalendarService', () => {
-  const provSource = (id: number) => ({
-    ...billSourceOf(providerAccount, { chargeFrequency: 'monthly', dueDay: 5, billsFrom: '2026-01-01' }),
-    bill: bill({ id, kind: 'recurring', dueDate: null, description: `Bill ${id}` }),
-  });
+  const provSource = (id: number) => billSourceOfProviderBill(
+    bill({ id, kind: 'recurring', dueDate: null, description: `Bill ${id}`, chargeFrequency: 'monthly', dueDay: 5, billsFrom: '2026-01-01' }),
+    providerAccount,
+    null,
+  );
 
   it('keeps two bills of one provider distinct and matches payments per bill; ignores orphans', async () => {
     const query = {

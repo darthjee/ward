@@ -36,8 +36,8 @@ export interface BillHistoryResponse {
 }
 
 /**
- * The bill history of a debt / provider-expense account, or of one provider
- * bill (lazy `BankModule`): every payment row — derived (including
+ * The bill history of a debt account, or of one provider bill (lazy
+ * `BankModule`): every payment row — derived (including
  * off-schedule ones) and one-off — newest `due_date` first, then newest id;
  * 50 per page. Like the ledger, an archived account's history stays readable.
  */
@@ -67,13 +67,13 @@ export class BillHistoryService {
   }
 
   /**
-   * The account-wide history: every payment row of the account, whichever bill it belongs to
-   * (and the rows no bill claims any more).
+   * The account-wide history of a debt: every payment row of the account. Providers list
+   * their history per bill ({@link historyForBill}).
    * @param {OwnerContext} owner - The resolved owner.
-   * @param {number} accountId - The debt / provider account.
+   * @param {number} accountId - The debt account.
    * @param {number} page - The 1-based page.
    * @returns {Promise<BillHistoryResponse>} `{ payments, pagination }` (empty past the last page).
-   * @throws {NotFoundException} The uniform 404 for a foreign or non-debt / non-provider account.
+   * @throws {NotFoundException} The uniform 404 for a foreign or non-debt account (providers included).
    */
   async history(owner: OwnerContext, accountId: number, page: number): Promise<BillHistoryResponse> {
     const source = await this.sources.resolve(owner, accountId);
@@ -132,7 +132,7 @@ export class BillHistoryService {
  * @param {BillPayment} payment - A payment row.
  * @param {ProviderBill | undefined} bill - Its provider bill, if it has one.
  * @param {Account} account - The row's source account.
- * @param {BillSource | null} source - The debt / provider details-row source, for the account-wide history.
+ * @param {BillSource | null} source - The debt source, for the account-wide history.
  * @returns {boolean} Whether the row is derived and off its schedule.
  */
 function offSchedule(payment: BillPayment, bill: ProviderBill | undefined, account: Account, source: BillSource | null): boolean {
