@@ -1,7 +1,7 @@
 import { initialPayFields, validatePayFields } from '../../../../../../../../assets/js/components/resources/bank/calendar/common/payFields.js';
 
 const OCC = {
-  kind: 'provider', currency: 'BRL', expected_amount: '10.00', default_paying_account: { id: 4, name: 'Main' },
+  kind: 'provider_bill', currency: 'BRL', expected_amount: '10.00', default_paying_account: { id: 4, name: 'Main' },
 };
 const OPTIONS = [['4', 'Main'], ['5', 'Other']];
 const NOW = new Date(2026, 10, 14, 12);

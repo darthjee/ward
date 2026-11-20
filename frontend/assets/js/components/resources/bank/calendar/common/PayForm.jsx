@@ -5,7 +5,7 @@ import { payingAccountOptions } from '../../common/form/controllers/scheduleFiel
 import { CHARGE_KINDS } from '../../../../../client/CalendarClient.js';
 
 /**
- * The fields of the Pay dialog: amount, paid on, paying account and, for provider / bill
+ * The fields of the Pay dialog: amount, paid on, paying account and, for provider-bill / bill
  * entries only, the "record charge" checkbox.
  *
  * @param {{occurrence: object, accounts: (Array<object>|null), state: object,

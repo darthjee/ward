@@ -1,7 +1,7 @@
 import { localToday } from '../../dates.js';
 import { text } from './nestedFields.js';
 
-/** The schedule fields shared by the debt and provider forms (nested with the type's fields). */
+/** The schedule fields of the debt form (nested with the type's fields). */
 export const SCHEDULE_FIELD_NAMES = ['bills_from', 'show_in_calendar', 'paying_account_id'];
 
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
@@ -18,8 +18,8 @@ export function emptyScheduleFields() {
 }
 
 /**
- * Build the schedule form fields of a loaded account's nested object (`debt` /
- * `provider_expense`); the response carries `paying_account: {id, name}`, never a raw id.
+ * Build the schedule form fields of a loaded debt's nested `debt` object; the response
+ * carries `paying_account: {id, name}`, never a raw id.
  *
  * @param {object|null} details - The nested object of the account response.
  * @returns {{bills_from: string, show_in_calendar: boolean, paying_account_id: string}} The
@@ -101,7 +101,7 @@ export function clearMismatchedPayingAccount(fields, accounts) {
 }
 
 /**
- * Build the schedule-aware field handlers of a debt / provider form.
+ * Build the schedule-aware field handlers of a debt form.
  *
  * @description `onFieldChange` fills Bills from with today on the first due day entry;
  * `onCurrencyChange` (create pages) also clears a default paying account that does not match

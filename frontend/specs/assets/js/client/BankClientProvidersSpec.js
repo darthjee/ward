@@ -20,6 +20,9 @@ const ACCOUNT_ATTRS = {
 const PROVIDER_ATTRS = {
   for_accountant: true,
   provider_tax_id: '12.345.678/0001-90',
+};
+
+const STALE_SCHEDULE = {
   expected_amount: '200.00',
   charge_frequency: 'monthly',
   due_day: 10,
@@ -65,7 +68,7 @@ describe('BankClient (provider expenses)', () => {
       it('creates a provider with type provider_expense and a whitelisted nested object', async () => {
         stub({ id: 3 }, 201);
         await BankClient.createProviderExpense(context, {
-          ...ACCOUNT_ATTRS, ...FORBIDDEN, extra: 'x', provider_expense: { ...PROVIDER_ATTRS, account_id: 3, extra: 'y' },
+          ...ACCOUNT_ATTRS, ...FORBIDDEN, extra: 'x', provider_expense: { ...PROVIDER_ATTRS, ...STALE_SCHEDULE, account_id: 3, extra: 'y' },
         });
 
         expect(lastCall()).toEqual({
@@ -78,13 +81,15 @@ describe('BankClient (provider expenses)', () => {
       it('updates a provider without the type, keeping nulls to clear', async () => {
         stub({ id: 3 });
         await BankClient.updateProviderExpense(context, 3, {
-          name: 'Rent', ...FORBIDDEN, provider_expense: { expected_amount: null, due_day: null, unknown: 1, charge_frequency: undefined },
+          name: 'Rent', ...FORBIDDEN, provider_expense: {
+            provider_tax_id: null, expected_amount: null, due_day: null, unknown: 1, charge_frequency: undefined,
+          },
         });
 
         expect(lastCall()).toEqual({
           path: `${prefix}/bank/accounts/3.json`,
           method: 'PATCH',
-          body: { name: 'Rent', provider_expense: { expected_amount: null, due_day: null } },
+          body: { name: 'Rent', provider_expense: { provider_tax_id: null } },
         });
       });
 

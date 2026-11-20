@@ -65,7 +65,7 @@ describe('CalendarEntry', () => {
     });
 
     it('links a provider', () => {
-      const p = occ({ kind: 'provider', source_account: { id: 4, name: 'Gym', type: 'provider_expense' } });
+      const p = occ({ kind: 'provider_bill', source_account: { id: 4, name: 'Gym', type: 'provider_expense' } });
 
       expect(render(p).containsAttribute('href', '#/bank/providers/4')).toBeTrue();
       expect(render(p, ORG).containsAttribute('href', '#/orgs/5/bank/providers/4')).toBeTrue();

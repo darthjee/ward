@@ -2,7 +2,7 @@ import usePayingAccounts from './usePayingAccounts.js';
 import { buildScheduleHandlers } from '../controllers/scheduleFields.js';
 
 /**
- * Plug the schedule inputs into a debt / provider form page.
+ * Plug the schedule inputs into a debt form page.
  *
  * @description Loads the paying accounts into `state.payingAccounts` and swaps in the
  * schedule-aware handlers: every field change goes through the Bills from autofill and, on the
