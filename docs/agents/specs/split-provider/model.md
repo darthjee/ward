@@ -78,9 +78,12 @@ mapped by the entity.
 `bank_provider_expense_details` keeps `for_accountant` and `provider_tax_id` (provider-level
 data; `for_accountant` classifies the relationship, not one charge). The seven schedule columns
 (`expected_amount`, `charge_frequency`, `due_day`, `due_month`, `bills_from`, `show_in_calendar`,
-`paying_account_id`) are **kept by the expand migration** and dropped only by the contract
-migration ([#125](https://github.com/darthjee/ward/issues/125)) — see
-[migration.md](migration.md). The provider-level default paying account disappears with the
+`paying_account_id`) were **kept by the expand migration** and are **dropped by the contract
+migration** ([#125](https://github.com/darthjee/ward/issues/125)) — see
+[migration.md](migration.md). Since #125 the provider-expense response carries only
+`for_accountant` and `provider_tax_id`; the write-through, `409 PROVIDER_HAS_MULTIPLE_BILLS` and
+the account-level aliases are gone, and recurring provider-bill occurrences carry
+`OccurrenceKind` `provider_bill`. The provider-level default paying account disappears with the
 schedule: a single default cannot serve bills with different paying accounts.
 
 ## The ledger is unchanged

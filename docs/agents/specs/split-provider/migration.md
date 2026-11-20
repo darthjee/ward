@@ -40,7 +40,9 @@ before acting, so it tolerates a partially applied `up`. Order:
 
 The provider schedule columns are **kept**. `bills.json` keeps working (implicitly `one_off`).
 
-## Transition rules (#121 – #124)
+## Transition rules (#121 – #124) — removed in #125
+
+All of the rules below were **removed in #125**; they are kept here as history.
 
 - **Write-through (from #121, gated in #122).** A provider-expense create / `PATCH` writes to
   the provider's single `recurring` bill, creating it when `due_day` is first set, so the
@@ -69,20 +71,36 @@ The provider schedule columns are **kept**. `bills.json` keeps working (implicit
 
 ## Contract migration (#125)
 
-Only after #124 is deployed:
+Only after #124, #131, #132 and #133 are **deployed** (merged is not enough):
 
 - Drop the seven schedule columns from `bank_provider_expense_details` (`for_accountant` and
-  `provider_tax_id` stay).
-- Drop the provider schedule DTO fields (sending one → `400`), the compatibility aliases,
-  `account-schedule.validator.ts` for providers and the `provider` branch of `billSourceOf`.
-- Rename `OccurrenceKind` `provider` → `provider_bill`.
+  `provider_tax_id` stay) in a **single `ALTER TABLE`**.
+- Drop the provider schedule DTO fields: sending one — including one nested in the
+  `provider_expense` object, e.g. `provider_expense.due_day` — is a strict `400`.
+- Remove the write-through and `409 PROVIDER_HAS_MULTIPLE_BILLS` (also from
+  `core/error-codes.ts`).
+- Remove the compatibility aliases: the account-level occurrence payment and
+  `bill-payments.json` serve `debt` only; a `provider_expense` account answers the same uniform
+  `404` as an unknown or foreign account.
+- Drop `account-schedule.validator.ts` for providers, `WithPayingAccount` from the provider
+  handler and the `provider` branch of `billSourceOf`.
+- Rename `OccurrenceKind` `provider` → `provider_bill` (computed, not persisted — no data
+  migration; the proxy cache reset on deploy clears cached `kind: 'provider'` responses).
+
+**Single recurring bill rule.** Provider bills have **no archived flag**, so "non-archived
+recurring" resolves to `kind = 'recurring'`: one-off bills are ignored. Exactly one recurring
+bill → its values; zero or several → `NULL`. The frontend **Add charge** prefill uses the same
+rule (via `provider-bills.json?kind=recurring`).
 
 ## Rollback
 
 | Migration | `down` | Loss |
 |---|---|---|
 | Expand (#121) | Delete `recurring` rows, drop the new columns and keys, rename `expected_amount` → `amount` and the table back to `bank_bills`, restore the original `derived_due_date`. | Lossless until #122 ships; **lossy** afterwards (extra bills dropped). |
-| Contract (#125) | Re-add the seven columns and backfill from the provider's single recurring bill; `NULL` with zero or several. | **Lossy**, documented as such. |
+| Contract (#125) | Re-add the seven columns (single `ALTER TABLE`) and backfill with one `UPDATE … JOIN` from the provider's single `recurring` bill (one-offs ignored); `NULL` with zero or several. Re-runnable after a partial failure. | **Lossy** for the copied columns only; bill data is never lost. |
+
+**Rollback order for #125:** run the migration's `down` **first**, then revert the code — the
+old code reads the dropped columns.
 
 ## Production-dump dry run
 

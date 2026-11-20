@@ -179,45 +179,29 @@ rules are in [Bank — Debt accounts](../../modules/bank/debt.md).
 transaction routes unchanged.
 
 ```json
-"provider_expense": {
-  "for_accountant": true, "provider_tax_id": "12.345.678/0001-90", "expected_amount": "149.90",
-  "charge_frequency": "monthly", "due_day": 10, "due_month": null
-}
+"provider_expense": { "for_accountant": true, "provider_tax_id": "12.345.678/0001-90" }
 ```
 
 - Present on list rows, the detail and the create / update / archive / unarchive responses of
-  provider-expense accounts; absent on other types. Unset fields are `null`;
-  `expected_amount` is a decimal string in the account's currency exponent. Loaded with one
-  query per type on the list (no N+1).
+  provider-expense accounts; absent on other types. Loaded with one query per type on the list
+  (no N+1). Since [#125](https://github.com/darthjee/ward/issues/125) the provider carries no
+  schedule: the former schedule keys (`expected_amount`, `charge_frequency`, `due_day`,
+  `due_month`, `bills_from`, `show_in_calendar`, `paying_account`) are **absent**. The schedule
+  lives on each provider bill (see [Provider bills](#provider-bills-122)).
 - **Create** — optional; without it a row is still created (`for_accountant` `true`,
-  `charge_frequency` `monthly`, every other field `null`). The paired rule below applies to
-  the defaults with the request merged on top.
-- **PATCH** — merged partially (omitted fields unchanged, `null` clears); the paired
-  `charge_frequency` ↔ `due_month` rule is checked on the stored details with the request
-  merged on top. Switching to `monthly` clears `due_month` automatically; switching to
-  `yearly` requires a `due_month` (stored or sent).
-- **Currency change** (only before any transaction) — rescales the stored `expected_amount`
-  like `opening_balance` (`200.00` BRL → `200` JPY; `12.50` BRL → JPY → `400`), unless the
-  same PATCH sends `expected_amount`, which is then validated against the new currency.
+  `provider_tax_id` `null`).
+- **PATCH** — merged partially (omitted fields unchanged, `null` clears `provider_tax_id`).
+- **Currency change** (only before any transaction) — rescales the provider's bills'
+  `expected_amount` like `opening_balance` (`200.00` BRL → `200` JPY; `12.50` BRL → JPY →
+  `400`).
 - **`provider_tax_id`** — free text, trimmed, blank → `null`, at most 32 characters, no
   format check.
-- **`400`** — `provider_expense: null`, unknown fields inside it, `provider_expense` on another
-  type; `for_accountant` / `charge_frequency` `null` (not nullable); `charge_frequency` not
-  `monthly` / `yearly`; `due_month` missing when yearly or present when monthly (merged
-  state); `due_day` outside 1–31, `due_month` outside 1–12; `expected_amount` ≤ 0, over the
-  amount bound or with too many decimals for the currency; `provider_tax_id` over 32.
+- **`400`** — `provider_expense: null`, unknown fields inside it (**including any former
+  schedule field**, e.g. `provider_expense.due_day`), `provider_expense` on another type;
+  `for_accountant` `null` (not nullable); `provider_tax_id` over 32.
 - **`409 ACCOUNT_ARCHIVED`** — any `provider_expense` field on an archived provider-expense
   account (a field failing the format checks above is still a `400`, rejected by the
   validation pipe first).
-- **Schedule fields** (bills, see [Bank — Bills](../../modules/bank/bills.md#schedule-fields)) — the object also
-  accepts `bills_from` (`YYYY-MM-DD` or `null`), `show_in_calendar` (boolean, not nullable,
-  default `true`) and `paying_account_id` (positive integer or `null`), and returns
-  `bills_from`, `show_in_calendar` and `paying_account: { id, name } | null` (never the raw
-  id). Setting `due_day` for the first time while `bills_from` is `null` and not sent sets
-  `bills_from` to UTC today; clearing `due_day` keeps it. A `paying_account_id` that is
-  unknown, another owner's, in the other context, not `regular` or archived → `422
-  ACCOUNT_NOT_FOUND` (one generic body); a visible account of another currency → `422
-  CURRENCY_MISMATCH`. A currency-changing account PATCH re-checks the stored default.
 - The accountant hand-off (`sent_to_accountant_at`, preview, mark sent / unsent) is described
   in [Accountant hand-off](#accountant-hand-off).
 
@@ -364,13 +348,20 @@ day, Saturday / Sunday → Monday); nothing is generated ahead of time. Tables:
 | DELETE | `<base>/bills/:id/payment.json` | — | `204` | `404`; `409 ACCOUNT_ARCHIVED` | `never` |
 | GET | `<base>/accounts/:accountId/bill-payments.json?page=` | — | `200 { payments, pagination }` | `400` invalid `page`; `404` (also for regular / investment accounts) | `user-scoped` |
 
+The account-level `occurrences/:dueDate/payment.json` and `bill-payments.json` routes serve
+**debt accounts only** since #125: a `provider_expense` account answers the same uniform `404`
+as an unknown or foreign account. Providers are paid and listed per bill via
+`<base>/provider-bills/:id/occurrences/:dueDate/payment.json` and
+`<base>/provider-bills/:id/bill-payments.json` (see
+`specs/split-provider/api/payments.md`).
+
 ### Calendar envelope and totals
 
 ```json
 {
   "occurrences": [
     {
-      "kind": "provider", "source_account": { "id": 12, "name": "Vivo Fibra", "type": "provider_expense" },
+      "kind": "provider_bill", "source_account": { "id": 12, "name": "Vivo Fibra", "type": "provider_expense" },
       "bill": null, "nominal_date": "2026-11-08", "effective_date": "2026-11-09",
       "expected_amount": "149.90", "currency": "BRL", "status": "open", "payment": null,
       "default_paying_account": { "id": 3, "name": "Nubank" }
@@ -380,7 +371,8 @@ day, Saturday / Sunday → Monday); nothing is generated ahead of time. Tables:
 }
 ```
 
-- `kind` is `debt`, `provider` or `bill`; `status` is `open`, `overdue`, `paid` or `skipped`;
+- `kind` is `debt`, `provider_bill` or `bill` (recurring provider-bill occurrences also carry
+  `source_bill: { id, description }`); `status` is `open`, `overdue`, `paid` or `skipped`;
   `payment` is `{ id, status, paid_on, amount, paying_account: { id, name } | null }` or `null`.
 - `calendar.json` lists the occurrences whose **effective** date is in `[from, to]`, sorted by
   `effective_date`, then `kind`, source account id and bill id. `overdue.json` lists every
@@ -420,8 +412,8 @@ Payment body (`@StrictBody()`): `status` (`paid` | `skipped`); for `paid` also `
 a debt → `400`. Check order: path `404`, body `400`, paying account `422`, then `409`.
 
 - `:dueDate` is the **nominal** date (`YYYY-MM-DD`). A date that is not an occurrence
-  (off-schedule, before `bills_from`, hidden or archived account) or a non-debt / non-provider
-  account → `404`.
+  (off-schedule, before `bills_from`, hidden or archived account) or, on the account-level
+  route, a non-debt account (providers included since #125) → `404`.
 - **`paid`** writes the `bank_bill_payments` row plus a payment (+) on the source account, a
   withdrawal (−) on the paying account and, with `record_charge`, an unsent charge (−) on the
   provider (it feeds the accountant hand-off), all dated `paid_on`, described
@@ -435,7 +427,7 @@ a debt → `400`. Check order: path `404`, body `400`, paying account `422`, the
 
 ### Bill history
 
-`bill-payments.json` lists the payment rows of a debt / provider account, newest `due_date`
+`bill-payments.json` lists the payment rows of a debt account (per-bill for providers), newest `due_date`
 first, then `id`, with the ledger `pagination` block:
 
 ```json
