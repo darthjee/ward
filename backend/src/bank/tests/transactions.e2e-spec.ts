@@ -14,6 +14,7 @@ import { createOwnerFixtures, NOT_FOUND_CASES, ownerKeysIn, type OwnerFixtures }
 
 jest.mock('../ledger.query.js', () => jest.requireActual('./support/in-memory-ledger.query.js'));
 jest.mock('../account-balances.query.js', () => jest.requireActual('./support/in-memory-ledger.query.js'));
+jest.mock('../provider-bills-summary.query.js', () => jest.requireActual('./support/in-memory-provider-bills-summary.query.js'));
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const isoDay = (offsetDays: number): string => new Date(Date.now() + offsetDays * DAY_MS).toISOString().slice(0, 10);

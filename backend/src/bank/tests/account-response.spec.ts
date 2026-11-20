@@ -63,6 +63,18 @@ describe('serializeAccount', () => {
     expect(serializeAccount(yen, { balance: 500n, mask: false })).toMatchObject({ opening_balance: '500', balance: '500' });
   });
 
+  it('merges the list extras at the top level', () => {
+    const summary = { count: 1, monthly: '1.00', yearly: '0.00' };
+    const result = serializeAccount(account, { balance: 0n, mask: true, extra: { bills_summary: summary } });
+
+    expect(result.bills_summary).toEqual(summary);
+    expect(result.id).toBe(1);
+  });
+
+  it('adds no extra field without extras', () => {
+    expect(serializeAccount(account, { balance: 0n, mask: true })).not.toHaveProperty('bills_summary');
+  });
+
   it('adds the nested object under the type name', () => {
     const debt = buildAccount({ type: 'debt' });
 

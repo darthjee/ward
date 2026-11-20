@@ -107,6 +107,41 @@ describe('AccountTypeRegistry', () => {
     });
   });
 
+  describe('listExtras', () => {
+    it('calls each implementing type\'s hook once with its accounts, skipping types without one', async () => {
+      const summaries = jest.fn(async (ids: number[]) => new Map(ids.map((id) => [id, { count: id, monthly: 0n, yearly: 0n }])));
+      const provider = new ProviderExpenseAccountHandler({ summaries } as never);
+      const listExtras = jest.spyOn(provider, 'listExtras');
+      const registry = new AccountTypeRegistry([new RegularAccountHandler(), new DebtAccountHandler(), provider]);
+      const accounts = [
+        buildAccount({ id: 1 }),
+        buildAccount({ id: 2, type: 'provider_expense' }),
+        buildAccount({ id: 3, type: 'debt' }),
+        buildAccount({ id: 4, type: 'provider_expense' }),
+      ];
+
+      const extras = await registry.listExtras(accounts);
+
+      expect(listExtras).toHaveBeenCalledTimes(1);
+      expect(listExtras).toHaveBeenCalledWith([accounts[1], accounts[3]]);
+      expect(summaries).toHaveBeenCalledWith([2, 4]);
+      expect([...extras.keys()]).toEqual([2, 4]);
+      expect(extras.get(4)).toEqual({ bills_summary: { count: 4, monthly: '0.00', yearly: '0.00' } });
+    });
+
+    it('returns an empty map for an empty list', async () => {
+      const summaries = jest.fn();
+      const registry = new AccountTypeRegistry([new ProviderExpenseAccountHandler({ summaries } as never)]);
+
+      await expect(registry.listExtras([])).resolves.toEqual(new Map());
+      expect(summaries).not.toHaveBeenCalled();
+    });
+
+    it('rejects an account whose type has no handler', async () => {
+      await expect(registry.listExtras([buildAccount({ type: 'debt' })])).rejects.toThrow(BadRequestException);
+    });
+  });
+
   it('registers more handlers by type', () => {
     const other = { ...new RegularAccountHandler(), type: 'debt' } as never;
 

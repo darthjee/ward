@@ -5,6 +5,7 @@ import { ownerKeysIn } from './support/owner-matrix.js';
 
 jest.mock('../ledger.query.js', () => jest.requireActual('./support/in-memory-ledger.query.js'));
 jest.mock('../account-balances.query.js', () => jest.requireActual('./support/in-memory-ledger.query.js'));
+jest.mock('../provider-bills-summary.query.js', () => jest.requireActual('./support/in-memory-provider-bills-summary.query.js'));
 
 // The bill schedule fields on the debt / provider_expense objects (bills.md, *Schedule fields on
 // source accounts*): bills_from lifecycle, show_in_calendar default and the paying_account_id

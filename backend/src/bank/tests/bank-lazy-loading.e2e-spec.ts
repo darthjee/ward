@@ -5,6 +5,7 @@ import { ALICE, buildBankTestApp, createAccount, send } from './support/build-ba
 
 jest.mock('../ledger.query.js', () => jest.requireActual('./support/in-memory-ledger.query.js'));
 jest.mock('../account-balances.query.js', () => jest.requireActual('./support/in-memory-ledger.query.js'));
+jest.mock('../provider-bills-summary.query.js', () => jest.requireActual('./support/in-memory-provider-bills-summary.query.js'));
 
 describe('lazy BankModule (e2e)', () => {
   let app: INestApplication;

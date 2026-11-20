@@ -14,10 +14,12 @@ import {
 import { BillPayment } from '../entities/bill-payment.entity.js';
 import type { InMemoryBankRepos } from './support/in-memory-bank-repos.js';
 import { AccountBalancesQuery } from './support/in-memory-ledger.query.js';
+import { ProviderBillsSummaryQuery } from './support/in-memory-provider-bills-summary.query.js';
 import { NOT_FOUND_CASES, ownerKeysIn, type OwnerFixtures } from './support/owner-matrix.js';
 
 jest.mock('../ledger.query.js', () => jest.requireActual('./support/in-memory-ledger.query.js'));
 jest.mock('../account-balances.query.js', () => jest.requireActual('./support/in-memory-ledger.query.js'));
+jest.mock('../provider-bills-summary.query.js', () => jest.requireActual('./support/in-memory-provider-bills-summary.query.js'));
 
 // Provider-expense accounts (docs/agents/modules/bank/provider-expense.md,
 // docs/agents/backend/routes/bank.md): the generic account routes with `type: provider_expense` and a nested
@@ -677,6 +679,93 @@ describe('provider-expense accounts (e2e)', () => {
         expect(AccountBalancesQuery.groupedCalls - balancesBefore).toBe(1);
         expect(repos.providerExpenseDetails.findCalls - detailsBefore).toBe(1);
         expect((repos.bills as unknown as { findCalls: number }).findCalls - billsBefore).toBe(1);
+      });
+    });
+
+    describe('bills_summary', () => {
+      const ZERO_SUMMARY = { count: 0, monthly: '0.00', yearly: '0.00' };
+      const billsPath = (id: number) => `${prefix}/accounts/${id}/provider-bills.json`;
+      const billPath = (id: number) => `${prefix}/provider-bills/${id}.json`;
+      const addBill = async (providerId: number, body: Body): Promise<{ id: number }> =>
+        (await send(app, 'post', billsPath(providerId), ALICE, body).expect(201)).body;
+      const listed = async (query = '?type=provider_expense'): Promise<Array<Record<string, unknown> & { id: number }>> =>
+        (await send(app, 'get', `${prefix}/accounts.json${query}`, ALICE).expect(200)).body;
+      const summaryOf = async (id: number, query?: string): Promise<unknown> =>
+        (await listed(query)).find((row) => row.id === id)?.bills_summary;
+
+      it('counts every bill and sums only the recurring bills with amounts, per frequency', async () => {
+        const created = await createProvider(orgId);
+        await addBill(created.id, { kind: 'recurring', description: 'Fee', due_day: 5, expected_amount: '100.00' });
+        await addBill(created.id, { kind: 'recurring', description: 'Support', due_day: 6, expected_amount: '150.00' });
+        await addBill(created.id, { kind: 'recurring', description: 'Variable', due_day: 7 });
+        await addBill(created.id, { kind: 'recurring', description: 'Tax', due_day: 8, charge_frequency: 'yearly', due_month: 3, expected_amount: '1200.00' });
+        await addBill(created.id, { kind: 'one_off', description: 'Setup', due_date: '2026-03-10', expected_amount: '10.00' });
+
+        expect(await summaryOf(created.id)).toEqual({ count: 5, monthly: '250.00', yearly: '1200.00' });
+      });
+
+      it('gives a provider without bills zeros, never null', async () => {
+        const created = await createProvider(orgId);
+
+        expect(await summaryOf(created.id)).toEqual(ZERO_SUMMARY);
+      });
+
+      it('formats the sums in the provider currency', async () => {
+        const created = await createProvider(orgId, { currency: 'JPY' });
+        await addBill(created.id, { kind: 'recurring', description: 'Fee', due_day: 5, expected_amount: '500' });
+
+        expect(await summaryOf(created.id)).toEqual({ count: 1, monthly: '500', yearly: '0' });
+      });
+
+      it('carries it on archived providers in archived=true lists', async () => {
+        const created = await createProvider(orgId);
+        await addBill(created.id, { kind: 'one_off', description: 'Setup', due_date: '2026-03-10', expected_amount: '10.00' });
+        await send(app, 'post', `${prefix}/accounts/${created.id}/archive.json`, ALICE).expect(200);
+
+        expect(await summaryOf(created.id, '?type=provider_expense&archived=true')).toEqual({ count: 1, monthly: '0.00', yearly: '0.00' });
+      });
+
+      it('is absent from other types and from the single-account GET', async () => {
+        const provider = await createProvider(orgId);
+        await createAccount(app, ALICE, orgId, { name: uniqueName('Regular') });
+        await createAccount(app, ALICE, orgId, { type: 'debt', name: uniqueName('Debt') });
+        await createAccount(app, ALICE, orgId, { type: 'investment', name: uniqueName('Investment') });
+
+        for (const type of ['regular', 'debt', 'investment']) {
+          (await listed(`?type=${type}`)).forEach((row) => expect(row).not.toHaveProperty('bills_summary'));
+        }
+
+        expect((await send(app, 'get', accountPath(orgId, provider.id), ALICE).expect(200)).body).not.toHaveProperty('bills_summary');
+      });
+
+      it('runs one grouped query per list request (no N+1) and exposes no owner ids', async () => {
+        await createProvider(orgId);
+        await createProvider(orgId);
+        const before = ProviderBillsSummaryQuery.groupedCalls;
+
+        const rows = await listed('?type=provider_expense&archived=true');
+
+        expect(rows.length).toBeGreaterThan(2);
+        expect(ProviderBillsSummaryQuery.groupedCalls - before).toBe(1);
+        expect(ownerKeysIn(rows.map((row) => row.bills_summary))).toEqual([]);
+      });
+
+      it('is refreshed after provider-bill writes, which invalidate the bank subtree including accounts.json', async () => {
+        const created = await createProvider(orgId);
+        const listPath = `${prefix}/accounts.json`;
+
+        const posted = await send(app, 'post', billsPath(created.id), ALICE, { kind: 'recurring', description: 'Fee', due_day: 5, expected_amount: '100.00' }).expect(201);
+        expect(posted.headers['x-cache-invalidate']).toBe(prefix);
+        expect(listPath.startsWith(`${posted.headers['x-cache-invalidate']}/`)).toBe(true);
+        expect(await summaryOf(created.id)).toEqual({ count: 1, monthly: '100.00', yearly: '0.00' });
+
+        const patched = await send(app, 'patch', billPath(posted.body.id), ALICE, { expected_amount: '80.00' }).expect(200);
+        expect(patched.headers['x-cache-invalidate']).toBe(prefix);
+        expect(await summaryOf(created.id)).toEqual({ count: 1, monthly: '80.00', yearly: '0.00' });
+
+        const deleted = await send(app, 'delete', billPath(posted.body.id), ALICE).expect(204);
+        expect(deleted.headers['x-cache-invalidate']).toBe(prefix);
+        expect(await summaryOf(created.id)).toEqual(ZERO_SUMMARY);
       });
     });
   });

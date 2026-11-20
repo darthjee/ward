@@ -826,7 +826,7 @@ function setupProviderExpense(
   ]);
   const service = new AccountService(accountRepository as never, registry, balances as never, { defaultCurrency: 'BRL' }, NO_SCHEDULE_CHECK);
 
-  return { service, accountRepository, balances, accountSave, detailsSave, detailsFind, manager };
+  return { service, registry, accountRepository, balances, accountSave, detailsSave, detailsFind, manager };
 }
 
 describe('AccountService with provider-expense accounts', () => {
@@ -950,6 +950,36 @@ describe('AccountService with provider-expense accounts', () => {
         show_in_calendar: true,
         paying_account: null,
       });
+    });
+
+    it('lists provider accounts with their bills_summary from one listExtras call', async () => {
+      const { service, registry } = setupProviderExpense();
+      const listExtras = jest.spyOn(registry, 'listExtras');
+
+      const [result] = await service.list(PERSONAL, { type: 'provider_expense' });
+
+      expect(listExtras).toHaveBeenCalledTimes(1);
+      expect(result.bills_summary).toEqual({ count: 0, monthly: '0.00', yearly: '0.00' });
+    });
+
+    it('lists regular accounts without a bills_summary', async () => {
+      const { service } = setupProviderExpense(buildAccount());
+
+      expect((await service.list(PERSONAL))[0]).not.toHaveProperty('bills_summary');
+    });
+
+    it.each([
+      ['find', (service: AccountService) => service.find(PERSONAL, 1)],
+      ['create', (service: AccountService) => service.create(PERSONAL, createDto({ type: 'provider_expense' }))],
+      ['update', (service: AccountService) => service.update(PERSONAL, 1, updateDto({ name: 'Renamed' }))],
+      ['archive', (service: AccountService) => service.archive(PERSONAL, 1)],
+      ['unarchive', (service: AccountService) => service.unarchive(PERSONAL, 1)],
+    ])('never adds a bills_summary on %s', async (_label, call) => {
+      const { service, registry } = setupProviderExpense();
+      const listExtras = jest.spyOn(registry, 'listExtras');
+
+      expect(await call(service)).not.toHaveProperty('bills_summary');
+      expect(listExtras).not.toHaveBeenCalled();
     });
 
     it('never adds a provider_expense object to a regular account', async () => {
