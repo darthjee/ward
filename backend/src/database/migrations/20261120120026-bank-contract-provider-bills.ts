@@ -5,7 +5,7 @@ const BILLS = 'bank_provider_bills';
 const PAYING_ACCOUNT_FK = 'fk_bank_provider_expense_details_paying_account';
 
 /** The seven provider-level schedule columns, with their original definitions. */
-export const SCHEDULE_COLUMNS: ReadonlyArray<readonly [string, string]> = [
+export const SCHEDULE_COLUMNS: readonly (readonly [string, string])[] = [
   ['expected_amount', 'BIGINT NULL'],
   ['charge_frequency', "VARCHAR(16) NOT NULL DEFAULT 'monthly'"],
   ['due_day', 'TINYINT NULL'],
