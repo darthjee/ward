@@ -32,7 +32,7 @@ function renderHeader(header, handlers) {
  */
 function renderShortcuts(account, handlers, state) {
   return (
-    <ProviderShortcuts account={account} onStartNew={handlers.onStartNew}>
+    <ProviderShortcuts context={state.context} account={account} onStartNew={handlers.onStartNew}>
       <AddBillLink account={account} context={state.context} />
     </ProviderShortcuts>
   );

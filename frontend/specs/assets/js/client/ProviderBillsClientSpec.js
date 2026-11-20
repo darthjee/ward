@@ -38,6 +38,15 @@ describe('ProviderBillsClient', () => {
         });
       });
 
+      it('filters the bills by kind when given', async () => {
+        stub({ provider_bills: [], pagination: {} });
+        await ProviderBillsClient.listProviderBills(context, 3, 1, 'recurring');
+
+        expect(lastCall()).toEqual({
+          path: `${prefix}/bank/accounts/3/provider-bills.json?page=1&kind=recurring`, method: 'GET', body: undefined,
+        });
+      });
+
       it('fetches one bill', async () => {
         stub({ id: 7 });
 

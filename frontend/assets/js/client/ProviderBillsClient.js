@@ -46,11 +46,15 @@ const ProviderBillsClient = {
    * @param {object} context - The owner context.
    * @param {number|string} providerId - The provider account id.
    * @param {number} [page] - The 1-based page.
+   * @param {string} [kind] - Only the bills of this kind (`recurring` / `one_off`); all when
+   *   omitted.
    * @returns {Promise<{provider_bills: Array<object>, pagination: object}|undefined>} The page.
    */
-  async listProviderBills(context, providerId, page = 1) {
+  async listProviderBills(context, providerId, page = 1, kind = undefined) {
+    const filter = kind ? `&kind=${encodeURIComponent(kind)}` : '';
+
     return ApiClient.getJson(
-      contextPath(context, `/bank/accounts/${providerId}/provider-bills.json?page=${page}`),
+      contextPath(context, `/bank/accounts/${providerId}/provider-bills.json?page=${page}${filter}`),
     );
   },
 
