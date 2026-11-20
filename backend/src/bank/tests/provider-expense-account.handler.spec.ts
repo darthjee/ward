@@ -1,5 +1,5 @@
 import { BadRequestException } from '@nestjs/common';
-import { buildAccount } from './account.test-support.js';
+import { buildAccount, NO_BILLS_SUMMARY } from './account.test-support.js';
 import { ProviderExpenseAccountHandler } from '../account-types/provider-expense-account.handler.js';
 import { defaultProviderExpenseState, type ProviderExpenseState } from '../account-types/provider-expense-details.js';
 import type { ProviderExpenseDetailsDto } from '../dto/provider-expense-details.dto.js';
@@ -34,7 +34,7 @@ const monthly = (): ProviderExpenseDetails => stored({ chargeFrequency: 'monthly
 const pe = (fields: Partial<ProviderExpenseDetailsDto>): ProviderExpenseDetailsDto => fields as ProviderExpenseDetailsDto;
 
 describe('ProviderExpenseAccountHandler', () => {
-  const handler = new ProviderExpenseAccountHandler();
+  const handler = new ProviderExpenseAccountHandler(NO_BILLS_SUMMARY);
 
   it('serves provider_expense and carries a ledger', () => {
     expect(handler.type).toBe('provider_expense');

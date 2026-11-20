@@ -1,5 +1,5 @@
 import { BadRequestException } from '@nestjs/common';
-import { buildAccount } from './account.test-support.js';
+import { buildAccount, NO_BILLS_SUMMARY } from './account.test-support.js';
 import { AccountTypeRegistry } from '../account-types/account-type.registry.js';
 import { DebtAccountHandler } from '../account-types/debt-account.handler.js';
 import { InvestmentAccountHandler } from '../account-types/investment-account.handler.js';
@@ -10,7 +10,7 @@ const allHandlers = (): AccountTypeRegistry => new AccountTypeRegistry([
   new RegularAccountHandler(),
   new DebtAccountHandler(),
   new InvestmentAccountHandler(),
-  new ProviderExpenseAccountHandler(),
+  new ProviderExpenseAccountHandler(NO_BILLS_SUMMARY),
 ]);
 
 describe('AccountTypeRegistry', () => {

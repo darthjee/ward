@@ -24,3 +24,8 @@ export function buildAccount(overrides: Partial<Account> = {}): Account {
     ...overrides,
   });
 }
+
+/** A `ProviderBillsSummaryQuery` stand-in for handlers built by hand: no provider has bills. */
+export const NO_BILLS_SUMMARY = {
+  summaries: async (ids: number[]) => new Map(ids.map((id) => [id, { count: 0, monthly: 0n, yearly: 0n }])),
+} as never;

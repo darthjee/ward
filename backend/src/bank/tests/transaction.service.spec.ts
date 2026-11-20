@@ -9,7 +9,7 @@ import type { Account } from '../entities/account.entity.js';
 import { Transaction } from '../entities/transaction.entity.js';
 import type { LedgerRow } from '../ledger.query.js';
 import { TransactionService } from '../transaction.service.js';
-import { buildAccount, ORGANIZATION, PERSONAL } from './account.test-support.js';
+import { buildAccount, NO_BILLS_SUMMARY, ORGANIZATION, PERSONAL } from './account.test-support.js';
 
 function buildTransaction(overrides: Partial<Transaction> = {}): Transaction {
   return Object.assign(new Transaction(), {
@@ -50,7 +50,7 @@ function setup(account: Account | null = buildAccount(), stored: Transaction | n
     page: jest.fn(async (): Promise<LedgerRow[]> => []),
     openingEffective: jest.fn(async () => 100000n),
   };
-  const registry = new AccountTypeRegistry([new RegularAccountHandler(), new ProviderExpenseAccountHandler()]);
+  const registry = new AccountTypeRegistry([new RegularAccountHandler(), new ProviderExpenseAccountHandler(NO_BILLS_SUMMARY)]);
   const service = new TransactionService(
     transactionRepository as never,
     accounts as never,

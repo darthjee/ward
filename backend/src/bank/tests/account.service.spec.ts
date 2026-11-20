@@ -10,7 +10,7 @@ import { ProviderExpenseAccountHandler } from '../account-types/provider-expense
 import { defaultProviderExpenseState } from '../account-types/provider-expense-details.js';
 import { RegularAccountHandler } from '../account-types/regular-account.handler.js';
 import { AccountService } from '../account.service.js';
-import { buildAccount, ORGANIZATION, PERSONAL } from './account.test-support.js';
+import { buildAccount, NO_BILLS_SUMMARY, ORGANIZATION, PERSONAL } from './account.test-support.js';
 import type { CreateAccountDto } from '../dto/create-account.dto.js';
 import type { UpdateAccountDto } from '../dto/update-account.dto.js';
 import { Account } from '../entities/account.entity.js';
@@ -822,7 +822,7 @@ function setupProviderExpense(
     new RegularAccountHandler(),
     new DebtAccountHandler(),
     new InvestmentAccountHandler(),
-    new ProviderExpenseAccountHandler(),
+    new ProviderExpenseAccountHandler(NO_BILLS_SUMMARY),
   ]);
   const service = new AccountService(accountRepository as never, registry, balances as never, { defaultCurrency: 'BRL' }, NO_SCHEDULE_CHECK);
 

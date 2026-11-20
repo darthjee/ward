@@ -1,5 +1,5 @@
 import { maskAccountNumber, serializeAccount } from '../account-response.js';
-import { buildAccount } from './account.test-support.js';
+import { buildAccount, NO_BILLS_SUMMARY } from './account.test-support.js';
 import { DebtAccountHandler } from '../account-types/debt-account.handler.js';
 import { InvestmentAccountHandler } from '../account-types/investment-account.handler.js';
 import { ProviderExpenseAccountHandler } from '../account-types/provider-expense-account.handler.js';
@@ -142,7 +142,7 @@ describe('serializeAccount', () => {
       chargeFrequency: 'monthly',
       dueMonth: null,
     });
-    const nested = new ProviderExpenseAccountHandler().serialize(details, provider);
+    const nested = new ProviderExpenseAccountHandler(NO_BILLS_SUMMARY).serialize(details, provider);
 
     const response = serializeAccount(provider, { balance: -20000n, mask: false, nested });
 
