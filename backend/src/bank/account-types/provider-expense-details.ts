@@ -12,8 +12,8 @@ import {
 import type { AccountRef } from '../account-refs.js';
 import { formatAmount } from '../currency.js';
 import type { ProviderExpenseDetailsDto } from '../dto/provider-expense-details.dto.js';
-import type { ProviderBill } from '../entities/provider-bill.entity.js';
-import type { ProviderChargeFrequency, ProviderExpenseDetails } from '../entities/provider-expense-details.entity.js';
+import type { ProviderBill, ProviderChargeFrequency } from '../entities/provider-bill.entity.js';
+import type { ProviderExpenseDetails } from '../entities/provider-expense-details.entity.js';
 
 // Pure helpers of the provider-expense account type: defaults, PATCH merge,
 // paired rule, currency rescale and serialization (see

@@ -2,6 +2,7 @@ import type { DataSource } from 'typeorm';
 import { columnInfo, indexNames, tableNames } from './schema-inspection.js';
 import { createTestDataSource, resetDatabase, runMigrationsUpTo } from './test-data-source.js';
 import { ALTER_BILLS_SQL, BankExpandProviderBills20261117120025 } from '../../migrations/20261117120025-bank-expand-provider-bills.js';
+import { BankContractProviderBills20261120120026 } from '../../migrations/20261120120026-bank-contract-provider-bills.js';
 
 const ACCOUNTS = 'bank_accounts';
 const TRANSACTIONS = 'bank_transactions';
@@ -17,7 +18,17 @@ interface Owner {
 const BILLS = 'bank_provider_bills';
 const OLD_BILLS = 'bank_bills';
 const BILL_PAYMENTS = 'bank_bill_payments';
-const SCHEDULE_TABLES = [DEBT_DETAILS, PROVIDER_EXPENSE_DETAILS];
+// The provider-level schedule was dropped by the contract migration: only debts keep these columns.
+const SCHEDULE_TABLES = [DEBT_DETAILS];
+const PROVIDER_SCHEDULE_COLUMNS = [
+  'expected_amount',
+  'charge_frequency',
+  'due_day',
+  'due_month',
+  'bills_from',
+  'show_in_calendar',
+  'paying_account_id',
+];
 
 async function insertAccount(ds: DataSource, owner: Owner, name: string, archived = false): Promise<number> {
   const result: { insertId: number } = await ds.query(
@@ -48,7 +59,7 @@ function insertInvestmentDetails(ds: DataSource, accountId: number): Promise<unk
 }
 
 function insertProviderExpenseDetails(ds: DataSource, accountId: number): Promise<unknown> {
-  return ds.query(`INSERT INTO ${PROVIDER_EXPENSE_DETAILS} (account_id, provider_tax_id, expected_amount) VALUES (?, '12.345.678/0001-90', 20000)`, [
+  return ds.query(`INSERT INTO ${PROVIDER_EXPENSE_DETAILS} (account_id, provider_tax_id) VALUES (?, '12.345.678/0001-90')`, [
     accountId,
   ]);
 }
@@ -289,14 +300,10 @@ describe('bank schema (MySQL)', () => {
         default: '1',
       });
       expect(await columnInfo(ds, PROVIDER_EXPENSE_DETAILS, 'provider_tax_id')).toMatchObject({ type: 'varchar(32)', nullable: true });
-      expect(await columnInfo(ds, PROVIDER_EXPENSE_DETAILS, 'expected_amount')).toMatchObject({ type: 'bigint', nullable: true });
-      expect(await columnInfo(ds, PROVIDER_EXPENSE_DETAILS, 'due_day')).toMatchObject({ type: 'tinyint', nullable: true });
-      expect(await columnInfo(ds, PROVIDER_EXPENSE_DETAILS, 'charge_frequency')).toMatchObject({
-        type: 'varchar(16)',
-        nullable: false,
-        default: 'monthly',
-      });
-      expect(await columnInfo(ds, PROVIDER_EXPENSE_DETAILS, 'due_month')).toMatchObject({ type: 'tinyint', nullable: true });
+    });
+
+    it.each(PROVIDER_SCHEDULE_COLUMNS)('no longer has the provider-level schedule column %s', async (column) => {
+      expect(await columnInfo(ds, PROVIDER_EXPENSE_DETAILS, column)).toBeUndefined();
     });
 
     it('uses account_id as the primary key', async () => {
@@ -655,6 +662,7 @@ describe('bank schema (MySQL)', () => {
 
         await ds.undoLastMigration();
         await ds.undoLastMigration();
+        await ds.undoLastMigration();
 
         expect(await tableNames(ds)).toContain(OLD_BILLS);
         expect(await tableNames(ds)).not.toContain(BILLS);
@@ -690,9 +698,106 @@ describe('bank schema (MySQL)', () => {
     });
   });
 
+  describe('contract provider bills', () => {
+    async function seedProvider(name: string): Promise<number> {
+      const accountId = await insertAccount(ds, { userId: 1 }, name);
+      await ds.query(`INSERT INTO ${PROVIDER_EXPENSE_DETAILS} (account_id) VALUES (?)`, [accountId]);
+      return accountId;
+    }
+
+    function seedRecurring(provider: number, description: string, fields: Record<string, unknown> = {}): Promise<unknown> {
+      const row = { provider_account_id: provider, kind: 'recurring', description, due_day: 5, ...fields };
+      const columns = Object.keys(row);
+      return ds.query(
+        `INSERT INTO ${BILLS} (${columns.join(', ')}) VALUES (${columns.map(() => '?').join(', ')})`,
+        Object.values(row),
+      );
+    }
+
+    const schedules = (): Promise<Array<Record<string, unknown>>> =>
+      ds.query(
+        `SELECT account_id AS id, expected_amount AS expected, charge_frequency AS frequency, due_day AS dueDay,
+                due_month AS dueMonth, DATE_FORMAT(bills_from, '%Y-%m-%d') AS billsFrom, show_in_calendar AS shown,
+                paying_account_id AS paying
+           FROM ${PROVIDER_EXPENSE_DETAILS} ORDER BY account_id`,
+      );
+
+    async function runDown(): Promise<void> {
+      const runner = ds.createQueryRunner();
+      try {
+        await new BankContractProviderBills20261120120026().down(runner);
+      } finally {
+        await runner.release();
+      }
+    }
+
+    it('down backfills only from a single recurring bill (one-offs ignored), NULL for zero or several, and re-runs safely', async () => {
+      const paying = await insertAccount(ds, { userId: 1 }, 'Checking');
+      const single = await seedProvider('Single');
+      const none = await seedProvider('None');
+      const several = await seedProvider('Several');
+      await seedRecurring(single, 'Rent', {
+        expected_amount: 20000,
+        charge_frequency: 'yearly',
+        due_day: 7,
+        due_month: 3,
+        bills_from: '2026-02-01',
+        show_in_calendar: 0,
+        paying_account_id: paying,
+      });
+      await insertBill(ds, single);
+      await insertBill(ds, none);
+      await seedRecurring(several, 'Rent', { expected_amount: 100 });
+      await seedRecurring(several, 'Fee', { expected_amount: 200 });
+
+      await ds.undoLastMigration();
+      await runDown();
+
+      const empty = { expected: null, frequency: 'monthly', dueDay: null, dueMonth: null, billsFrom: null, shown: 1, paying: null };
+      expect(await schedules()).toEqual([
+        { id: single, expected: '20000', frequency: 'yearly', dueDay: 7, dueMonth: 3, billsFrom: '2026-02-01', shown: 0, paying },
+        { id: none, ...empty },
+        { id: several, ...empty },
+      ]);
+    });
+
+    it('down falls back to the column defaults for a recurring bill with NULL frequency and visibility', async () => {
+      const provider = await seedProvider('Nullish');
+      await seedRecurring(provider, 'Rent', { charge_frequency: null, show_in_calendar: null });
+
+      await ds.undoLastMigration();
+
+      expect(await schedules()).toEqual([
+        { id: provider, expected: null, frequency: 'monthly', dueDay: 5, dueMonth: null, billsFrom: null, shown: 1, paying: null },
+      ]);
+    });
+
+    it('up leaves the payment count unchanged', async () => {
+      await resetDatabase(ds);
+      await runMigrationsUpTo(ds, 'BankExpandProviderBills20261117120025');
+      const provider = await seedProvider('Rent');
+      await seedRecurring(provider, 'Rent');
+      const [{ id: billId }]: Array<{ id: number }> = await ds.query(`SELECT id FROM ${BILLS}`);
+      await insertPayment(ds, { source_account_id: provider, provider_bill_id: billId });
+      await insertPayment(ds, { source_account_id: provider, provider_bill_id: billId, due_date: '2026-04-10' });
+      const count = async (): Promise<unknown> => (await ds.query(`SELECT COUNT(*) AS n FROM ${BILL_PAYMENTS}`))[0].n;
+      const before = await count();
+
+      await ds.runMigrations();
+
+      expect(await count()).toEqual(before);
+      expect(await columnInfo(ds, PROVIDER_EXPENSE_DETAILS, 'expected_amount')).toBeUndefined();
+    });
+  });
+
   describe('down', () => {
-    it('drops the bill tables, then the schedule fields, then sent_to_accountant_at, then bank_provider_expense_details, bank_investment_details, bank_debt_details, then bank_transactions, then bank_accounts', async () => {
-      // First undo the later, non-bank auth locale migration.
+    it('restores the provider schedule, drops the bill tables, then the schedule fields, then sent_to_accountant_at, then bank_provider_expense_details, bank_investment_details, bank_debt_details, then bank_transactions, then bank_accounts', async () => {
+      // First undo the provider-bills contract (re-adds the provider schedule columns), then the
+      // provider-bills expand (back to bank_bills), then the later, non-bank auth locale migration.
+      await ds.undoLastMigration();
+      for (const column of PROVIDER_SCHEDULE_COLUMNS) {
+        expect(await columnInfo(ds, PROVIDER_EXPENSE_DETAILS, column)).toBeDefined();
+      }
       await ds.undoLastMigration();
       await ds.undoLastMigration();
       expect(await tableNames(ds)).toContain(OLD_BILLS);
@@ -703,7 +808,7 @@ describe('bank schema (MySQL)', () => {
       expect(await columnInfo(ds, DEBT_DETAILS, 'bills_from')).toBeDefined();
 
       await ds.undoLastMigration();
-      for (const table of SCHEDULE_TABLES) {
+      for (const table of [DEBT_DETAILS, PROVIDER_EXPENSE_DETAILS]) {
         expect(await columnInfo(ds, table, 'bills_from')).toBeUndefined();
         expect(await columnInfo(ds, table, 'show_in_calendar')).toBeUndefined();
         expect(await columnInfo(ds, table, 'paying_account_id')).toBeUndefined();

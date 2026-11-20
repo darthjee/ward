@@ -1,6 +1,9 @@
 import { Column, CreateDateColumn, Entity, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
 import { bigintTransformer } from './bigint.transformer.js';
 
+/** How often a recurring provider bill charges. */
+export type ProviderChargeFrequency = 'monthly' | 'yearly';
+
 /** `recurring` bills carry a schedule; `one_off` bills carry a `dueDate`. */
 export type ProviderBillKind = 'recurring' | 'one_off';
 

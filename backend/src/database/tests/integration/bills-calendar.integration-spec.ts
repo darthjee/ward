@@ -90,7 +90,7 @@ describe('bills calendar reads (MySQL)', () => {
 
   it('filters bills and payments by date range with real operators', async () => {
     const provider = await insertAccount({ type: 'provider_expense' });
-    await ds.getRepository(ProviderExpenseDetails).save({ accountId: provider.id, dueDay: 5, billsFrom: '2026-01-01' });
+    await ds.getRepository(ProviderExpenseDetails).save({ accountId: provider.id });
     const inRange = await bills.save(bills.create({ providerAccountId: provider.id, payingAccountId: null, kind: 'one_off', dueDate: '2026-01-20', expectedAmount: 100n, description: 'In', notes: null }));
     await bills.save(bills.create({ providerAccountId: provider.id, payingAccountId: null, kind: 'one_off', dueDate: '2026-02-20', expectedAmount: 100n, description: 'Out', notes: null }));
     const recurring = await bills.save(bills.create({

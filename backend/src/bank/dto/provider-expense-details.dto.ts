@@ -2,7 +2,7 @@ import { Transform } from 'class-transformer';
 import { IsBoolean, IsIn, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
 import { IsCalendarDate, IsOptionalNonNull, MAX_INT_COLUMN, PROVIDER_TAX_ID_MAX_LENGTH, RATE_PERIODS, trimToNull } from './field-validators.js';
 import { MaxCodePoints } from '../../core/string-validators.js';
-import type { ProviderChargeFrequency } from '../entities/provider-expense-details.entity.js';
+import type { ProviderChargeFrequency } from '../entities/provider-bill.entity.js';
 
 /** The frequencies a provider charge accepts. */
 export const PROVIDER_CHARGE_FREQUENCIES = RATE_PERIODS;
