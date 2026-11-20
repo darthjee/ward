@@ -89,4 +89,13 @@ export interface AccountTypeHandler {
    *   `undefined` when the type has none.
    */
   serialize(details: unknown, account: Account): Record<string, unknown> | undefined;
+
+  /**
+   * Optional, list only (`accounts.json`): top-level fields merged into each
+   * listed account of this type (e.g. `bills_summary`). Never called by the
+   * single GET or the write responses.
+   * @param {Account[]} accounts - The listed accounts (all of this type).
+   * @returns {Promise<Map<number, Record<string, unknown>>>} Extra fields keyed by account id.
+   */
+  listExtras?(accounts: Account[]): Promise<Map<number, Record<string, unknown>>>;
 }

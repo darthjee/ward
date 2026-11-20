@@ -1,5 +1,5 @@
 import { BadRequestException } from '@nestjs/common';
-import { buildAccount } from './account.test-support.js';
+import { buildAccount, NO_BILLS_SUMMARY } from './account.test-support.js';
 import { ProviderExpenseAccountHandler } from '../account-types/provider-expense-account.handler.js';
 import { defaultProviderExpenseState, type ProviderExpenseState } from '../account-types/provider-expense-details.js';
 import type { ProviderExpenseDetailsDto } from '../dto/provider-expense-details.dto.js';
@@ -34,7 +34,7 @@ const monthly = (): ProviderExpenseDetails => stored({ chargeFrequency: 'monthly
 const pe = (fields: Partial<ProviderExpenseDetailsDto>): ProviderExpenseDetailsDto => fields as ProviderExpenseDetailsDto;
 
 describe('ProviderExpenseAccountHandler', () => {
-  const handler = new ProviderExpenseAccountHandler();
+  const handler = new ProviderExpenseAccountHandler(NO_BILLS_SUMMARY);
 
   it('serves provider_expense and carries a ledger', () => {
     expect(handler.type).toBe('provider_expense');
@@ -455,6 +455,41 @@ describe('ProviderExpenseAccountHandler', () => {
         show_in_calendar: true,
         paying_account: null,
       });
+    });
+  });
+
+  describe('listExtras', () => {
+    const summaries = jest.fn(async () => new Map([
+      [1, { count: 3, monthly: 25000n, yearly: 120000n }],
+      [5, { count: 2, monthly: 250n, yearly: 0n }],
+    ]));
+    const withSummaries = new ProviderExpenseAccountHandler({ summaries } as never);
+
+    it('maps every account to its bills_summary from one summaries call', async () => {
+      const accounts = [buildAccount({ id: 1, type: 'provider_expense' }), buildAccount({ id: 5, type: 'provider_expense', currency: 'JPY' })];
+
+      const extras = await withSummaries.listExtras(accounts);
+
+      expect(summaries).toHaveBeenCalledTimes(1);
+      expect(summaries).toHaveBeenCalledWith([1, 5]);
+      expect(extras.get(1)).toEqual({ bills_summary: { count: 3, monthly: '250.00', yearly: '1200.00' } });
+      expect(extras.get(5)).toEqual({ bills_summary: { count: 2, monthly: '250', yearly: '0' } });
+    });
+
+    it.each([
+      ['BRL', '0.00'],
+      ['JPY', '0'],
+      ['BHD', '0.000'],
+    ])('defaults an account without a summary row to zeros in %s (%p)', async (currency, zero) => {
+      const extras = await withSummaries.listExtras([buildAccount({ id: 9, type: 'provider_expense', currency })]);
+
+      expect(extras.get(9)).toEqual({ bills_summary: { count: 0, monthly: zero, yearly: zero } });
+    });
+
+    it('never exposes owner or organization ids', async () => {
+      const extras = await withSummaries.listExtras([buildAccount({ id: 1, type: 'provider_expense', userId: 7, organizationId: 3 })]);
+
+      expect(JSON.stringify(extras.get(1))).not.toMatch(/user_id|organization_id|userId|organizationId/);
     });
   });
 });

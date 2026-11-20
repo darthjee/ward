@@ -58,19 +58,42 @@ export class AccountTypeRegistry {
    * @throws {BadRequestException} When an account's type has no handler.
    */
   async loadDetails(accounts: Account[], manager: EntityManager): Promise<Map<number, unknown>> {
-    const idsByType = new Map<string, number[]>();
-
-    for (const account of accounts) {
-      idsByType.set(account.type, [...(idsByType.get(account.type) ?? []), account.id]);
-    }
-
     const details = new Map<number, unknown>();
 
-    for (const [type, ids] of idsByType) {
-      const loaded = await this.get(type).loadDetails(ids, manager);
+    for (const [type, group] of this.#byType(accounts)) {
+      const loaded = await this.get(type).loadDetails(group.map(({ id }) => id), manager);
       loaded.forEach((value, id) => details.set(id, value));
     }
 
     return details;
+  }
+
+  /**
+   * Loads the list-only top-level fields of accounts of any type: one
+   * `listExtras` call per type present that implements it (no N+1).
+   * @param {Account[]} accounts - The listed accounts.
+   * @returns {Promise<Map<number, Record<string, unknown>>>} Extra fields keyed by account id.
+   * @throws {BadRequestException} When an account's type has no handler.
+   */
+  async listExtras(accounts: Account[]): Promise<Map<number, Record<string, unknown>>> {
+    const extras = new Map<number, Record<string, unknown>>();
+
+    for (const [type, group] of this.#byType(accounts)) {
+      const handler = this.get(type);
+      const loaded = handler.listExtras ? await handler.listExtras(group) : new Map<number, Record<string, unknown>>();
+      loaded.forEach((value, id) => extras.set(id, value));
+    }
+
+    return extras;
+  }
+
+  #byType(accounts: Account[]): Map<string, Account[]> {
+    const byType = new Map<string, Account[]>();
+
+    for (const account of accounts) {
+      byType.set(account.type, [...(byType.get(account.type) ?? []), account]);
+    }
+
+    return byType;
   }
 }

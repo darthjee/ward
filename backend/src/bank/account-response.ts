@@ -37,6 +37,8 @@ export interface SerializeAccountOptions {
   mask: boolean;
   /** The handler's nested response object, if any. */
   nested?: Record<string, unknown>;
+  /** List-only top-level fields from the handler (e.g. `bills_summary`), if any. */
+  extra?: Record<string, unknown>;
 }
 
 /**
@@ -56,7 +58,7 @@ export function maskAccountNumber(accountNumber: string | null): string | null {
  * Serializes an {@link Account} into its public view (entities are never
  * returned directly). Amounts are decimal strings in the currency's exponent.
  * @param {Account} account - The account.
- * @param {SerializeAccountOptions} options - Balance, masking and nested object.
+ * @param {SerializeAccountOptions} options - Balance, masking, nested object and list extras.
  * @returns {AccountResponse} The public view, without any owner field.
  */
 export function serializeAccount(account: Account, options: SerializeAccountOptions): AccountResponse {
@@ -81,5 +83,5 @@ export function serializeAccount(account: Account, options: SerializeAccountOpti
     response[account.type] = options.nested;
   }
 
-  return response;
+  return options.extra === undefined ? response : { ...response, ...options.extra };
 }

@@ -15,6 +15,7 @@ import {
   type ProviderExpenseResponse,
   type ProviderExpenseState,
 } from './provider-expense-details.js';
+import { formatAmount } from '../currency.js';
 import type { ProviderExpenseDetailsDto } from '../dto/provider-expense-details.dto.js';
 import type { Account } from '../entities/account.entity.js';
 import { ProviderBill } from '../entities/provider-bill.entity.js';
@@ -22,6 +23,7 @@ import { ProviderExpenseDetails } from '../entities/provider-expense-details.ent
 import { todayUtc } from '../ledger-date.js';
 import { lockedRecurringBills, lockProvider } from '../provider-bill-checks.js';
 import { providerHasMultipleBills } from '../provider-bill-conflicts.js';
+import { ProviderBillsSummaryQuery } from '../provider-bills-summary.query.js';
 
 /** The nested fields that make a request a schedule edit (the write-through only runs for these). */
 const SCHEDULE_KEYS = ['expected_amount', 'charge_frequency', 'due_day', 'due_month', 'bills_from', 'show_in_calendar', 'paying_account_id'] as const;
@@ -55,6 +57,14 @@ function scheduleSentIn(nested: unknown): boolean {
 export class ProviderExpenseAccountHandler implements AccountTypeHandler {
   readonly type = 'provider_expense';
   readonly carriesLedger = true;
+  private readonly summaries: ProviderBillsSummaryQuery;
+
+  /**
+   * @param {ProviderBillsSummaryQuery} summaries - The grouped bill totals of the list's `bills_summary`.
+   */
+  constructor(summaries: ProviderBillsSummaryQuery) {
+    this.summaries = summaries;
+  }
 
   /**
    * No-op: provider-expense accounts have no account-level rule.
@@ -160,6 +170,29 @@ export class ProviderExpenseAccountHandler implements AccountTypeHandler {
    */
   serialize(details: unknown, account: Account): ProviderExpenseResponse {
     return serializeProviderExpense(details as LoadedProviderExpense | undefined, account.currency);
+  }
+
+  /**
+   * List only: every provider's `bills_summary` from one grouped query.
+   * `count` covers every bill; `monthly`/`yearly` sum the recurring bills'
+   * `expected_amount` in the account's currency (zero when there is none).
+   * @param {Account[]} accounts - The listed provider-expense accounts.
+   * @returns {Promise<Map<number, Record<string, unknown>>>} `{ bills_summary }` keyed by account id.
+   */
+  async listExtras(accounts: Account[]): Promise<Map<number, Record<string, unknown>>> {
+    const summaries = await this.summaries.summaries(accounts.map(({ id }) => id));
+
+    return new Map(accounts.map((account) => {
+      const { count, monthly, yearly } = summaries.get(account.id) ?? { count: 0, monthly: 0n, yearly: 0n };
+
+      return [account.id, {
+        bills_summary: {
+          count,
+          monthly: formatAmount(monthly, account.currency),
+          yearly: formatAmount(yearly, account.currency),
+        },
+      }];
+    }));
   }
 
   async #syncBills(

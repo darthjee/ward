@@ -17,6 +17,7 @@ import { NOT_FOUND_CASES, ownerKeysIn, type OwnerFixtures } from './support/owne
 
 jest.mock('../ledger.query.js', () => jest.requireActual('./support/in-memory-ledger.query.js'));
 jest.mock('../account-balances.query.js', () => jest.requireActual('./support/in-memory-ledger.query.js'));
+jest.mock('../provider-bills-summary.query.js', () => jest.requireActual('./support/in-memory-provider-bills-summary.query.js'));
 
 // Investment accounts (docs/agents/modules/bank/investment.md, docs/agents/backend/routes/bank.md): the
 // generic account routes with `type: investment` and a nested `investment` object, in both owner

@@ -1,5 +1,5 @@
 import { maskAccountNumber, serializeAccount } from '../account-response.js';
-import { buildAccount } from './account.test-support.js';
+import { buildAccount, NO_BILLS_SUMMARY } from './account.test-support.js';
 import { DebtAccountHandler } from '../account-types/debt-account.handler.js';
 import { InvestmentAccountHandler } from '../account-types/investment-account.handler.js';
 import { ProviderExpenseAccountHandler } from '../account-types/provider-expense-account.handler.js';
@@ -61,6 +61,18 @@ describe('serializeAccount', () => {
     const yen = buildAccount({ currency: 'JPY', openingBalance: 500n });
 
     expect(serializeAccount(yen, { balance: 500n, mask: false })).toMatchObject({ opening_balance: '500', balance: '500' });
+  });
+
+  it('merges the list extras at the top level', () => {
+    const summary = { count: 1, monthly: '1.00', yearly: '0.00' };
+    const result = serializeAccount(account, { balance: 0n, mask: true, extra: { bills_summary: summary } });
+
+    expect(result.bills_summary).toEqual(summary);
+    expect(result.id).toBe(1);
+  });
+
+  it('adds no extra field without extras', () => {
+    expect(serializeAccount(account, { balance: 0n, mask: true })).not.toHaveProperty('bills_summary');
   });
 
   it('adds the nested object under the type name', () => {
@@ -142,7 +154,7 @@ describe('serializeAccount', () => {
       chargeFrequency: 'monthly',
       dueMonth: null,
     });
-    const nested = new ProviderExpenseAccountHandler().serialize(details, provider);
+    const nested = new ProviderExpenseAccountHandler(NO_BILLS_SUMMARY).serialize(details, provider);
 
     const response = serializeAccount(provider, { balance: -20000n, mask: false, nested });
 

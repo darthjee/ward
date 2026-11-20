@@ -17,6 +17,7 @@ import { createOwnerFixtures, NOT_FOUND_CASES, ownerKeysIn, type OwnerFixtures }
 
 jest.mock('../ledger.query.js', () => jest.requireActual('./support/in-memory-ledger.query.js'));
 jest.mock('../account-balances.query.js', () => jest.requireActual('./support/in-memory-ledger.query.js'));
+jest.mock('../provider-bills-summary.query.js', () => jest.requireActual('./support/in-memory-provider-bills-summary.query.js'));
 
 const TODAY = new Date().toISOString().slice(0, 10);
 

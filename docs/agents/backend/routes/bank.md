@@ -69,7 +69,7 @@ per-endpoint reference.
 
 | Method | Route | Body | Success | Errors | Cache class |
 |---|---|---|---|---|---|
-| GET | `<base>/accounts.json?type=regular&archived=false` | — | `200` list of accounts of that `type` (`regular` default, `debt`, `investment`, `provider_expense`), sorted by name; `archived=true` also lists archived ones (with `archived_at` set) | `400` type without a handler, invalid `archived` | `user-scoped` |
+| GET | `<base>/accounts.json?type=regular&archived=false` | — | `200` list of accounts of that `type` (`regular` default, `debt`, `investment`, `provider_expense`), sorted by name; `archived=true` also lists archived ones (with `archived_at` set); `provider_expense` rows also carry `bills_summary` (see [Provider-expense object](#provider-expense-object)) | `400` type without a handler, invalid `archived` | `user-scoped` |
 | POST | `<base>/accounts.json` | `CreateAccountDto` | `201` account | `400` validation / type without a handler / wrong nested object / non-zero `opening_balance` on an investment; `409 ACCOUNT_NAME_TAKEN` | `never` |
 | GET | `<base>/accounts/:accountId.json` | — | `200` account (full number) | `404` | `user-scoped` |
 | PATCH | `<base>/accounts/:accountId.json` | `UpdateAccountDto` | `200` account | `400`; `404`; `409 ACCOUNT_ARCHIVED` (anything but `name` on an archived account), `CURRENCY_LOCKED` (currency change once the account has transactions), `ACCOUNT_NAME_TAKEN` | `never` |
@@ -134,6 +134,11 @@ rules are in [Bank — Debt accounts](../../modules/bank/debt.md).
   unknown, another owner's, in the other context, not `regular` or archived → `422
   ACCOUNT_NOT_FOUND` (one generic body); a visible account of another currency → `422
   CURRENCY_MISMATCH`. A currency-changing account PATCH re-checks the stored default.
+- **`bills_summary`** (list only) — every `provider_expense` row of `GET <base>/accounts.json`
+  (active and archived) carries a top-level `bills_summary: { count, monthly, yearly }`,
+  computed in one grouped query over all listed providers (no N+1). It is absent on the
+  single-account GET, the write responses and other types. Rules in
+  [Split provider — Provider-bills API](../../specs/split-provider/api/provider-bills.md#bills_summary-on-the-provider-list).
 
 ### Investment object
 

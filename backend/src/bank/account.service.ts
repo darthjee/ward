@@ -4,8 +4,9 @@ import { IsNull, Repository } from 'typeorm';
 import { AccountBalancesQuery } from './account-balances.query.js';
 import { accountArchived, accountHasTransactions, currencyLocked, mapNameClash } from './account-conflicts.js';
 import { accountOwnerWhere, copyEditableFields, nestedObject, ownerColumns, presentFields } from './account-fields.js';
-import { serializeAccount, type AccountResponse } from './account-response.js';
+import type { AccountResponse } from './account-response.js';
 import { AccountScheduleValidator } from './account-schedule.validator.js';
+import { AccountPresenter } from './account.presenter.js';
 import type { OwnerContext } from '../core/owner-context.js';
 import { ownerNotFound } from '../core/parse-id.js';
 import type { AccountTypeHandler } from './account-types/account-type-handler.js';
@@ -46,6 +47,7 @@ export class AccountService {
   private readonly balances: AccountBalancesQuery;
   private readonly config: BankConfig;
   private readonly schedule: AccountScheduleValidator;
+  private readonly presenter: AccountPresenter;
 
   /**
    * @param {Repository<Account>} accountRepository - The account repository.
@@ -66,11 +68,13 @@ export class AccountService {
     this.balances = balances;
     this.config = config;
     this.schedule = schedule;
+    this.presenter = new AccountPresenter(accountRepository, registry, balances);
   }
 
   /**
    * Lists the owner's accounts of one type, sorted by name, with every current
-   * balance from one grouped query and `account_number` masked.
+   * balance from one grouped query, `account_number` masked and the handlers'
+   * list-only fields (e.g. a provider's `bills_summary`).
    * @param {OwnerContext} owner - The resolved owner.
    * @param {ListAccountsOptions} options - Type and archived filter.
    * @returns {Promise<AccountResponse[]>} The accounts.
@@ -83,7 +87,7 @@ export class AccountService {
       order: { name: 'ASC', id: 'ASC' },
     });
 
-    return this.#present(accounts, true);
+    return this.presenter.present(accounts, { mask: true, listExtras: true });
   }
 
   /**
@@ -93,7 +97,7 @@ export class AccountService {
    * @throws {NotFoundException} The uniform 404 when not owned by `owner`.
    */
   async find(owner: OwnerContext, id: number): Promise<AccountResponse> {
-    return this.#presentOne(await this.findOwned(owner, id), false);
+    return this.presenter.presentOne(await this.findOwned(owner, id), false);
   }
 
   /**
@@ -144,7 +148,7 @@ export class AccountService {
       notes: dto.notes ?? null,
     });
 
-    return this.#presentOne(await this.#saveWithDetails(account, handler, prepared), true);
+    return this.presenter.presentOne(await this.#saveWithDetails(account, handler, prepared), true);
   }
 
   /**
@@ -183,7 +187,7 @@ export class AccountService {
       account.openingBalance = parseAmountInput('opening_balance', dto.opening_balance, account.currency);
     }
 
-    return this.#presentOne(await this.#saveWithDetails(account, handler, prepared), true);
+    return this.presenter.presentOne(await this.#saveWithDetails(account, handler, prepared), true);
   }
 
   /**
@@ -201,7 +205,7 @@ export class AccountService {
       await this.accountRepository.save(account);
     }
 
-    return this.#presentOne(account, true);
+    return this.presenter.presentOne(account, true);
   }
 
   /**
@@ -220,7 +224,7 @@ export class AccountService {
       await mapNameClash(() => this.accountRepository.save(account));
     }
 
-    return this.#presentOne(account, true);
+    return this.presenter.presentOne(account, true);
   }
 
   /**
@@ -274,25 +278,6 @@ export class AccountService {
         const saved = await manager.getRepository(Account).save(account);
         await handler.saveDetails(saved, prepared, manager);
         return saved;
-      }),
-    );
-  }
-
-  async #presentOne(account: Account, mask: boolean): Promise<AccountResponse> {
-    const [response] = await this.#present([account], mask);
-
-    return response;
-  }
-
-  async #present(accounts: Account[], mask: boolean): Promise<AccountResponse[]> {
-    const balances = await this.balances.currentBalances(accounts);
-    const details = await this.registry.loadDetails(accounts, this.accountRepository.manager);
-
-    return accounts.map((account) =>
-      serializeAccount(account, {
-        balance: balances.get(account.id) ?? account.openingBalance,
-        mask,
-        nested: this.registry.get(account.type).serialize(details.get(account.id), account),
       }),
     );
   }

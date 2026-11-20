@@ -17,6 +17,7 @@ import { BillPayment } from '../entities/bill-payment.entity.js';
 
 jest.mock('../ledger.query.js', () => jest.requireActual('./support/in-memory-ledger.query.js'));
 jest.mock('../account-balances.query.js', () => jest.requireActual('./support/in-memory-ledger.query.js'));
+jest.mock('../provider-bills-summary.query.js', () => jest.requireActual('./support/in-memory-provider-bills-summary.query.js'));
 
 // `provider-bills` CRUD (docs/agents/specs/split-provider/api/provider-bills.md).
 

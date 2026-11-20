@@ -11,6 +11,7 @@ import { BillPayment } from '../../../bank/entities/bill-payment.entity.js';
 import { DebtDetails } from '../../../bank/entities/debt-details.entity.js';
 import { ProviderBill } from '../../../bank/entities/provider-bill.entity.js';
 import { ProviderExpenseDetails } from '../../../bank/entities/provider-expense-details.entity.js';
+import { ProviderBillsSummaryQuery } from '../../../bank/provider-bills-summary.query.js';
 
 const ALICE = { kind: 'user', userId: 1 } as const;
 
@@ -44,7 +45,7 @@ describe('bills calendar reads (MySQL)', () => {
     const registry = new AccountTypeRegistry([
       new RegularAccountHandler(),
       new DebtAccountHandler(),
-      new ProviderExpenseAccountHandler(),
+      new ProviderExpenseAccountHandler(new ProviderBillsSummaryQuery(bills)),
     ]);
     query = new CalendarQuery(accounts, bills, payments, registry);
     service = new CalendarService(query);
