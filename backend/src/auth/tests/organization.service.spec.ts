@@ -1,6 +1,6 @@
 import { NotFoundException } from '@nestjs/common';
 import { ownerNotFound } from '../../core/parse-org-id.js';
-import { MembershipRole } from '../entities/organization-membership.entity.js';
+import { MembershipRole, type OrganizationMembership } from '../entities/organization-membership.entity.js';
 import { OrganizationService } from '../organization.service.js';
 import { createInMemoryOrganizationRepos } from './support/in-memory-organization-repos.js';
 
@@ -35,26 +35,32 @@ describe('OrganizationService', () => {
     });
   });
 
-  describe('isMember', () => {
+  describe('findRole', () => {
     beforeEach(async () => {
       await service.create(7, 'Family');
     });
 
-    it('is true for a member', async () => {
-      await expect(service.isMember(7, 1)).resolves.toBe(true);
+    it('returns the role of a member', async () => {
+      await expect(service.findRole(7, 1)).resolves.toBe(MembershipRole.OWNER);
     });
 
-    it('is false for a non-member', async () => {
-      await expect(service.isMember(8, 1)).resolves.toBe(false);
+    it.each([MembershipRole.ADMIN, MembershipRole.USER])('returns the seeded %p role', async (role) => {
+      repos.membershipRepo.rows.push({ id: 50, organizationId: 1, userId: 8, role } as OrganizationMembership);
+
+      await expect(service.findRole(8, 1)).resolves.toBe(role);
     });
 
-    it('is false for an unknown organization, with the same single lookup', async () => {
-      const existsBy = jest.spyOn(repos.membershipRepo, 'existsBy');
+    it('is null for a non-member', async () => {
+      await expect(service.findRole(8, 1)).resolves.toBeNull();
+    });
+
+    it('is null for an unknown organization, with the same single lookup', async () => {
+      const findOne = jest.spyOn(repos.membershipRepo, 'findOne');
       const findOrganization = jest.spyOn(repos.organizationRepo, 'findOneBy');
 
-      await expect(service.isMember(7, 99)).resolves.toBe(false);
-      expect(existsBy).toHaveBeenCalledTimes(1);
-      expect(existsBy).toHaveBeenCalledWith({ organizationId: 99, userId: 7 });
+      await expect(service.findRole(7, 99)).resolves.toBeNull();
+      expect(findOne).toHaveBeenCalledTimes(1);
+      expect(findOne).toHaveBeenCalledWith({ where: { organizationId: 99, userId: 7 }, select: { role: true } });
       expect(findOrganization).not.toHaveBeenCalled();
     });
   });

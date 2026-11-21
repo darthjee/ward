@@ -10,7 +10,6 @@ export type InMemoryMembershipRepo = Omit<InMemoryRepo<OrganizationMembership>, 
   OrganizationRepoExtras<OrganizationMembership>;
 
 interface OrganizationRepoExtras<T> {
-  existsBy: (where: Partial<T>) => Promise<boolean>;
   manager: { transaction: <R>(callback: (manager: FakeManager) => Promise<R>) => Promise<R> };
 }
 
@@ -19,10 +18,10 @@ interface FakeManager {
 }
 
 // Adds what `OrganizationService` needs on top of `createInMemoryRepo()`:
-// - `save` stamps `updatedAt` on every save (and `createdAt` on insert), like
-//   TypeORM's `@CreateDateColumn`/`@UpdateDateColumn`, so serialized
-//   organizations always carry both timestamps;
-// - `existsBy`, used by `isMember`.
+// `save` stamps `updatedAt` on every save (and `createdAt` on insert), like
+// TypeORM's `@CreateDateColumn`/`@UpdateDateColumn`, so serialized
+// organizations always carry both timestamps. `findRole` goes through the base
+// `findOne({ where, select })` (the fake ignores `select`).
 function withOrganizationExtras<T extends { id?: number; createdAt?: Date; updatedAt?: Date }>(
   repo: InMemoryRepo<T>,
 ): InMemoryRepo<T> & Omit<OrganizationRepoExtras<T>, 'manager'> {
@@ -32,9 +31,8 @@ function withOrganizationExtras<T extends { id?: number; createdAt?: Date; updat
     entity.updatedAt = now;
     return repo.save(entity);
   };
-  const existsBy = async (where: Partial<T>): Promise<boolean> => (await repo.findOneBy(where)) !== null;
 
-  return { ...repo, save, existsBy };
+  return { ...repo, save };
 }
 
 // Builds the in-memory `Organization` and `OrganizationMembership` repos sharing

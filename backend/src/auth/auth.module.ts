@@ -43,7 +43,7 @@ import { SESSION_LOOKUP } from '../core/session-lookup.js';
  * Owns organizations: exports `OrganizationService` (the only way other
  * modules read memberships) and provides Core's
  * `ORGANIZATION_MEMBERSHIP_LOOKUP` port with it, so the global
- * `OwnerContextGuard` checks memberships without `core/` importing `auth/`.
+ * `OwnerContextGuard` resolves the member's role without `core/` importing `auth/`.
  */
 @Module({
   imports: [
