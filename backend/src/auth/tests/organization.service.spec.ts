@@ -1,4 +1,4 @@
-import { NotFoundException } from '@nestjs/common';
+import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { ownerNotFound } from '../../core/parse-org-id.js';
 import { MembershipRole, type OrganizationMembership } from '../entities/organization-membership.entity.js';
 import { OrganizationService } from '../organization.service.js';
@@ -135,6 +135,32 @@ describe('OrganizationService', () => {
 
     it('throws the uniform 404 for an unknown organization', async () => {
       await expect(service.rename(7, 99, 'Ghost')).rejects.toThrow(NotFoundException);
+    });
+
+    describe('by role', () => {
+      const seed = (userId: number, role: MembershipRole): void => {
+        repos.membershipRepo.rows.push({ id: 50 + userId, organizationId: 1, userId, role } as OrganizationMembership);
+      };
+
+      it('forbids a user with the uniform 403, saving nothing', async () => {
+        seed(8, MembershipRole.USER);
+        const save = jest.spyOn(repos.organizationRepo, 'save');
+        const error = await service.rename(8, 1, 'Hijacked').catch((caught: unknown) => caught);
+
+        expect(error).toBeInstanceOf(ForbiddenException);
+        expect((error as ForbiddenException).getResponse()).toEqual({ statusCode: 403, message: 'Forbidden' });
+        expect(save).not.toHaveBeenCalled();
+        expect(repos.organizationRepo.rows[0].name).toBe('Family');
+      });
+
+      it('renames for an admin, returning the admin role', async () => {
+        seed(8, MembershipRole.ADMIN);
+
+        const { organization, role } = await service.rename(8, 1, 'Household');
+
+        expect(organization.name).toBe('Household');
+        expect(role).toBe(MembershipRole.ADMIN);
+      });
     });
   });
 });

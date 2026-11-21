@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import type { OrganizationMembershipLookup } from '../core/organization-membership-lookup.js';
-import type { OrgRole } from '../core/org-role.js';
+import { hasMinRole, OrgRole, orgRoleForbidden } from '../core/org-role.js';
 import { ownerNotFound } from '../core/parse-org-id.js';
 import { MembershipRole, OrganizationMembership } from './entities/organization-membership.entity.js';
 import { Organization } from './entities/organization.entity.js';
@@ -122,18 +122,25 @@ export class OrganizationService implements OrganizationMembershipLookup {
   }
 
   /**
-   * Renames an organization the user is a member of (any role; last write wins).
+   * Renames an organization the user is an `admin` or `owner` of (last write wins among them).
+   * The membership is checked first, so a non-member gets the uniform 404 before a `user` gets
+   * the uniform 403.
    * @param {number} userId - The user's id.
    * @param {number} orgId - The organization's id.
    * @param {string} name - The validated, trimmed new name.
    * @returns {Promise<MemberOrganization>} The renamed organization with the user's role.
    * @throws {NotFoundException} The uniform 404 when the user is not a member.
+   * @throws {ForbiddenException} The uniform 403 when the member's role is below `admin`.
    */
   async rename(userId: number, orgId: number, name: string): Promise<MemberOrganization> {
     const found = await this.findMembership(userId, orgId);
 
     if (!found) {
       throw ownerNotFound();
+    }
+
+    if (!hasMinRole(found.membership.role, OrgRole.ADMIN)) {
+      throw orgRoleForbidden();
     }
 
     found.organization.name = name;
