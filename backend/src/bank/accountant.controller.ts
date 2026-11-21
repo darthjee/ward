@@ -4,6 +4,8 @@ import { BankModuleLoader } from './bank-module.loader.js';
 import { CacheClass } from '../core/cache-class.js';
 import { CachePolicy } from '../core/cache-policy.decorator.js';
 import { CurrentOwner } from '../core/current-owner.decorator.js';
+import { MinOrgRole } from '../core/min-org-role.decorator.js';
+import { OrgRole } from '../core/org-role.js';
 import type { OwnerContext } from '../core/owner-context.js';
 import { OwnerScopedController } from '../core/owner-scoped.decorator.js';
 import { StrictBody } from '../core/strict-validation.pipe.js';
@@ -53,6 +55,7 @@ export class AccountantController {
    * @returns {Promise<MarkChargesResponse>} Every posted id with its mark.
    */
   @Post('accountant/mark-sent.json')
+  @MinOrgRole(OrgRole.USER)
   @CachePolicy(CacheClass.Never)
   @HttpCode(HttpStatus.OK)
   async markSent(@CurrentOwner() owner: OwnerContext, @StrictBody() dto: MarkChargesDto): Promise<MarkChargesResponse> {
@@ -68,6 +71,7 @@ export class AccountantController {
    * @returns {Promise<MarkChargesResponse>} Every posted id with a `null` mark.
    */
   @Post('accountant/mark-unsent.json')
+  @MinOrgRole(OrgRole.USER)
   @CachePolicy(CacheClass.Never)
   @HttpCode(HttpStatus.OK)
   async markUnsent(@CurrentOwner() owner: OwnerContext, @StrictBody() dto: MarkChargesDto): Promise<MarkChargesResponse> {

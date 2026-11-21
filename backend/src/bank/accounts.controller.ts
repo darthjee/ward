@@ -4,6 +4,8 @@ import { BankModuleLoader } from './bank-module.loader.js';
 import { CacheClass } from '../core/cache-class.js';
 import { CachePolicy } from '../core/cache-policy.decorator.js';
 import { CurrentOwner } from '../core/current-owner.decorator.js';
+import { MinOrgRole } from '../core/min-org-role.decorator.js';
+import { OrgRole } from '../core/org-role.js';
 import type { OwnerContext } from '../core/owner-context.js';
 import { OwnerScopedController } from '../core/owner-scoped.decorator.js';
 import { parseId } from '../core/parse-id.js';
@@ -56,6 +58,7 @@ export class AccountsController {
    * @returns {Promise<AccountResponse>} The created account.
    */
   @Post('accounts.json')
+  @MinOrgRole(OrgRole.ADMIN)
   @CachePolicy(CacheClass.Never)
   async create(
     @CurrentOwner() owner: OwnerContext,
@@ -91,6 +94,7 @@ export class AccountsController {
    * @returns {Promise<AccountResponse>} The updated account.
    */
   @Patch('accounts/:accountId.json')
+  @MinOrgRole(OrgRole.ADMIN)
   @CachePolicy(CacheClass.Never)
   async update(
     @CurrentOwner() owner: OwnerContext,
@@ -110,6 +114,7 @@ export class AccountsController {
    * @returns {Promise<void>}
    */
   @Delete('accounts/:accountId.json')
+  @MinOrgRole(OrgRole.ADMIN)
   @CachePolicy(CacheClass.Never)
   @HttpCode(HttpStatus.NO_CONTENT)
   async remove(
@@ -129,6 +134,7 @@ export class AccountsController {
    * @returns {Promise<AccountResponse>} The archived account.
    */
   @Post('accounts/:accountId/archive.json')
+  @MinOrgRole(OrgRole.ADMIN)
   @CachePolicy(CacheClass.Never)
   @HttpCode(HttpStatus.OK)
   async archive(
@@ -148,6 +154,7 @@ export class AccountsController {
    * @returns {Promise<AccountResponse>} The active account.
    */
   @Post('accounts/:accountId/unarchive.json')
+  @MinOrgRole(OrgRole.ADMIN)
   @CachePolicy(CacheClass.Never)
   @HttpCode(HttpStatus.OK)
   async unarchive(

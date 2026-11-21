@@ -4,6 +4,8 @@ import type { BillHistoryResponse } from './bill-history.service.js';
 import { CacheClass } from '../core/cache-class.js';
 import { CachePolicy } from '../core/cache-policy.decorator.js';
 import { CurrentOwner } from '../core/current-owner.decorator.js';
+import { MinOrgRole } from '../core/min-org-role.decorator.js';
+import { OrgRole } from '../core/org-role.js';
 import type { OwnerContext } from '../core/owner-context.js';
 import { OwnerScopedController } from '../core/owner-scoped.decorator.js';
 import { parseId } from '../core/parse-id.js';
@@ -60,6 +62,7 @@ export class ProviderBillPaymentsController {
    * @returns {Promise<OccurrenceResponse>} The updated occurrence.
    */
   @Post('provider-bills/:id/occurrences/:dueDate/payment.json')
+  @MinOrgRole(OrgRole.USER)
   @CachePolicy(CacheClass.Never)
   @HttpCode(HttpStatus.CREATED)
   async pay(
@@ -82,6 +85,7 @@ export class ProviderBillPaymentsController {
    * @returns {Promise<void>}
    */
   @Delete('provider-bills/:id/occurrences/:dueDate/payment.json')
+  @MinOrgRole(OrgRole.ADMIN)
   @CachePolicy(CacheClass.Never)
   @HttpCode(HttpStatus.NO_CONTENT)
   async undo(

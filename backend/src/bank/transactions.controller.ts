@@ -3,6 +3,8 @@ import { BankModuleLoader } from './bank-module.loader.js';
 import { CacheClass } from '../core/cache-class.js';
 import { CachePolicy } from '../core/cache-policy.decorator.js';
 import { CurrentOwner } from '../core/current-owner.decorator.js';
+import { MinOrgRole } from '../core/min-org-role.decorator.js';
+import { OrgRole } from '../core/org-role.js';
 import type { OwnerContext } from '../core/owner-context.js';
 import { OwnerScopedController } from '../core/owner-scoped.decorator.js';
 import { parseId } from '../core/parse-id.js';
@@ -58,6 +60,7 @@ export class TransactionsController {
    * @returns {Promise<TransactionResponse>} The created transaction.
    */
   @Post('accounts/:accountId/transactions.json')
+  @MinOrgRole(OrgRole.USER)
   @CachePolicy(CacheClass.Never)
   async create(
     @CurrentOwner() owner: OwnerContext,
@@ -79,6 +82,7 @@ export class TransactionsController {
    * @returns {Promise<TransactionResponse>} The updated transaction.
    */
   @Patch('accounts/:accountId/transactions/:transactionId.json')
+  @MinOrgRole(OrgRole.USER)
   @CachePolicy(CacheClass.Never)
   async update(
     @CurrentOwner() owner: OwnerContext,
@@ -101,6 +105,7 @@ export class TransactionsController {
    * @returns {Promise<void>}
    */
   @Delete('accounts/:accountId/transactions/:transactionId.json')
+  @MinOrgRole(OrgRole.ADMIN)
   @CachePolicy(CacheClass.Never)
   @HttpCode(HttpStatus.NO_CONTENT)
   async remove(
