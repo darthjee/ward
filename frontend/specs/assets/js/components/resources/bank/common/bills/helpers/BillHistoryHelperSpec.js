@@ -40,6 +40,7 @@ function state(overrides = {}) {
     pending: false,
     confirmation: null,
     selfHref: '#/bank/providers/7',
+    canUndo: true,
     ...overrides,
   };
 }
@@ -99,6 +100,14 @@ describe('BillHistoryHelper', () => {
     const page = output({ account: { ...ACCOUNT, archived_at: '2026-05-01T00:00:00Z' } });
 
     expect(page.contains('>Undo<')).toBeFalse();
+    expect(page.contains('Boiler repair')).toBeTrue();
+  });
+
+  it('hides Undo and its column without the undo permission', () => {
+    const page = output({ canUndo: false });
+
+    expect(page.contains('>Undo<')).toBeFalse();
+    expect(page.containsAttribute('aria-label', 'Actions')).toBeFalse();
     expect(page.contains('Boiler repair')).toBeTrue();
   });
 

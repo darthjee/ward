@@ -7,7 +7,7 @@ import {
 } from '../../../../../../../../../assets/js/components/common/ownerContext/hooks/useOwnerContext.js';
 import { installFakeWindow, uninstallFakeWindow } from '../../../../../../../../support/fakeWindow.js';
 
-function probe(base, context = DEFAULT_OWNER_CONTEXT.context) {
+function probe(base, context = DEFAULT_OWNER_CONTEXT.context, role = 'owner') {
   let result;
   const Probe = () => {
     result = useAccountDetail(base);
@@ -16,7 +16,7 @@ function probe(base, context = DEFAULT_OWNER_CONTEXT.context) {
 
   renderToStaticMarkup(React.createElement(
     OwnerContext.Provider,
-    { value: { ...DEFAULT_OWNER_CONTEXT, context, userId: 1 } },
+    { value: { ...DEFAULT_OWNER_CONTEXT, context, userId: 1, role } },
     React.createElement(Probe),
   ));
 
@@ -39,5 +39,23 @@ describe('useAccountDetail', () => {
     expect(result.reload).toEqual(jasmine.any(Function));
     expect(result.ledgerForm.form.editing).toBeNull();
     expect(result.ledgerForm.actions.reset).toEqual(jasmine.any(Function));
+  });
+
+  it('grants every account permission to an admin', () => {
+    installFakeWindow({ location: { hash: '#/orgs/5/bank/debts/7' } });
+
+    const { state } = probe('/bank/debts', { kind: 'organization', orgId: 5 }, 'admin');
+
+    expect(state.canManageAccounts).toBeTrue();
+    expect(state.canDelete).toBeTrue();
+  });
+
+  it('denies managing and deleting to a user', () => {
+    installFakeWindow({ location: { hash: '#/orgs/5/bank/debts/7' } });
+
+    const { state } = probe('/bank/debts', { kind: 'organization', orgId: 5 }, 'user');
+
+    expect(state.canManageAccounts).toBeFalse();
+    expect(state.canDelete).toBeFalse();
   });
 });

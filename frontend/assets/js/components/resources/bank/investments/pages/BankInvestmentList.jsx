@@ -12,7 +12,7 @@ import BankInvestmentListHelper from './helpers/BankInvestmentListHelper.jsx';
  */
 export default function BankInvestmentList() {
   const {
-    context, accounts, error, archived, notFound, handlers,
+    context, accounts, error, archived, notFound, canManageAccounts, handlers,
   } = useAccountList('investment');
 
   if (notFound) {
@@ -20,6 +20,6 @@ export default function BankInvestmentList() {
   }
 
   return BankInvestmentListHelper.render({
-    accounts, error, archived, context,
+    accounts, error, archived, context, canManageAccounts,
   }, handlers);
 }

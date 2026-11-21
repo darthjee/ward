@@ -11,7 +11,7 @@ import BankDebtListHelper from './helpers/BankDebtListHelper.jsx';
  */
 export default function BankDebtList() {
   const {
-    context, accounts, error, archived, notFound, handlers,
+    context, accounts, error, archived, notFound, canManageAccounts, handlers,
   } = useAccountList('debt');
 
   if (notFound) {
@@ -19,6 +19,6 @@ export default function BankDebtList() {
   }
 
   return BankDebtListHelper.render({
-    accounts, error, archived, context,
+    accounts, error, archived, context, canManageAccounts,
   }, handlers);
 }

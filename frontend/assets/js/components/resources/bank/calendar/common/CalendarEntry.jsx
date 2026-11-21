@@ -1,4 +1,6 @@
 import { contextHash } from '../../../../../utils/context/ownerContext.js';
+import { ACTIONS } from '../../../../../utils/permissions/orgPermissions.js';
+import useCan from '../../../../common/ownerContext/hooks/useCan.js';
 import { formatMoney } from '../../common/amounts.js';
 import { formatDate } from '../../common/dates.js';
 import { BILLS_BASE, SECTION_BY_TYPE } from '../../common/sections.js';
@@ -76,9 +78,12 @@ function EntryDate({ occurrence }) {
  *
  * @param {{occurrence: object, onPay: Function, onSkip: Function, onUndo: Function}} props - The
  *   occurrence and its handlers.
- * @returns {React.ReactElement|null} Pay / Skip for pending entries, Undo for settled ones.
+ * @returns {React.ReactElement|null} Pay / Skip for pending entries, Undo for settled ones
+ *   (only when the caller's role may undo payments), otherwise `null`.
  */
 function EntryActions({ occurrence, onPay, onSkip, onUndo }) {
+  const canUndo = useCan(ACTIONS.UNDO_PAYMENT);
+
   if (occurrence.status === 'open' || occurrence.status === 'overdue') {
     return (
       <span className="ms-2">
@@ -86,6 +91,10 @@ function EntryActions({ occurrence, onPay, onSkip, onUndo }) {
         <button type="button" className="btn btn-sm btn-outline-secondary" onClick={() => onSkip(occurrence)}>Skip</button>
       </span>
     );
+  }
+
+  if (!canUndo) {
+    return null;
   }
 
   return (

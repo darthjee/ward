@@ -48,6 +48,8 @@ function output(overrides = {}, account = {}) {
     form: initialLedgerForm('2026-05-10'),
     actionPending: null,
     confirmation: null,
+    canManageAccounts: true,
+    canDelete: true,
     updateValue: initialUpdateValue('2026-05-10'),
     ...overrides,
   }, HANDLERS));

@@ -45,6 +45,7 @@ describe('LedgerTableHelper', () => {
       editingId: null,
       readOnly: false,
       busy: false,
+      canDelete: true,
       page: 1,
       firstPageHref: '#/bank/accounts/12?page=1',
       ...overrides,
@@ -99,6 +100,13 @@ describe('LedgerTableHelper', () => {
 
     expect(handlers.onEdit).toHaveBeenCalledWith(ROWS[0]);
     expect(handlers.onDeleteTransaction).toHaveBeenCalledWith(ROWS[0]);
+  });
+
+  it('hides Delete but keeps Edit without the delete permission', () => {
+    const page = output({ canDelete: false });
+
+    expect(page.contains('Delete')).toBeFalse();
+    expect(page.contains('Edit')).toBeTrue();
   });
 
   it('hides every action on an archived account, keeping the ledger readable', () => {

@@ -19,11 +19,48 @@ function output(state = {}, account = {}) {
     context: { kind: 'personal' },
     base: '/bank/debts',
     details: React.createElement('p', null, 'Debt info'),
+    canManageAccounts: true,
+    canDelete: true,
     ...state,
   }, HANDLERS));
 }
 
 describe('AccountHeaderHelper', () => {
+  describe('permissions', () => {
+    it('hides Edit and Archive without the manage-accounts permission', () => {
+      const page = output({ canManageAccounts: false });
+
+      expect(page.containsAttribute('href', '#/bank/debts/7/edit')).toBeFalse();
+      expect(page.contains('Archive')).toBeFalse();
+      expect(page.contains('Delete')).toBeTrue();
+    });
+
+    it('hides Rename and Unarchive on an archived account without the permission', () => {
+      const page = output({ canManageAccounts: false }, { archived_at: '2026-02-01T00:00:00.000Z' });
+
+      expect(page.contains('Rename')).toBeFalse();
+      expect(page.contains('Unarchive')).toBeFalse();
+      expect(page.contains(ARCHIVED_BANNER)).toBeTrue();
+    });
+
+    it('hides Delete without the delete permission', () => {
+      const page = output({ canDelete: false });
+
+      expect(page.contains('Delete')).toBeFalse();
+      expect(page.containsAttribute('href', '#/bank/debts/7/edit')).toBeTrue();
+      expect(page.contains('Archive')).toBeTrue();
+    });
+
+    it('hides every action when the permissions are not given (role not yet known)', () => {
+      const page = output({ canManageAccounts: undefined, canDelete: undefined });
+
+      expect(page.containsAttribute('href', '#/bank/debts/7/edit')).toBeFalse();
+      expect(page.contains('Archive')).toBeFalse();
+      expect(page.contains('Delete')).toBeFalse();
+      expect(page.contains('Car loan')).toBeTrue();
+    });
+  });
+
   it('renders the name, the balance, then the section details', () => {
     expect(output().containsInOrder('Car loan', formatMoney('-9500.00', 'BRL'), 'Debt info')).toBeTrue();
   });

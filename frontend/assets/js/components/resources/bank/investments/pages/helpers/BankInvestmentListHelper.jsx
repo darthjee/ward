@@ -41,14 +41,16 @@ function renderRow(investment, context) {
  *
  * @param {Array<object>} investments - The investments, sorted by name.
  * @param {object} context - The active owner context.
+ * @param {boolean} canCreate - Whether the caller's role may create accounts (the empty state
+ *   shows its create link only then).
  * @returns {React.ReactElement} The table or the empty state.
  */
-function renderInvestments(investments, context) {
+function renderInvestments(investments, context, canCreate) {
   if (investments.length === 0) {
     return (
       <EmptyAccountList
         message="No investments yet"
-        href={contextHash(context, `${LIST_PATH}/new`)}
+        href={canCreate ? contextHash(context, `${LIST_PATH}/new`) : null}
         label="Create an investment"
       />
     );
@@ -75,13 +77,16 @@ function renderInvestments(investments, context) {
 /**
  * Render the body: the investments once loaded, a loading notice otherwise.
  *
- * @param {{accounts: (Array<object>|null), error: (object|null), context: object}} state -
+ * @param {{accounts: (Array<object>|null), error: (object|null), context: object,
+ *   canManageAccounts: boolean}} state -
  *   Page state.
  * @returns {React.ReactElement|null} The body.
  */
-function renderBody({ accounts, error, context }) {
+function renderBody({
+  accounts, error, context, canManageAccounts,
+}) {
   if (accounts) {
-    return renderInvestments(accounts, context);
+    return renderInvestments(accounts, context, canManageAccounts);
   }
 
   return error ? null : <p className="text-muted">Loading…</p>;
@@ -98,7 +103,7 @@ const BankInvestmentListHelper = {
    * since currencies may differ).
    *
    * @param {{accounts: (Array<object>|null), error: (object|null), archived: boolean,
-   *   context: object}} state - The loaded investments, the classified error, the archived
+   *   context: object, canManageAccounts: boolean}} state - The loaded investments, the classified error, the archived
    *   filter and the active owner context.
    * @param {{onRetry: Function, onDismiss: Function}} handlers - Alert handlers.
    * @returns {React.ReactElement} The rendered page.
@@ -111,6 +116,7 @@ const BankInvestmentListHelper = {
           base={LIST_PATH}
           context={state.context}
           archived={state.archived}
+          canCreate={state.canManageAccounts}
           newLabel="New investment"
         />
         <BankErrorAlert error={state.error} onRetry={handlers.onRetry} onDismiss={handlers.onDismiss} />

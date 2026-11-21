@@ -1,5 +1,9 @@
 import React from 'react';
 import CalendarEntry, { occurrenceKey } from '../../../../../../../../assets/js/components/resources/bank/calendar/common/CalendarEntry.jsx';
+import {
+  DEFAULT_OWNER_CONTEXT,
+  OwnerContext,
+} from '../../../../../../../../assets/js/components/common/ownerContext/hooks/useOwnerContext.js';
 import { renderedOutput } from '../../../../../../../support/renderedOutput.js';
 
 const PERSONAL = { kind: 'personal' };
@@ -21,12 +25,16 @@ function occ(overrides = {}) {
   };
 }
 
-function render(occurrence, context = PERSONAL) {
+function render(occurrence, context = PERSONAL, role = 'owner') {
   const noop = () => undefined;
 
-  return renderedOutput(React.createElement(CalendarEntry, {
-    context, occurrence, onPay: noop, onSkip: noop, onUndo: noop, variant: 'list',
-  }));
+  return renderedOutput(React.createElement(
+    OwnerContext.Provider,
+    { value: { ...DEFAULT_OWNER_CONTEXT, context, role } },
+    React.createElement(CalendarEntry, {
+      context, occurrence, onPay: noop, onSkip: noop, onUndo: noop, variant: 'list',
+    }),
+  ));
 }
 
 describe('CalendarEntry', () => {
@@ -117,6 +125,24 @@ describe('CalendarEntry', () => {
         expect(out.containsElement('button', 'Undo')).toBeTrue();
         expect(out.containsElement('button', 'Pay')).toBeFalse();
       });
+    });
+
+    it('offers Undo to an admin', () => {
+      expect(render(occ({ status: 'paid' }), ORG, 'admin').containsElement('button', 'Undo')).toBeTrue();
+    });
+
+    it('hides Undo from a user, keeping the entry', () => {
+      const out = render(occ({ status: 'paid' }), ORG, 'user');
+
+      expect(out.containsElement('button', 'Undo')).toBeFalse();
+      expect(out.contains('>Loan</a>')).toBeTrue();
+    });
+
+    it('keeps Pay and Skip for a user', () => {
+      const out = render(occ({ status: 'open' }), ORG, 'user');
+
+      expect(out.containsElement('button', 'Pay')).toBeTrue();
+      expect(out.containsElement('button', 'Skip')).toBeTrue();
     });
   });
 

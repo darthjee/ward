@@ -17,15 +17,26 @@ const STATUS_LABELS = new Map([
 export const EMPTY_HISTORY_TEXT = 'No bills paid or skipped yet.';
 
 /**
- * Render a row's Undo button, hidden while the account is archived.
+ * Whether the Undo column is shown: the account is active and the caller's role may undo.
+ *
+ * @param {{account: object, canUndo: boolean}} state - Helper state.
+ * @returns {boolean} True when Undo is offered.
+ */
+function showsUndo(state) {
+  return !state.account.archived_at && Boolean(state.canUndo);
+}
+
+/**
+ * Render a row's Undo button, hidden while the account is archived or when the caller's role
+ * may not undo payments.
  *
  * @param {object} payment - The history row.
- * @param {object} state - Helper state (`account`, `pending`).
+ * @param {object} state - Helper state (`account`, `pending`, `canUndo`).
  * @param {{onUndo: Function}} handlers - Row handlers.
- * @returns {React.ReactElement|null} The actions cell, or `null` on an archived account.
+ * @returns {React.ReactElement|null} The actions cell, or `null` when Undo is not offered.
  */
 function renderUndo(payment, state, handlers) {
-  if (state.account.archived_at) {
+  if (!showsUndo(state)) {
     return null;
   }
 
@@ -63,13 +74,13 @@ function renderRow(payment, state, handlers) {
 }
 
 /**
- * Render the header of the actions column, hidden while the account is archived.
+ * Render the header of the actions column, hidden whenever Undo is not offered.
  *
- * @param {object} account - The account.
+ * @param {object} state - Helper state (`account`, `canUndo`).
  * @returns {React.ReactElement|null} The header cell, or `null`.
  */
-function renderActionsHeader(account) {
-  return account.archived_at ? null : <th aria-label="Actions" />;
+function renderActionsHeader(state) {
+  return showsUndo(state) ? <th aria-label="Actions" /> : null;
 }
 
 /**
@@ -98,7 +109,7 @@ function renderBody(state, handlers) {
           <th className="text-end">Amount</th>
           <th>Paying account</th>
           <th>Bill</th>
-          {renderActionsHeader(state.account)}
+          {renderActionsHeader(state)}
         </tr>
       </thead>
       <tbody>{state.data.payments.map((payment) => renderRow(payment, state, handlers))}</tbody>
@@ -141,7 +152,8 @@ const BillHistoryHelper = {
    *
    * @param {{account: object, sourceType: string, page: number, data: (object|null),
    *   error: (object|null), pending: boolean, confirmation: (object|null),
-   *   selfHref: string}} state - Helper state.
+   *   selfHref: string, canUndo: boolean}} state - Helper state (`canUndo`: whether the
+   *   caller's role may undo payments).
    * @param {{onNavigate: Function, onUndo: Function, onConfirmUndo: Function,
    *   onCancelUndo: Function, onRetry: Function, onDismiss: Function}} handlers - Handlers.
    * @returns {React.ReactElement} The section.

@@ -12,7 +12,7 @@ import BankProviderListHelper from './helpers/BankProviderListHelper.jsx';
  */
 export default function BankProviderList() {
   const {
-    context, accounts, error, archived, notFound, handlers,
+    context, accounts, error, archived, notFound, canManageAccounts, handlers,
   } = useAccountList('provider_expense');
 
   if (notFound) {
@@ -20,6 +20,6 @@ export default function BankProviderList() {
   }
 
   return BankProviderListHelper.render({
-    accounts, error, archived, context,
+    accounts, error, archived, context, canManageAccounts,
   }, handlers);
 }

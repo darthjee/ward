@@ -61,7 +61,23 @@ describe('organization pages', () => {
     it('renders the loading state for the context organization', () => {
       const { state } = capture(inContext(OrganizationOverview), OrganizationOverviewHelper);
 
-      expect(state).toEqual({ org: null, loadError: null, context: ORG_CONTEXT });
+      expect(state).toEqual({
+        org: null, loadError: null, context: ORG_CONTEXT, canRename: false,
+      });
+    });
+
+    ['owner', 'admin'].forEach((role) => {
+      it(`allows an ${role} to rename`, () => {
+        const { state } = capture(inContext(OrganizationOverview, { role }), OrganizationOverviewHelper);
+
+        expect(state.canRename).toBeTrue();
+      });
+    });
+
+    it('does not allow a user to rename', () => {
+      const { state } = capture(inContext(OrganizationOverview, { role: 'user' }), OrganizationOverviewHelper);
+
+      expect(state.canRename).toBeFalse();
     });
   });
 

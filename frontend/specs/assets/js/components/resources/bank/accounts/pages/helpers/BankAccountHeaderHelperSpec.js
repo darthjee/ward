@@ -28,6 +28,8 @@ function output(state = {}, account = {}) {
     hasTransactions: false,
     actionPending: null,
     context: { kind: 'personal' },
+    canManageAccounts: true,
+    canDelete: true,
     ...state,
   }, HANDLERS));
 }

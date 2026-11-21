@@ -3,17 +3,18 @@ import { withHashQuery } from '../../../../../utils/routing/hashQuery.js';
 
 /**
  * Header of an accounts list page: the title, the *Show / Hide archived* toggle, any extra
- * section links (e.g. Providers' **Accountant hand-off**) and the create button, all linked
- * under the section base in the active context.
+ * section links (e.g. Providers' **Accountant hand-off**) and the create button (only when the
+ * caller's role may create accounts), all linked under the section base in the active context.
  *
  * @param {{title: string, base: string, context: object, archived: boolean,
- *   newLabel: string, children: React.ReactNode}} props - The page title, the section base
- *   path, the active owner context, whether archived rows are shown, the create button label
- *   and optional extra links rendered beside the create button.
+ *   newLabel: string, canCreate: boolean, children: React.ReactNode}} props - The page title,
+ *   the section base path, the active owner context, whether archived rows are shown, the
+ *   create button label, whether to offer the create button and optional extra links rendered
+ *   beside the create button.
  * @returns {React.ReactElement} The header.
  */
 export default function AccountListHeader({
-  title, base, context, archived, newLabel, children,
+  title, base, context, archived, newLabel, canCreate, children,
 }) {
   const listHash = contextHash(context, base);
   const toggleHash = withHashQuery(listHash, { archived: archived ? null : 'true' });
@@ -25,7 +26,7 @@ export default function AccountListHeader({
         {archived ? 'Hide archived' : 'Show archived'}
       </a>
       {children}
-      <a className="btn btn-primary" href={contextHash(context, `${base}/new`)}>{newLabel}</a>
+      {canCreate && <a className="btn btn-primary" href={contextHash(context, `${base}/new`)}>{newLabel}</a>}
     </div>
   );
 }

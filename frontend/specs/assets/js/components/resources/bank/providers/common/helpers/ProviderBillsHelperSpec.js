@@ -27,6 +27,7 @@ function state(overrides = {}) {
     pending: false,
     confirmation: null,
     selfHref: '#/bank/providers/7',
+    canDelete: true,
     ...overrides,
   };
 }
@@ -80,6 +81,15 @@ describe('ProviderBillsHelper', () => {
     expect(page.containsAttribute('href', '#/bank/bills/4/history')).toBeTrue();
     expect(page.contains('/bills/4/edit')).toBeTrue();
     expect(page.contains('Delete')).toBeTrue();
+  });
+
+  it('hides Delete but keeps Add bill, History and Edit without the delete permission', () => {
+    const page = output({ canDelete: false });
+
+    expect(page.contains('Delete')).toBeFalse();
+    expect(page.contains('Add bill')).toBeTrue();
+    expect(page.containsAttribute('href', '#/bank/bills/4/history')).toBeTrue();
+    expect(page.contains('/bills/4/edit')).toBeTrue();
   });
 
   it('renders the Actions header on an active provider', () => {

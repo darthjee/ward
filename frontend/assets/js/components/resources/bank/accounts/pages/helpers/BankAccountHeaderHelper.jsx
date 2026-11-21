@@ -35,8 +35,9 @@ const BankAccountHeaderHelper = {
    * (bank, branch, full account number, currency, opening date / balance, notes).
    *
    * @param {{account: object, hasTransactions: boolean, actionPending: (string|null),
-   *   context: object}} state - The account, the "has transactions" signal, the in-flight
-   *   action and the owner context.
+   *   context: object, canManageAccounts: boolean, canDelete: boolean}} state - The account,
+   *   the "has transactions" signal, the in-flight action, the owner context and the caller's
+   *   permissions.
    * @param {{onArchive: Function, onUnarchive: Function, onDeleteAccount: Function}} handlers -
    *   Action handlers.
    * @returns {React.ReactElement} The rendered header.

@@ -10,7 +10,7 @@ import { INVESTMENTS_BASE } from '../../../common/sections.js';
  * investment details.
  *
  * @param {object} header - Header state (`account`, `hasTransactions`, `actionPending`,
- *   `context`).
+ *   `context`, `canManageAccounts`, `canDelete`).
  * @param {object} handlers - Action handlers.
  * @returns {React.ReactElement} The header.
  */

@@ -12,7 +12,7 @@ import { PROVIDERS_BASE } from '../../../common/sections.js';
  * provider details.
  *
  * @param {object} header - Header state (`account`, `hasTransactions`, `actionPending`,
- *   `context`).
+ *   `context`, `canManageAccounts`, `canDelete`).
  * @param {object} handlers - Action handlers.
  * @returns {React.ReactElement} The header.
  */

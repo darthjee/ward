@@ -51,6 +51,8 @@ function state(overrides = {}, account = {}) {
     form: initialLedgerForm('2026-05-10'),
     actionPending: null,
     confirmation: null,
+    canManageAccounts: true,
+    canDelete: true,
     markUnsentPending: false,
     ...overrides,
   };

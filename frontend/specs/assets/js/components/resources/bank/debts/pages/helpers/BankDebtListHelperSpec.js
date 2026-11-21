@@ -39,7 +39,7 @@ const handlers = { onRetry: () => undefined, onDismiss: () => undefined };
 
 function output(state = {}) {
   return renderedOutput(BankDebtListHelper.render({
-    accounts: DEBTS, error: null, archived: false, context: PERSONAL, ...state,
+    accounts: DEBTS, error: null, archived: false, context: PERSONAL, canManageAccounts: true, ...state,
   }, handlers));
 }
 
@@ -93,6 +93,16 @@ describe('BankDebtListHelper', () => {
     expect(page.containsAttribute('href', '#/orgs/5/bank/debts/1')).toBeTrue();
     expect(page.containsAttribute('href', '#/orgs/5/bank/debts/new')).toBeTrue();
     expect(page.containsInOrder('href="#/orgs/5/bank/debts"', 'Hide archived')).toBeTrue();
+  });
+
+  it('hides New and the empty-state create link without the manage-accounts permission', () => {
+    const list = output({ canManageAccounts: false });
+    const empty = output({ accounts: [], canManageAccounts: false });
+
+    expect(list.contains('New debt')).toBeFalse();
+    expect(list.containsAttribute('href', '#/bank/debts/new')).toBeFalse();
+    expect(empty.contains('No debts yet')).toBeTrue();
+    expect(empty.contains('Create a debt')).toBeFalse();
   });
 
   it('renders the empty state with a create button', () => {

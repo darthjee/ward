@@ -27,6 +27,8 @@ function state(overrides = {}) {
     form: initialLedgerForm('2026-05-10'),
     actionPending: null,
     confirmation: null,
+    canManageAccounts: true,
+    canDelete: true,
     ...overrides,
   };
 }
@@ -51,8 +53,39 @@ describe('AccountDetailHelper', () => {
     renderedOutput(AccountDetailHelper.render(state(), HANDLERS, options));
 
     expect(options.renderHeader).toHaveBeenCalledWith({
-      account: ACCOUNT, hasTransactions: false, actionPending: null, context: { kind: 'personal' },
+      account: ACCOUNT,
+      hasTransactions: false,
+      actionPending: null,
+      context: { kind: 'personal' },
+      canManageAccounts: true,
+      canDelete: true,
     }, HANDLERS);
+  });
+
+  it('passes the permissions to the header and hides the ledger Delete without delete', () => {
+    const page = renderedOutput(AccountDetailHelper.render(
+      state({
+        canManageAccounts: false,
+        canDelete: false,
+        data: {
+          account: ACCOUNT,
+          ledger: {
+            ...LEDGER,
+            transactions: [{
+              id: 9, date: '2026-02-01', description: 'Coffee', amount: '-1.00', balance: '0.00',
+            }],
+          },
+        },
+      }),
+      HANDLERS,
+      options,
+    ));
+
+    expect(options.renderHeader.calls.mostRecent().args[0]).toEqual(jasmine.objectContaining({
+      canManageAccounts: false, canDelete: false,
+    }));
+    expect(page.contains('>Delete<')).toBeFalse();
+    expect(page.contains('>Edit<')).toBeTrue();
   });
 
   it('renders the shortcuts slot between the Ledger heading and the inline form', () => {

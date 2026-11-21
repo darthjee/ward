@@ -1,9 +1,12 @@
 import useBillHistory from './hooks/useBillHistory.js';
 import BillHistoryHelper from './helpers/BillHistoryHelper.jsx';
+import useCan from '../../../../common/ownerContext/hooks/useCan.js';
+import { ACTIONS } from '../../../../../utils/permissions/orgPermissions.js';
 
 /**
  * The **Bill history** of a debt account or of one provider bill (`billId`): its paid and
- * skipped bills, newest due date first, paginated, each with **Undo** (hidden while the account is archived).
+ * skipped bills, newest due date first, paginated, each with **Undo** (hidden while the account
+ * is archived, or when the caller's role may not undo payments).
  *
  * @param {object} props - Component props.
  * @param {object} props.context - The owner context.
@@ -19,6 +22,9 @@ export default function BillHistory({
   const { state, handlers } = useBillHistory({
     context, account, onUndone, billId,
   });
+  const canUndo = useCan(ACTIONS.UNDO_PAYMENT);
 
-  return BillHistoryHelper.render({ ...state, account, sourceType }, handlers);
+  return BillHistoryHelper.render({
+    ...state, account, sourceType, canUndo,
+  }, handlers);
 }

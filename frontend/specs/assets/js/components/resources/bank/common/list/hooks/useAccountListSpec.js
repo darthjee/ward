@@ -9,7 +9,7 @@ import { installFakeWindow, uninstallFakeWindow } from '../../../../../../../../
 
 const ORG = { kind: 'organization', orgId: 5 };
 
-function probe(context = DEFAULT_OWNER_CONTEXT.context) {
+function probe(context = DEFAULT_OWNER_CONTEXT.context, role = 'owner') {
   let result;
   const Probe = () => {
     result = useAccountList('debt');
@@ -18,7 +18,7 @@ function probe(context = DEFAULT_OWNER_CONTEXT.context) {
 
   renderToStaticMarkup(React.createElement(
     OwnerContext.Provider,
-    { value: { ...DEFAULT_OWNER_CONTEXT, context, userId: 1 } },
+    { value: { ...DEFAULT_OWNER_CONTEXT, context, userId: 1, role } },
     React.createElement(Probe),
   ));
 
@@ -34,6 +34,12 @@ describe('useAccountList', () => {
     expect(probe(ORG)).toEqual(jasmine.objectContaining({
       context: ORG, accounts: null, error: null, archived: false, notFound: false,
     }));
+  });
+
+  it('lets an owner or admin manage accounts, but not a user', () => {
+    expect(probe(ORG, 'owner').canManageAccounts).toBeTrue();
+    expect(probe(ORG, 'admin').canManageAccounts).toBeTrue();
+    expect(probe(ORG, 'user').canManageAccounts).toBeFalse();
   });
 
   it('reads ?archived=true from the hash', () => {
