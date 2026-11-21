@@ -8,6 +8,7 @@ import { CurrentOwner } from '../current-owner.decorator.js';
 import { HttpExceptionFilter } from '../http-exception.filter.js';
 import { LazyModuleLoaderService } from '../lazy-module-loader.service.js';
 import { LoggingModule } from '../logging.module.js';
+import type { OrgRole } from '../org-role.js';
 import { ORGANIZATION_MEMBERSHIP_LOOKUP, type OrganizationMembershipLookup } from '../organization-membership-lookup.js';
 import { OwnerContextGuard } from '../owner-context.guard.js';
 import type { OwnerContext } from '../owner-context.js';
@@ -20,14 +21,14 @@ import { OwnerScopedController } from '../owner-scoped.decorator.js';
 // it exactly like here — this spec's controller even resolves its service through
 // `LazyModuleLoaderService`, as a lazy module's controller does.
 
-const MEMBERSHIPS = new Set(['7:3']);
+const MEMBERSHIPS = new Map<string, OrgRole>([['7:3', 'owner']]);
 
 class FakeMembershipLookup implements OrganizationMembershipLookup {
   calls: Array<[number, number]> = [];
 
-  async isMember(userId: number, orgId: number): Promise<boolean> {
+  async findRole(userId: number, orgId: number): Promise<OrgRole | null> {
     this.calls.push([userId, orgId]);
-    return MEMBERSHIPS.has(`${userId}:${orgId}`);
+    return MEMBERSHIPS.get(`${userId}:${orgId}`) ?? null;
   }
 }
 
@@ -121,7 +122,7 @@ describe('owner-scoped mechanism without the auth module (e2e)', () => {
       .set('x-test-user', '7')
       .expect(200);
 
-    expect(response.body).toEqual({ owner: { kind: 'organization', organizationId: 3 }, lazy: true });
+    expect(response.body).toEqual({ owner: { kind: 'organization', organizationId: 3, role: 'owner' }, lazy: true });
     expect(lookup.calls).toEqual([[7, 3]]);
   });
 

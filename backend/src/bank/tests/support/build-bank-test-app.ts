@@ -9,6 +9,7 @@ import { CacheInvalidationInterceptor } from '../../../core/cache-invalidation.i
 import { CachePolicyInterceptor } from '../../../core/cache-policy.interceptor.js';
 import { HttpExceptionFilter } from '../../../core/http-exception.filter.js';
 import { LoggingModule } from '../../../core/logging.module.js';
+import { OrgRole } from '../../../core/org-role.js';
 import { ORGANIZATION_MEMBERSHIP_LOOKUP, type OrganizationMembershipLookup } from '../../../core/organization-membership-lookup.js';
 import { OwnerContextGuard } from '../../../core/owner-context.guard.js';
 import { BankRoutesModule } from '../../bank-routes.module.js';
@@ -38,11 +39,15 @@ export const ADMIN = '9';
 export const ALICE_ORG = 3;
 export const BOB_ORG = 4;
 
-const MEMBERSHIPS = new Set([`${ALICE}:${ALICE_ORG}`, `${BOB}:${BOB_ORG}`]);
-
+// Per-app memberships (`"<userId>:<orgId>"` -> role); the defaults are both `owner`.
 class FakeMembershipLookup implements OrganizationMembershipLookup {
-  async isMember(userId: number, orgId: number): Promise<boolean> {
-    return MEMBERSHIPS.has(`${userId}:${orgId}`);
+  readonly memberships = new Map<string, OrgRole>([
+    [`${ALICE}:${ALICE_ORG}`, OrgRole.OWNER],
+    [`${BOB}:${BOB_ORG}`, OrgRole.OWNER],
+  ]);
+
+  async findRole(userId: number, orgId: number): Promise<OrgRole | null> {
+    return this.memberships.get(`${userId}:${orgId}`) ?? null;
   }
 }
 
@@ -63,6 +68,8 @@ class StubUserGuard implements CanActivate {
 export interface BankTestApp {
   app: INestApplication;
   repos: InMemoryBankRepos;
+  /** Seeds (or replaces) a membership for this app only — joining arrives in #82. */
+  seedMembership: (userId: string | number, orgId: number, role: OrgRole) => void;
 }
 
 function fakeDataSource(repos: InMemoryBankRepos) {
@@ -87,10 +94,12 @@ function fakeDataSource(repos: InMemoryBankRepos) {
 /**
  * Builds the bank e2e app.
  * @param {Record<string, string>} config - Config values (e.g. `BANK_DEFAULT_CURRENCY`).
- * @returns {Promise<BankTestApp>} The initialised app and its in-memory repositories.
+ * @returns {Promise<BankTestApp>} The initialised app, its in-memory repositories and a
+ *   membership seeding helper.
  */
 export async function buildBankTestApp(config: Record<string, string> = {}): Promise<BankTestApp> {
   const repos = createInMemoryBankRepos();
+  const lookup = new FakeMembershipLookup();
   const values: Record<string, string> = { WARD_LOG_LEVEL: 'error', ...config };
 
   @Global()
@@ -106,7 +115,7 @@ export async function buildBankTestApp(config: Record<string, string> = {}): Pro
   @Module({
     imports: [FakeInfrastructureModule, LoggingModule, BankRoutesModule],
     providers: [
-      { provide: ORGANIZATION_MEMBERSHIP_LOOKUP, useValue: new FakeMembershipLookup() },
+      { provide: ORGANIZATION_MEMBERSHIP_LOOKUP, useValue: lookup },
       { provide: APP_GUARD, useClass: StubUserGuard },
       { provide: APP_GUARD, useClass: OwnerContextGuard },
       { provide: APP_INTERCEPTOR, useClass: CachePolicyInterceptor },
@@ -120,7 +129,11 @@ export async function buildBankTestApp(config: Record<string, string> = {}): Pro
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
   await app.init();
 
-  return { app, repos };
+  const seedMembership = (userId: string | number, orgId: number, role: OrgRole): void => {
+    lookup.memberships.set(`${userId}:${orgId}`, role);
+  };
+
+  return { app, repos, seedMembership };
 }
 
 type TransactionFn = <R>(work: (manager: unknown) => Promise<R>) => Promise<R>;

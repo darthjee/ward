@@ -1,15 +1,19 @@
-import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { ErrorCodes } from '../../core/error-codes.js';
+import type { OwnerContext } from '../../core/owner-context.js';
 import { ownerNotFound } from '../../core/parse-id.js';
 import { AccountTypeRegistry } from '../account-types/account-type.registry.js';
 import { ProviderExpenseAccountHandler } from '../account-types/provider-expense-account.handler.js';
 import { RegularAccountHandler } from '../account-types/regular-account.handler.js';
 import type { CreateTransactionDto } from '../dto/create-transaction.dto.js';
-import type { Account } from '../entities/account.entity.js';
+import { Account } from '../entities/account.entity.js';
+import { BillPayment } from '../entities/bill-payment.entity.js';
 import { Transaction } from '../entities/transaction.entity.js';
 import type { LedgerRow } from '../ledger.query.js';
 import { TransactionService } from '../transaction.service.js';
 import { buildAccount, NO_BILLS_SUMMARY, ORGANIZATION, PERSONAL } from './account.test-support.js';
+import { createInMemoryBankRepo } from './support/in-memory-bank-repos.js';
+import { PaymentGeneratedQuery } from './support/in-memory-payment-generated.query.js';
 
 function buildTransaction(overrides: Partial<Transaction> = {}): Transaction {
   return Object.assign(new Transaction(), {
@@ -50,15 +54,25 @@ function setup(account: Account | null = buildAccount(), stored: Transaction | n
     page: jest.fn(async (): Promise<LedgerRow[]> => []),
     openingEffective: jest.fn(async () => 100000n),
   };
+  const billPaymentRepository = createInMemoryBankRepo(BillPayment);
+  // Source accounts of the seeded bill payments: 1 belongs to ORGANIZATION (3), 2 to another organization.
+  const accountRepository = createInMemoryBankRepo(Account);
+  accountRepository.rows.push(
+    buildAccount({ id: 1, userId: null, organizationId: 3 }),
+    buildAccount({ id: 2, userId: null, organizationId: 4 }),
+  );
+  const paymentGenerated = new PaymentGeneratedQuery(billPaymentRepository, accountRepository);
+  jest.spyOn(paymentGenerated, 'isPaymentGenerated');
   const registry = new AccountTypeRegistry([new RegularAccountHandler(), new ProviderExpenseAccountHandler(NO_BILLS_SUMMARY)]);
   const service = new TransactionService(
     transactionRepository as never,
+    paymentGenerated as never,
     accounts as never,
     registry,
     ledgerQuery as never,
   );
 
-  return { service, transactionRepository, accounts, ledgerQuery };
+  return { service, transactionRepository, billPaymentRepository, paymentGenerated, accounts, ledgerQuery };
 }
 
 const createDto = (fields: Partial<CreateTransactionDto> = {}): CreateTransactionDto =>
@@ -235,6 +249,82 @@ describe('TransactionService', () => {
           sent_to_accountant_at: SENT_AT,
         });
       });
+    });
+
+    describe('on a payment-generated transaction', () => {
+      const asRole = (role: 'owner' | 'admin' | 'user') => ({ ...ORGANIZATION, role });
+      const COLUMNS = ['paymentTransactionId', 'withdrawalTransactionId', 'chargeTransactionId'] as const;
+      const generatedBy = (column: (typeof COLUMNS)[number], sourceAccountId = 1) => {
+        const context = setup();
+        context.billPaymentRepository.rows.push(Object.assign(new BillPayment(), { id: 1, sourceAccountId, [column]: 5 }));
+
+        return context;
+      };
+
+      it.each(COLUMNS)('forbids an organization user when referenced by %s', async (column) => {
+        const { service, transactionRepository } = generatedBy(column);
+        const error = await service.update(asRole('user'), 1, 5, { description: 'Tea' }).catch((caught: unknown) => caught);
+
+        expect(error).toBeInstanceOf(ForbiddenException);
+        expect((error as ForbiddenException).getResponse()).toEqual({ statusCode: 403, message: 'Forbidden' });
+        expect(transactionRepository.save).not.toHaveBeenCalled();
+      });
+
+      it('runs one owner-scoped lookup for a user', async () => {
+        const { service, paymentGenerated } = generatedBy('chargeTransactionId');
+
+        await service.update(asRole('user'), 1, 5, {}).catch(() => undefined);
+
+        expect(paymentGenerated.isPaymentGenerated).toHaveBeenCalledTimes(1);
+        expect(paymentGenerated.isPaymentGenerated).toHaveBeenCalledWith(asRole('user'), 5);
+      });
+
+      it.each(COLUMNS)('ignores a bill payment of another owner context referencing the id by %s', async (column) => {
+        const { service, transactionRepository, paymentGenerated } = generatedBy(column, 2);
+
+        await service.update(asRole('user'), 1, 5, { description: 'Tea' });
+
+        expect(paymentGenerated.isPaymentGenerated).toHaveBeenCalledTimes(1);
+        expect(transactionRepository.save).toHaveBeenCalled();
+      });
+
+      it('fails closed: an unknown role is checked like a user', async () => {
+        const { service, transactionRepository, paymentGenerated } = generatedBy('paymentTransactionId');
+        const unknown = { ...ORGANIZATION, role: 'guest' } as unknown as OwnerContext;
+
+        await expect(service.update(unknown, 1, 5, { description: 'Tea' })).rejects.toThrow(ForbiddenException);
+        expect(paymentGenerated.isPaymentGenerated).toHaveBeenCalledTimes(1);
+        expect(transactionRepository.save).not.toHaveBeenCalled();
+      });
+
+      it.each([
+        ['an organization admin', asRole('admin')],
+        ['an organization owner', asRole('owner')],
+        ['the personal context', PERSONAL],
+      ])('allows %s without running the query', async (_label, owner) => {
+        const { service, transactionRepository, paymentGenerated } = generatedBy('paymentTransactionId');
+
+        await service.update(owner, 1, 5, { description: 'Tea' });
+
+        expect(transactionRepository.save).toHaveBeenCalled();
+        expect(paymentGenerated.isPaymentGenerated).not.toHaveBeenCalled();
+      });
+    });
+
+    it('allows an organization user to edit a plain transaction', async () => {
+      const { service, transactionRepository, paymentGenerated } = setup();
+
+      await service.update({ ...ORGANIZATION, role: 'user' }, 1, 5, { description: 'Tea' });
+
+      expect(paymentGenerated.isPaymentGenerated).toHaveBeenCalledTimes(1);
+      expect(transactionRepository.save).toHaveBeenCalled();
+    });
+
+    it('answers 404 for an unknown transaction as a user, without the payment-generated lookup', async () => {
+      const { service, paymentGenerated } = setup(buildAccount(), null);
+
+      await expect(service.update({ ...ORGANIZATION, role: 'user' }, 1, 5, {})).rejects.toThrow(NotFoundException);
+      expect(paymentGenerated.isPaymentGenerated).not.toHaveBeenCalled();
     });
 
     it('never touches the mark of a positive amount on another account type', async () => {

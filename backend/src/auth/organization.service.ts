@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
+import { hasMinRole, OrgRole, orgRoleForbidden } from '../core/org-role.js';
 import type { OrganizationMembershipLookup } from '../core/organization-membership-lookup.js';
 import { ownerNotFound } from '../core/parse-org-id.js';
 import { MembershipRole, OrganizationMembership } from './entities/organization-membership.entity.js';
@@ -21,7 +22,8 @@ export interface MembershipWithOrganization {
 /**
  * Organizations and memberships (exported by `AuthModule`: other modules read
  * memberships only through it, never by querying the tables). Also Core's
- * `ORGANIZATION_MEMBERSHIP_LOOKUP` implementation, used by `OwnerContextGuard`.
+ * `ORGANIZATION_MEMBERSHIP_LOOKUP` implementation (`findRole`), used by
+ * `OwnerContextGuard` to resolve the caller's role.
  *
  * Every lookup is scoped to the caller's own membership: there is no global
  * admin bypass and no caching between requests. A non-member gets the same
@@ -45,15 +47,20 @@ export class OrganizationService implements OrganizationMembershipLookup {
   }
 
   /**
-   * Checks membership with one lookup on the unique `(organization_id, user_id)`
+   * Resolves the user's role with one lookup on the unique `(organization_id, user_id)`
    * key, without first checking that the organization exists (same cost for an
    * unknown organization, so organizations cannot be enumerated).
    * @param {number} userId - The user's id.
    * @param {number} orgId - The organization's id.
-   * @returns {Promise<boolean>} Whether the user is a member.
+   * @returns {Promise<OrgRole | null>} The member's role, or `null` when the user is not a member.
    */
-  async isMember(userId: number, orgId: number): Promise<boolean> {
-    return this.membershipRepository.existsBy({ organizationId: orgId, userId });
+  async findRole(userId: number, orgId: number): Promise<OrgRole | null> {
+    const row = await this.membershipRepository.findOne({
+      where: { organizationId: orgId, userId },
+      select: { role: true },
+    });
+
+    return row?.role ?? null;
   }
 
   /**
@@ -115,18 +122,25 @@ export class OrganizationService implements OrganizationMembershipLookup {
   }
 
   /**
-   * Renames an organization the user is a member of (any role; last write wins).
+   * Renames an organization the user is an `admin` or `owner` of (last write wins among them).
+   * The membership is checked first, so a non-member gets the uniform 404 before a `user` gets
+   * the uniform 403.
    * @param {number} userId - The user's id.
    * @param {number} orgId - The organization's id.
    * @param {string} name - The validated, trimmed new name.
    * @returns {Promise<MemberOrganization>} The renamed organization with the user's role.
    * @throws {NotFoundException} The uniform 404 when the user is not a member.
+   * @throws {ForbiddenException} The uniform 403 when the member's role is below `admin`.
    */
   async rename(userId: number, orgId: number, name: string): Promise<MemberOrganization> {
     const found = await this.findMembership(userId, orgId);
 
     if (!found) {
       throw ownerNotFound();
+    }
+
+    if (!hasMinRole(found.membership.role, OrgRole.ADMIN)) {
+      throw orgRoleForbidden();
     }
 
     found.organization.name = name;

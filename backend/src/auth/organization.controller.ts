@@ -18,6 +18,8 @@ import { StrictBody } from '../core/strict-validation.pipe.js';
  * (taken as a raw string, never a number, so `1e3` cannot become `1000`) and
  * checks membership through the service; every miss (unknown, malformed,
  * non-member — including a non-member global admin) answers the uniform 404.
+ * Renaming needs the `admin` or `owner` role (uniform 403 for a `user`); the
+ * order is 400 body → 404 membership → 403 role.
  * Bodies come only through `@StrictBody()`, so unknown fields (`role`,
  * `organizationId`) answer 400. Cache class: `never` at the controller level,
  * narrowed to `user-scoped` on the GETs. Writes declare the paths they invalidate
@@ -87,10 +89,12 @@ export class OrganizationController {
   }
 
   /**
-   * `PATCH /orgs/:orgId.json`. Renames an organization the caller is a member of. The body is
-   * validated before `:orgId` or membership is checked, so an invalid body answers 400 even for an
-   * unknown or foreign organization; this is deliberate, as the 400 depends only on the body and
-   * cannot be used to enumerate organizations (owner-scoped routes answer their 404 first instead).
+   * `PATCH /orgs/:orgId.json`. Renames an organization the caller is an `admin` or `owner` of.
+   * The order is 400 body → 404 membership → 403 role. The body is validated before `:orgId` or
+   * membership is checked, so an invalid body answers 400 even for an unknown or foreign
+   * organization; this is deliberate, as the 400 depends only on the body and cannot be used to
+   * enumerate organizations (owner-scoped routes answer their 404 first instead). A member whose
+   * role is `user` gets the uniform 403, after the membership check.
    * @param {AccessTokenPayload} caller - The authenticated user.
    * @param {string} rawOrgId - The raw `:orgId` route parameter.
    * @param {OrganizationNameDto} dto - The new name (only field accepted, required).

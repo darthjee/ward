@@ -3,6 +3,8 @@ import { BankModuleLoader } from './bank-module.loader.js';
 import { CacheClass } from '../core/cache-class.js';
 import { CachePolicy } from '../core/cache-policy.decorator.js';
 import { CurrentOwner } from '../core/current-owner.decorator.js';
+import { MinOrgRole } from '../core/min-org-role.decorator.js';
+import { OrgRole } from '../core/org-role.js';
 import type { OwnerContext } from '../core/owner-context.js';
 import { OwnerScopedController } from '../core/owner-scoped.decorator.js';
 import { parseId } from '../core/parse-id.js';
@@ -63,6 +65,7 @@ export class ProviderBillsController {
    * @returns {Promise<ProviderBillResponse>} The created bill.
    */
   @Post('accounts/:accountId/provider-bills.json')
+  @MinOrgRole(OrgRole.USER)
   @CachePolicy(CacheClass.Never)
   async create(
     @CurrentOwner() owner: OwnerContext,
@@ -97,6 +100,7 @@ export class ProviderBillsController {
    * @returns {Promise<ProviderBillResponse>} The updated bill.
    */
   @Patch('provider-bills/:id.json')
+  @MinOrgRole(OrgRole.USER)
   @CachePolicy(CacheClass.Never)
   async update(
     @CurrentOwner() owner: OwnerContext,
@@ -116,6 +120,7 @@ export class ProviderBillsController {
    * @returns {Promise<void>}
    */
   @Delete('provider-bills/:id.json')
+  @MinOrgRole(OrgRole.ADMIN)
   @CachePolicy(CacheClass.Never)
   @HttpCode(HttpStatus.NO_CONTENT)
   async remove(@CurrentOwner() owner: OwnerContext, @Param('id') rawId: string): Promise<void> {

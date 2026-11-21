@@ -1,8 +1,31 @@
 import type { INestApplication } from '@nestjs/common';
-import { ADMIN, ALICE, ALICE_ORG, base, BOB, BOB_ORG, createAccount, send } from './build-bank-test-app.js';
+import { ADMIN, ALICE, ALICE_ORG, base, type BankTestApp, BOB, BOB_ORG, createAccount, send } from './build-bank-test-app.js';
+import { OrgRole } from '../../../core/org-role.js';
 
 // Fixtures and cases for the owner-context 404 matrix (regular.md / transactions.md *Required
 // tests*, and the record-level tests of auth/organizations.md moved from #46).
+
+/** The uniform owner-scoped 404 body, without its timestamp (compare with `withoutTimestamp`). */
+export const UNIFORM_404 = { error: { code: 'NOT_FOUND', message: 'Not Found' }, statusCode: 404 };
+
+/** The uniform organization-role 403 body, without its timestamp (compare with `withoutTimestamp`). */
+export const UNIFORM_403 = { error: { code: 'FORBIDDEN', message: 'Forbidden' }, statusCode: 403 };
+
+/** Extra members of `ALICE_ORG`, one per role (seeded with {@link seedOrgRoles}). */
+export const ORG_MEMBERS: Record<OrgRole, string> = {
+  [OrgRole.OWNER]: '20',
+  [OrgRole.ADMIN]: '21',
+  [OrgRole.USER]: '22',
+};
+
+/**
+ * Seeds {@link ORG_MEMBERS} on `ALICE_ORG` (joining arrives in #82).
+ * @param {BankTestApp['seedMembership']} seedMembership - The harness seeding helper.
+ * @returns {void}
+ */
+export function seedOrgRoles(seedMembership: BankTestApp['seedMembership']): void {
+  Object.entries(ORG_MEMBERS).forEach(([role, user]) => seedMembership(user, ALICE_ORG, role as OrgRole));
+}
 
 export interface OwnerFixtures {
   alicePersonal: number;

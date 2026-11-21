@@ -1,18 +1,14 @@
 import { Column, CreateDateColumn, Entity, Index, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
+import { OrgRole } from '../../core/org-role.js';
 
 /**
- * A member's role in an organization. Stored but **not enforced** (every member
- * can do every in-scope action), and distinct from Ward's global `User.isAdmin`.
+ * A member's role in an organization — an alias of `core`'s {@link OrgRole}.
+ * Roles are enforced (see `@MinOrgRole` and `hasMinRole`) in the order
+ * `user` < `admin` < `owner`, and are distinct from Ward's global `User.isAdmin`.
+ * The organization's creator is its `owner`.
  */
-export const MembershipRole = {
-  /** The organization's single owner — its creator. */
-  OWNER: 'owner',
-  /** Reserved for the future permission system. */
-  ADMIN: 'admin',
-  /** A regular member (future invited members join as `user`). */
-  USER: 'user',
-} as const;
-export type MembershipRole = typeof MembershipRole[keyof typeof MembershipRole];
+export const MembershipRole = OrgRole;
+export type MembershipRole = OrgRole;
 
 /**
  * A user's membership of an organization, with their role in it. Owns table

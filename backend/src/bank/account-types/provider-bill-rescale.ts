@@ -1,6 +1,6 @@
 import type { EntityManager } from 'typeorm';
 import { IsNull } from 'typeorm';
-import type { OwnerContext } from '../../core/owner-context.js';
+import type { OwnerScope } from '../../core/owner-context.js';
 import { accountOwnerWhere } from '../account-fields.js';
 import { convertAmountInput } from '../amount-input.js';
 import { accountNotFoundInBody, currencyMismatch } from '../body-reference-errors.js';
@@ -10,9 +10,9 @@ import { PAYING_ACCOUNT_TYPE } from '../paying-account.resolver.js';
 
 /**
  * @param {Account} account - An account.
- * @returns {OwnerContext} Its owner, as the routes would resolve it.
+ * @returns {OwnerScope} Its data owner scope.
  */
-function ownerOf(account: Account): OwnerContext {
+function ownerOf(account: Account): OwnerScope {
   return account.userId === null
     ? { kind: 'organization', organizationId: account.organizationId as number }
     : { kind: 'user', userId: account.userId };

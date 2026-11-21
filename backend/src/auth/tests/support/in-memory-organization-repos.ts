@@ -4,13 +4,10 @@ import { Organization } from '../../entities/organization.entity.js';
 
 type InMemoryRepo<T extends { id?: number }> = ReturnType<typeof createInMemoryRepo<T>>;
 
-export type InMemoryOrganizationRepo = Omit<InMemoryRepo<Organization>, 'manager'> &
-  OrganizationRepoExtras<Organization>;
-export type InMemoryMembershipRepo = Omit<InMemoryRepo<OrganizationMembership>, 'manager'> &
-  OrganizationRepoExtras<OrganizationMembership>;
+export type InMemoryOrganizationRepo = Omit<InMemoryRepo<Organization>, 'manager'> & OrganizationRepoExtras;
+export type InMemoryMembershipRepo = Omit<InMemoryRepo<OrganizationMembership>, 'manager'> & OrganizationRepoExtras;
 
-interface OrganizationRepoExtras<T> {
-  existsBy: (where: Partial<T>) => Promise<boolean>;
+interface OrganizationRepoExtras {
   manager: { transaction: <R>(callback: (manager: FakeManager) => Promise<R>) => Promise<R> };
 }
 
@@ -19,22 +16,21 @@ interface FakeManager {
 }
 
 // Adds what `OrganizationService` needs on top of `createInMemoryRepo()`:
-// - `save` stamps `updatedAt` on every save (and `createdAt` on insert), like
-//   TypeORM's `@CreateDateColumn`/`@UpdateDateColumn`, so serialized
-//   organizations always carry both timestamps;
-// - `existsBy`, used by `isMember`.
+// `save` stamps `updatedAt` on every save (and `createdAt` on insert), like
+// TypeORM's `@CreateDateColumn`/`@UpdateDateColumn`, so serialized
+// organizations always carry both timestamps. `findRole` goes through the base
+// `findOne({ where, select })` (the fake ignores `select`).
 function withOrganizationExtras<T extends { id?: number; createdAt?: Date; updatedAt?: Date }>(
   repo: InMemoryRepo<T>,
-): InMemoryRepo<T> & Omit<OrganizationRepoExtras<T>, 'manager'> {
+): InMemoryRepo<T> {
   const save = async (entity: T): Promise<T> => {
     const now = new Date();
     entity.createdAt ??= now;
     entity.updatedAt = now;
     return repo.save(entity);
   };
-  const existsBy = async (where: Partial<T>): Promise<boolean> => (await repo.findOneBy(where)) !== null;
 
-  return { ...repo, save, existsBy };
+  return { ...repo, save };
 }
 
 // Builds the in-memory `Organization` and `OrganizationMembership` repos sharing

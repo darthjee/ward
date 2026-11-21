@@ -4,14 +4,14 @@ import { ownerColumns } from '../../../bank/account-fields.js';
 import { AccountantChargesQuery, PREVIEW_MAX_ROWS } from '../../../bank/accountant-charges.query.js';
 import { Account } from '../../../bank/entities/account.entity.js';
 import { Transaction } from '../../../bank/entities/transaction.entity.js';
-import type { OwnerContext } from '../../../core/owner-context.js';
+import type { OwnerScope } from '../../../core/owner-context.js';
 
-const ALICE: OwnerContext = { kind: 'user', userId: 1 };
-const BOB: OwnerContext = { kind: 'user', userId: 2 };
-const ALICE_ORG: OwnerContext = { kind: 'organization', organizationId: 1 };
+const ALICE: OwnerScope = { kind: 'user', userId: 1 };
+const BOB: OwnerScope = { kind: 'user', userId: 2 };
+const ALICE_ORG: OwnerScope = { kind: 'organization', organizationId: 1 };
 
 interface AccountFields {
-  owner?: OwnerContext;
+  owner?: OwnerScope;
   type?: string;
   forAccountant?: boolean | null;
   archived?: boolean;

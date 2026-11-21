@@ -1,5 +1,5 @@
 import type { FindOptionsWhere } from 'typeorm';
-import { ownerWhere, type OwnerContext } from '../core/owner-context.js';
+import { ownerWhere, type OwnerScope } from '../core/owner-context.js';
 import type { UpdateAccountDto } from './dto/update-account.dto.js';
 import type { Account } from './entities/account.entity.js';
 
@@ -14,22 +14,22 @@ const COPIED_FIELDS = [
 ] as const;
 
 /**
- * @param {OwnerContext} owner - The resolved owner.
+ * @param {OwnerScope} owner - The data owner scope.
  * @returns {Pick<Account, 'userId' | 'organizationId'>} The owner columns of a
  *   new account: exactly one is set, always from the route, never the body.
  */
-export function ownerColumns(owner: OwnerContext): Pick<Account, 'userId' | 'organizationId'> {
+export function ownerColumns(owner: OwnerScope): Pick<Account, 'userId' | 'organizationId'> {
   return owner.kind === 'user'
     ? { userId: owner.userId, organizationId: null }
     : { userId: null, organizationId: owner.organizationId };
 }
 
 /**
- * @param {OwnerContext} owner - The resolved owner.
+ * @param {OwnerScope} owner - The data owner scope.
  * @returns {FindOptionsWhere<Account>} `ownerWhere(owner)`, typed for the
  *   `Account` repository: both owner columns are always constrained.
  */
-export function accountOwnerWhere(owner: OwnerContext): FindOptionsWhere<Account> {
+export function accountOwnerWhere(owner: OwnerScope): FindOptionsWhere<Account> {
   return ownerWhere(owner) as FindOptionsWhere<Account>;
 }
 

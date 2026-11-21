@@ -63,7 +63,7 @@ describe('CacheInvalidationInterceptor', () => {
     });
 
     it('emits the organization prefix for an organization owner', async () => {
-      await run({ method: 'PATCH', ownerContext: { kind: 'organization', organizationId: 3 } });
+      await run({ method: 'PATCH', ownerContext: { kind: 'organization', organizationId: 3, role: 'owner' } });
       expect(response.set).toHaveBeenCalledWith(CACHE_INVALIDATE_HEADER, '/orgs/3/bank');
     });
 
