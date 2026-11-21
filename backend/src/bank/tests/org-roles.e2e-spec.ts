@@ -14,6 +14,7 @@ import { ORG_MEMBERS, seedOrgRoles, UNIFORM_403, UNIFORM_404 } from './support/o
 import { hasMinRole, OrgRole } from '../../core/org-role.js';
 
 jest.mock('../ledger.query.js', () => jest.requireActual('./support/in-memory-ledger.query.js'));
+jest.mock('../payment-generated.query.js', () => jest.requireActual('./support/in-memory-payment-generated.query.js'));
 jest.mock('../account-balances.query.js', () => jest.requireActual('./support/in-memory-ledger.query.js'));
 jest.mock('../provider-bills-summary.query.js', () => jest.requireActual('./support/in-memory-provider-bills-summary.query.js'));
 jest.mock('../accountant-charges.query.js', () => jest.requireActual('./support/in-memory-accountant-charges.query.js'));
@@ -287,6 +288,24 @@ describe('organization roles on bank writes (e2e)', () => {
 
     it.each([OrgRole.ADMIN, OrgRole.OWNER])('may be edited by an %s', async (role) => {
       const response = await edit(role);
+
+      expect(response.status).toBe(200);
+      expect(response.body.description).toBe('Edited');
+    });
+
+    it('ignores a bill payment of another owner context referencing the same id', async () => {
+      const accountId = await regular(ALICE_ORG);
+      const created = await expectOk('post', `${base(ALICE_ORG)}/accounts/${accountId}/transactions.json`, {
+        date: '2026-01-12', amount: '-10.00', description: 'Plain',
+      });
+      const foreignSource = await regular(null);
+      await repos.billPayments.save(repos.billPayments.create({
+        sourceAccountId: foreignSource, dueDate: '2026-01-10', status: 'paid', paymentTransactionId: created.id as number,
+      }));
+
+      const response = await send(app, 'patch', `${base(ALICE_ORG)}/accounts/${accountId}/transactions/${String(created.id)}.json`, ORG_MEMBERS.user, {
+        description: 'Edited',
+      });
 
       expect(response.status).toBe(200);
       expect(response.body.description).toBe('Edited');

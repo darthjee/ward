@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { accountArchived } from './account-conflicts.js';
-import { OrgRole, orgRoleForbidden } from '../core/org-role.js';
+import { hasMinRole, OrgRole, orgRoleForbidden } from '../core/org-role.js';
 import { ownerRole, type OwnerContext } from '../core/owner-context.js';
 import { ownerNotFound } from '../core/parse-id.js';
 import { AccountTypeRegistry } from './account-types/account-type.registry.js';
@@ -11,10 +11,10 @@ import { parseAmountInput } from './amount-input.js';
 import type { CreateTransactionDto } from './dto/create-transaction.dto.js';
 import type { UpdateTransactionDto } from './dto/update-transaction.dto.js';
 import type { Account } from './entities/account.entity.js';
-import { BillPayment } from './entities/bill-payment.entity.js';
 import { Transaction } from './entities/transaction.entity.js';
 import { LedgerQuery } from './ledger.query.js';
 import { buildPagination, LEDGER_PER_PAGE } from './pagination.js';
+import { PaymentGeneratedQuery } from './payment-generated.query.js';
 import {
   PROVIDER_EXPENSE_TYPE,
   serializeLedger,
@@ -32,33 +32,34 @@ const AMOUNT_RULES = { nonZero: true };
  * an account of another owner or context, a transaction of another account
  * and an unknown id all answer the same uniform 404. Transactions of an
  * archived account are read-only (409). A payment-generated transaction (one
- * referenced by a `bank_bill_payments` row) may be edited only by an organization
- * `admin` or `owner` (or in the personal context); a `user` gets the uniform 403.
+ * referenced by a `bank_bill_payments` row of the same owner) may be edited only by an
+ * organization `admin` or `owner` (or in the personal context); any lower role gets the
+ * uniform 403.
  */
 @Injectable()
 export class TransactionService {
   private readonly transactionRepository: Repository<Transaction>;
-  private readonly billPaymentRepository: Repository<BillPayment>;
+  private readonly paymentGenerated: PaymentGeneratedQuery;
   private readonly accounts: AccountService;
   private readonly registry: AccountTypeRegistry;
   private readonly ledgerQuery: LedgerQuery;
 
   /**
    * @param {Repository<Transaction>} transactionRepository - The transaction repository.
-   * @param {Repository<BillPayment>} billPaymentRepository - The bill-payment repository (read-only here).
+   * @param {PaymentGeneratedQuery} paymentGenerated - The owner-scoped payment-generated lookup.
    * @param {AccountService} accounts - Owner-scoped account lookups.
    * @param {AccountTypeRegistry} registry - The account type handlers.
    * @param {LedgerQuery} ledgerQuery - The ledger SQL.
    */
   constructor(
     @InjectRepository(Transaction) transactionRepository: Repository<Transaction>,
-      @InjectRepository(BillPayment) billPaymentRepository: Repository<BillPayment>,
+      paymentGenerated: PaymentGeneratedQuery,
       accounts: AccountService,
       registry: AccountTypeRegistry,
       ledgerQuery: LedgerQuery,
   ) {
     this.transactionRepository = transactionRepository;
-    this.billPaymentRepository = billPaymentRepository;
+    this.paymentGenerated = paymentGenerated;
     this.accounts = accounts;
     this.registry = registry;
     this.ledgerQuery = ledgerQuery;
@@ -174,20 +175,16 @@ export class TransactionService {
     return account;
   }
 
-  // Only an organization `user` is checked: `owner`, `admin` and the personal context skip the
-  // query. The transaction was already found inside an owned account, which scopes the lookup;
-  // each of the three columns has an FK index.
+  // Fail-closed: every role below `admin` (known or not) is checked; `owner`, `admin` and the
+  // personal context skip the query. The check is one EXISTS over the three transaction
+  // references, joined to the payment's source account and scoped by the owner filter, so a bill
+  // payment of another owner or context never makes the transaction payment-generated.
   async #assertMayEdit(owner: OwnerContext, transaction: Transaction): Promise<void> {
-    if (ownerRole(owner) !== OrgRole.USER) {
+    if (hasMinRole(ownerRole(owner), OrgRole.ADMIN)) {
       return;
     }
 
-    const id = transaction.id;
-    const paymentGenerated = await this.billPaymentRepository.exists({
-      where: [{ paymentTransactionId: id }, { withdrawalTransactionId: id }, { chargeTransactionId: id }],
-    });
-
-    if (paymentGenerated) {
+    if (await this.paymentGenerated.isPaymentGenerated(owner, transaction.id)) {
       throw orgRoleForbidden();
     }
   }
