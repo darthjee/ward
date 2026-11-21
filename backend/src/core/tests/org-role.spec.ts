@@ -26,7 +26,6 @@ describe('orgRoleForbidden', () => {
     expect(orgRoleForbidden().getResponse()).toEqual({
       statusCode: 403,
       message: 'Forbidden',
-      error: 'Forbidden',
     });
   });
 });
