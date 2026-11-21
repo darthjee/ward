@@ -56,8 +56,9 @@ A route with no class is never cached (no `X-Cache-Allow`), but the spec still f
 ## Response headers
 
 The global `CachePolicyInterceptor` sets the headers **before** the handler runs, so errors
-thrown by the handler carry them too. Rejections from global guards (`OriginGuard`, `JwtGuard`,
-`AdminGuard`) happen before interceptors and carry no cache headers; that is harmless because
+thrown by the handler carry them too. Rejections from guards (the global `OriginGuard`, `JwtGuard` and
+`AdminGuard`, and `OwnerContextGuard`'s uniform 404 and `@MinOrgRole` 403) happen before
+interceptors and carry no cache headers; that is harmless because
 Tent only caches 2xx responses.
 
 | Effective class | `X-Cache-Allow` | `X-Skip-Cache` | `Cache-Control` |

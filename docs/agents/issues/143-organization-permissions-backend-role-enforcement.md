@@ -64,7 +64,7 @@ Each owner-scoped write route (mounted under both the personal prefix and `orgs/
 
 ### Responses
 
-- **403**: a member whose role is too low gets the uniform Nest default body `{ statusCode: 403, message: 'Forbidden', error: 'Forbidden' }`, built by one factory. It names neither the resource nor the required role.
+- **403**: a member whose role is too low gets a uniform 403, built by one factory (a bare `ForbiddenException`). On the wire the global `HttpExceptionFilter` renders it as `{ error: { code: 'FORBIDDEN', message: 'Forbidden' }, statusCode: 403, timestamp }`, the same way the uniform 404 is rendered. It names neither the resource nor the required role.
 - **404 first**: non-members, an unknown or malformed `:orgId` and wrong-context records keep today's uniform 404. This check always runs **before** the role check.
 
 ## Solution
