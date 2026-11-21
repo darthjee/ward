@@ -42,6 +42,19 @@ describe('BankErrorAlert', () => {
     expect(page.contains('Retry')).toBeFalse();
   });
 
+  it('renders the permission message without Retry for a forbidden', () => {
+    const page = render({
+      error: classifyError(new ApiError(403, 'Forbidden', 'FORBIDDEN')),
+      onRetry: () => undefined,
+      onDismiss: () => undefined,
+    });
+
+    expect(page.contains('alert-danger')).toBeTrue();
+    expect(page.contains('You don&#x27;t have permission to do this')).toBeTrue();
+    expect(page.contains('Retry')).toBeFalse();
+    expect(page.contains('Forbidden')).toBeFalse();
+  });
+
   it('lists validation details', () => {
     const page = render({
       error: classifyError(new ApiError(400, 'Validation failed', 'VALIDATION_FAILED', ['a is bad', 'b is bad'])),

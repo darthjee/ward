@@ -51,4 +51,15 @@ describe('OrganizationEditController', () => {
     expect(deps.onNotFound).toHaveBeenCalled();
     expect(deps.setSubmitError).not.toHaveBeenCalledWith('Not Found');
   });
+
+  it('shows the permission message on a 403', async () => {
+    deps.client.rename.and.rejectWith(new ApiError(403, 'Forbidden', 'FORBIDDEN'));
+
+    await controller.handleSubmit(5, { name: 'New' });
+
+    expect(deps.setSubmitError).toHaveBeenCalledWith("You don't have permission to do this");
+    expect(deps.setSubmitError).not.toHaveBeenCalledWith('Forbidden');
+    expect(deps.setPending.calls.mostRecent().args[0]).toBeFalse();
+    expect(deps.onNotFound).not.toHaveBeenCalled();
+  });
 });

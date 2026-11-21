@@ -3,6 +3,7 @@ import {
 } from 'react';
 import { OwnerContext } from './hooks/useOwnerContext.js';
 import OrgListController, { EMPTY_ORG_STATE, buildOrgListEffect } from './controllers/OrgListController.js';
+import buildForbiddenRefreshEffect from './controllers/forbiddenRefreshEffect.js';
 import { runEntryResolution, trackVisit } from '../../../utils/context/entryResolution.js';
 import { ROLES } from '../../../utils/permissions/orgPermissions.js';
 
@@ -53,7 +54,8 @@ export function buildOwnerContextValue(route, orgState, refreshOrgs) {
  * Provides the active owner context, the user id and the organization list to the page tree.
  *
  * @description Loads the org list once per session (via {@link OrgListController}), runs entry
- * resolution after each session's first load, and remembers the context of every visited
+ * resolution after each session's first load, refreshes the list (and so the caller's role)
+ * whenever the API answers `403 Forbidden`, and remembers the context of every visited
  * context-aware page.
  * @param {object} props - Component props.
  * @param {{page: string, context: object}} props.route - The resolved route.
@@ -69,6 +71,7 @@ export default function OwnerContextProvider({ route, children }) {
   const refreshOrgs = useCallback(() => controller.refresh(), [controller]);
 
   useEffect(() => buildOrgListEffect(controller)(), [controller]);
+  useEffect(() => buildForbiddenRefreshEffect(refreshOrgs)(), [refreshOrgs]);
   useEffect(() => trackVisit(route, orgState.userId), [route, orgState.userId]);
 
   const value = useMemo(

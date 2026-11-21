@@ -1,7 +1,9 @@
 import OrganizationFormController from './OrganizationFormController.js';
+import { PERMISSION_DENIED_MESSAGE } from '../../../../common/PermissionDenied.jsx';
 
 /**
- * Controller for the Rename organization page. A `404` on save shows the Not-found view.
+ * Controller for the Rename organization page. A `404` on save shows the Not-found view; a
+ * `403` shows the permission message.
  */
 export default class OrganizationEditController extends OrganizationFormController {
   /**
@@ -27,7 +29,8 @@ export default class OrganizationEditController extends OrganizationFormControll
   }
 
   /**
-   * Handle a failed request: a `404` shows Not-found, anything else the backend message.
+   * Handle a failed request: a `404` shows Not-found, a `403` the permission message,
+   * anything else the backend message.
    *
    * @param {Error & {status?: number}} error - The error thrown by the client.
    * @returns {void} Nothing.
@@ -35,6 +38,12 @@ export default class OrganizationEditController extends OrganizationFormControll
   handleSubmitError(error) {
     if (error.status === 404) {
       this.onNotFound();
+      return;
+    }
+
+    if (error.status === 403) {
+      this.setSubmitError(PERMISSION_DENIED_MESSAGE);
+      this.setPending(false);
       return;
     }
 
