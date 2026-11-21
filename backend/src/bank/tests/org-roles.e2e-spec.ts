@@ -260,6 +260,39 @@ describe('organization roles on bank writes (e2e)', () => {
     });
   });
 
+  describe('a payment-generated transaction', () => {
+    const paidTransaction = async (): Promise<{ accountId: number; transactionId: number }> => {
+      const checking = await regular(ALICE_ORG);
+      await expectOk('post', occurrencePath(ALICE_ORG, await debt(ALICE_ORG)), {
+        status: 'paid', paid_on: '2026-01-12', amount: '490.00', paying_account_id: checking,
+      });
+      const payment = repos.billPayments.rows[repos.billPayments.rows.length - 1];
+
+      return { accountId: checking, transactionId: payment.withdrawalTransactionId as number };
+    };
+    const edit = async (role: OrgRole) => {
+      const { accountId, transactionId } = await paidTransaction();
+
+      return send(app, 'patch', `${base(ALICE_ORG)}/accounts/${accountId}/transactions/${transactionId}.json`, ORG_MEMBERS[role], {
+        description: 'Edited',
+      });
+    };
+
+    it('answers the uniform 403 to a user', async () => {
+      const response = await edit(OrgRole.USER);
+
+      expect(response.status).toBe(403);
+      expect(withoutTimestamp(response)).toEqual(UNIFORM_403);
+    });
+
+    it.each([OrgRole.ADMIN, OrgRole.OWNER])('may be edited by an %s', async (role) => {
+      const response = await edit(role);
+
+      expect(response.status).toBe(200);
+      expect(response.body.description).toBe('Edited');
+    });
+  });
+
   describe('the 404 comes before the role check', () => {
     it.each(['0' + String(ALICE_ORG), 'abc', '-1'])('for the malformed :orgId %p', async (orgId) => {
       const response = await send(app, 'post', `/orgs/${orgId}/bank/accounts.json`, ORG_MEMBERS.user, { name: 'X' }).expect(404);

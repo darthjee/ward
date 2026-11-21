@@ -92,7 +92,9 @@ export function createInMemoryBankRepo<T extends Row>(
       if (lock) locks.push(lock.mode);
       return repo.findOneBy(where);
     },
-    existsBy: async (where: Where): Promise<boolean> => rows.some((row) => matches(row, where)),
+    existsBy: async (where: Where | Where[]): Promise<boolean> =>
+      rows.some((row) => (Array.isArray(where) ? where.some((branch) => matches(row, branch)) : matches(row, where))),
+    exists: async ({ where = {} }: { where?: Where | Where[] } = {}): Promise<boolean> => repo.existsBy(where),
     save: async (entityToSave: T): Promise<T> => {
       const now = new Date();
       const index = rows.findIndex((row) => row.id !== undefined && row.id === entityToSave.id);
