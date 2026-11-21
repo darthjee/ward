@@ -80,7 +80,7 @@ describe('@OwnerScopedController (e2e)', () => {
     it('resolves the organization as owner for a member', async () => {
       const response = await getOwner(current.app, owner, '/orgs/1').expect(200);
 
-      expect(response.body).toEqual({ kind: 'organization', organizationId: 1 });
+      expect(response.body).toEqual({ kind: 'organization', organizationId: 1, role: 'owner' });
     });
 
     it('is user-scoped: X-Cache-Allow with a private Cache-Control', async () => {

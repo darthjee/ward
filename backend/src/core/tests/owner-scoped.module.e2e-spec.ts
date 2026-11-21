@@ -122,7 +122,7 @@ describe('owner-scoped mechanism without the auth module (e2e)', () => {
       .set('x-test-user', '7')
       .expect(200);
 
-    expect(response.body).toEqual({ owner: { kind: 'organization', organizationId: 3 }, lazy: true });
+    expect(response.body).toEqual({ owner: { kind: 'organization', organizationId: 3, role: 'owner' }, lazy: true });
     expect(lookup.calls).toEqual([[7, 3]]);
   });
 
