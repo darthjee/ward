@@ -14,7 +14,7 @@ describe('getCurrentOwner', () => {
   describe('when the guard resolved an owner context', () => {
     it.each<OwnerContext>([
       { kind: 'user', userId: 7 },
-      { kind: 'organization', organizationId: 3 },
+      { kind: 'organization', organizationId: 3, role: 'admin' },
     ])('returns %p unchanged', (ownerContext) => {
       expect(getCurrentOwner(undefined, contextFor({ ownerContext }))).toBe(ownerContext);
     });

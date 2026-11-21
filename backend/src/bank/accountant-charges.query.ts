@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import type { EntityManager, Repository } from 'typeorm';
-import { ownerSqlWhere, type OwnerContext, type OwnerSqlWhere } from '../core/owner-context.js';
+import { ownerSqlWhere, type OwnerScope, type OwnerSqlWhere } from '../core/owner-context.js';
 import { Transaction } from './entities/transaction.entity.js';
 
 /** Most charges one preview returns; one more row is read to detect an overflow. */
@@ -98,13 +98,13 @@ export class AccountantChargesQuery {
   /**
    * Reads the preview: at most {@link PREVIEW_MAX_ROWS} + 1 rows, ordered by
    * date then id, so the caller can tell an overflow apart.
-   * @param {OwnerContext} owner - The active owner.
+   * @param {OwnerScope} owner - The active owner.
    * @param {string} from - The first day (`YYYY-MM-DD`, inclusive).
    * @param {string} to - The last day (`YYYY-MM-DD`, inclusive).
    * @param {boolean} includeSent - Whether sent charges are listed too.
    * @returns {Promise<AccountantChargeRow[]>} The charges.
    */
-  async preview(owner: OwnerContext, from: string, to: string, includeSent: boolean): Promise<AccountantChargeRow[]> {
+  async preview(owner: OwnerScope, from: string, to: string, includeSent: boolean): Promise<AccountantChargeRow[]> {
     const ownerFilter = ownerSqlWhere(owner, 'a');
     const rows: RawChargeRow[] = await this.transactionRepository.query(previewSql(ownerFilter, includeSent), [
       ...ownerFilter.params,
@@ -132,11 +132,11 @@ export class AccountantChargesQuery {
    * until the surrounding DB transaction ends. Ids of another owner or context
    * are simply absent from the result.
    * @param {EntityManager} manager - The manager of the running DB transaction.
-   * @param {OwnerContext} owner - The active owner.
+   * @param {OwnerScope} owner - The active owner.
    * @param {number[]} ids - The de-duplicated transaction ids.
    * @returns {Promise<ResolvedMarkRow[]>} The owner's matching transactions.
    */
-  async resolveForUpdate(manager: EntityManager, owner: OwnerContext, ids: number[]): Promise<ResolvedMarkRow[]> {
+  async resolveForUpdate(manager: EntityManager, owner: OwnerScope, ids: number[]): Promise<ResolvedMarkRow[]> {
     const ownerFilter = ownerSqlWhere(owner, 'a');
     const rows: RawResolvedRow[] = await manager.query(
       `SELECT t.id, t.amount, t.sent_to_accountant_at, a.type, d.for_accountant
