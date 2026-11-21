@@ -1,4 +1,5 @@
 import NotFound from '../../../../common/notFound/NotFound.jsx';
+import PermissionDenied from '../../../../common/PermissionDenied.jsx';
 import useAccountEditPage from '../../common/form/hooks/useAccountEditPage.js';
 import BankProviderEditController from './controllers/BankProviderEditController.js';
 import { providerFieldsFromAccount } from './controllers/providerFormFields.js';
@@ -11,6 +12,8 @@ import { PROVIDERS_BASE } from '../../common/sections.js';
  * ledger page 1, whose `total_count` locks the currency once the provider has transactions. An
  * archived provider can only be renamed. A `409` shows its message and reloads.
  *
+ * A role that may not manage accounts sees the permission message instead of the form.
+ *
  * @returns {React.ReactElement} The rendered page.
  */
 export default function BankProviderEdit() {
@@ -18,11 +21,15 @@ export default function BankProviderEdit() {
     base: PROVIDERS_BASE, fieldsFrom: providerFieldsFromAccount, idPrefix: 'bank-provider-edit-',
   });
   const {
-    context, notFound, accountId, account, state, handlers,
+    context, notFound, forbidden, accountId, account, state, handlers,
   } = page;
 
   if (notFound) {
     return <NotFound orgId={context.orgId ?? null} />;
+  }
+
+  if (forbidden) {
+    return <PermissionDenied />;
   }
 
   return BankProviderFormHelper.render(state, handlers, {

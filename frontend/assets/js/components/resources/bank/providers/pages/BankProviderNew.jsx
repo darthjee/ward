@@ -1,4 +1,5 @@
 import NotFound from '../../../../common/notFound/NotFound.jsx';
+import PermissionDenied from '../../../../common/PermissionDenied.jsx';
 import useAccountNewPage from '../../common/form/hooks/useAccountNewPage.js';
 import BankProviderNewController from './controllers/BankProviderNewController.js';
 import { emptyProviderFields } from './controllers/providerFormFields.js';
@@ -11,16 +12,22 @@ import { PROVIDERS_BASE } from '../../common/sections.js';
  * `default_currency`; when that fails the form still works, with no default and a warning.
  * Saving creates a `provider_expense` account and goes to its detail page.
  *
+ * A role that may not manage accounts sees the permission message instead of the form.
+ *
  * @returns {React.ReactElement} The rendered page.
  */
 export default function BankProviderNew() {
   const page = useAccountNewPage(BankProviderNewController, emptyProviderFields(), 'bank-provider-new-');
   const {
-    context, notFound, state, handlers,
+    context, notFound, forbidden, state, handlers,
   } = page;
 
   if (notFound) {
     return <NotFound orgId={context.orgId ?? null} />;
+  }
+
+  if (forbidden) {
+    return <PermissionDenied />;
   }
 
   return BankProviderFormHelper.render(state, handlers, {

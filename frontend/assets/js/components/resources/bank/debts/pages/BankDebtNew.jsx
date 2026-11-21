@@ -1,4 +1,5 @@
 import NotFound from '../../../../common/notFound/NotFound.jsx';
+import PermissionDenied from '../../../../common/PermissionDenied.jsx';
 import useAccountNewPage from '../../common/form/hooks/useAccountNewPage.js';
 import useScheduleForm from '../../common/form/hooks/useScheduleForm.js';
 import BankDebtNewController from './controllers/BankDebtNewController.js';
@@ -12,15 +13,21 @@ import { DEBTS_BASE } from '../../common/sections.js';
  * `default_currency`; when that fails the form still works, with no default and a warning.
  * Saving creates a `debt` account and goes to its detail page.
  *
+ * A role that may not manage accounts sees the permission message instead of the form.
+ *
  * @returns {React.ReactElement} The rendered page.
  */
 export default function BankDebtNew() {
   const page = useAccountNewPage(BankDebtNewController, emptyDebtFields(), 'bank-debt-new-');
-  const { context, notFound } = page;
+  const { context, notFound, forbidden } = page;
   const { state, handlers } = useScheduleForm(page, { create: true });
 
   if (notFound) {
     return <NotFound orgId={context.orgId ?? null} />;
+  }
+
+  if (forbidden) {
+    return <PermissionDenied />;
   }
 
   return BankDebtFormHelper.render(state, handlers, {

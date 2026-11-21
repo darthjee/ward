@@ -1,4 +1,5 @@
 import NotFound from '../../../../common/notFound/NotFound.jsx';
+import PermissionDenied from '../../../../common/PermissionDenied.jsx';
 import useAccountEditPage, { mergeLoadedAccount } from '../../common/form/hooks/useAccountEditPage.js';
 import BankAccountEditController from './controllers/BankAccountEditController.js';
 import { fieldsFromAccount } from '../../common/form/controllers/accountFormFields.js';
@@ -14,17 +15,23 @@ export { mergeLoadedAccount };
  * transactions. An archived account can only be renamed. A `409 CURRENCY_LOCKED` /
  * `ACCOUNT_ARCHIVED` shows its message and reloads, so the form re-renders locked / name-only.
  *
+ * A role that may not manage accounts sees the permission message instead of the form.
+ *
  * @returns {React.ReactElement} The rendered page.
  */
 export default function BankAccountEdit() {
   const {
-    context, notFound, accountId, account, state, handlers,
+    context, notFound, forbidden, accountId, account, state, handlers,
   } = useAccountEditPage(BankAccountEditController, {
     base: ACCOUNTS_BASE, fieldsFrom: fieldsFromAccount, idPrefix: 'bank-account-edit-',
   });
 
   if (notFound) {
     return <NotFound orgId={context.orgId ?? null} />;
+  }
+
+  if (forbidden) {
+    return <PermissionDenied />;
   }
 
   return BankAccountFormHelper.render(state, handlers, {
