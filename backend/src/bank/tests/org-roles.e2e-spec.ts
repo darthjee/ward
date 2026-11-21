@@ -1,5 +1,4 @@
 import type { INestApplication } from '@nestjs/common';
-import { hasMinRole, OrgRole } from '../../core/org-role.js';
 import {
   ALICE,
   ALICE_ORG,
@@ -12,6 +11,7 @@ import {
 } from './support/build-bank-test-app.js';
 import type { InMemoryBankRepos } from './support/in-memory-bank-repos.js';
 import { ORG_MEMBERS, seedOrgRoles, UNIFORM_403, UNIFORM_404 } from './support/owner-matrix.js';
+import { hasMinRole, OrgRole } from '../../core/org-role.js';
 
 jest.mock('../ledger.query.js', () => jest.requireActual('./support/in-memory-ledger.query.js'));
 jest.mock('../account-balances.query.js', () => jest.requireActual('./support/in-memory-ledger.query.js'));

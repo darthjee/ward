@@ -1,4 +1,3 @@
-import { MembershipRole, type OrganizationMembership } from '../entities/organization-membership.entity.js';
 import {
   createOrganization,
   loginCookie,
@@ -9,6 +8,7 @@ import {
   useOrganizationTestApp,
   withoutTimestamp,
 } from './organization.controller.e2e-test-support.js';
+import { MembershipRole, type OrganizationMembership } from '../entities/organization-membership.entity.js';
 import { expectValidationErrorBody } from './support/error-body.js';
 
 const UNIFORM_404 = { error: { code: 'NOT_FOUND', message: 'Not Found' }, statusCode: 404 };

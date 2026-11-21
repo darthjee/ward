@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
-import type { OrganizationMembershipLookup } from '../core/organization-membership-lookup.js';
 import { hasMinRole, OrgRole, orgRoleForbidden } from '../core/org-role.js';
+import type { OrganizationMembershipLookup } from '../core/organization-membership-lookup.js';
 import { ownerNotFound } from '../core/parse-org-id.js';
 import { MembershipRole, OrganizationMembership } from './entities/organization-membership.entity.js';
 import { Organization } from './entities/organization.entity.js';

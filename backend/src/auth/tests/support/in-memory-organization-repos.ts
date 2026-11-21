@@ -4,12 +4,10 @@ import { Organization } from '../../entities/organization.entity.js';
 
 type InMemoryRepo<T extends { id?: number }> = ReturnType<typeof createInMemoryRepo<T>>;
 
-export type InMemoryOrganizationRepo = Omit<InMemoryRepo<Organization>, 'manager'> &
-  OrganizationRepoExtras<Organization>;
-export type InMemoryMembershipRepo = Omit<InMemoryRepo<OrganizationMembership>, 'manager'> &
-  OrganizationRepoExtras<OrganizationMembership>;
+export type InMemoryOrganizationRepo = Omit<InMemoryRepo<Organization>, 'manager'> & OrganizationRepoExtras;
+export type InMemoryMembershipRepo = Omit<InMemoryRepo<OrganizationMembership>, 'manager'> & OrganizationRepoExtras;
 
-interface OrganizationRepoExtras<T> {
+interface OrganizationRepoExtras {
   manager: { transaction: <R>(callback: (manager: FakeManager) => Promise<R>) => Promise<R> };
 }
 
@@ -24,7 +22,7 @@ interface FakeManager {
 // `findOne({ where, select })` (the fake ignores `select`).
 function withOrganizationExtras<T extends { id?: number; createdAt?: Date; updatedAt?: Date }>(
   repo: InMemoryRepo<T>,
-): InMemoryRepo<T> & Omit<OrganizationRepoExtras<T>, 'manager'> {
+): InMemoryRepo<T> {
   const save = async (entity: T): Promise<T> => {
     const now = new Date();
     entity.createdAt ??= now;
