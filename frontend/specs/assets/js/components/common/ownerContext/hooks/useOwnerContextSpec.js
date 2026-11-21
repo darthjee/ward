@@ -26,4 +26,12 @@ describe('useOwnerContext', () => {
   it('defaults refreshOrgs to a resolved promise', async () => {
     await expectAsync(DEFAULT_OWNER_CONTEXT.refreshOrgs()).toBeResolved();
   });
+
+  it('defaults role to null', () => {
+    expect(DEFAULT_OWNER_CONTEXT.role).toBeNull();
+  });
+
+  it('defaults refreshRole to a resolved promise', async () => {
+    await expectAsync(DEFAULT_OWNER_CONTEXT.refreshRole()).toBeResolved();
+  });
 });

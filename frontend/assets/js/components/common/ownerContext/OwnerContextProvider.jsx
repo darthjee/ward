@@ -4,6 +4,25 @@ import {
 import { OwnerContext } from './hooks/useOwnerContext.js';
 import OrgListController, { EMPTY_ORG_STATE, buildOrgListEffect } from './controllers/OrgListController.js';
 import { runEntryResolution, trackVisit } from '../../../utils/context/entryResolution.js';
+import { ROLES } from '../../../utils/permissions/orgPermissions.js';
+
+/**
+ * Resolve the caller's role in the active context.
+ *
+ * @param {{kind: string, orgId?: number}} context - The active owner context.
+ * @param {Array<object>} orgs - The loaded organization list (each entry carries a `role`).
+ * @returns {string|null} `owner` in personal context, the org's role in an organization
+ *   context, or `null` while the list is loading or when the org is not in the list.
+ */
+function resolveRole(context, orgs) {
+  if (context.kind === 'personal') {
+    return ROLES.OWNER;
+  }
+
+  const org = orgs.find((entry) => String(entry.id) === String(context.orgId));
+
+  return org?.role ?? null;
+}
 
 /**
  * Build the provider value from the route and the org-list state.
@@ -12,8 +31,9 @@ import { runEntryResolution, trackVisit } from '../../../utils/context/entryReso
  *   source of the active context).
  * @param {{userId: (number|null), orgs: Array<object>, orgsLoaded: boolean,
  *   orgsError: (string|null)}} orgState - The org-list state.
- * @param {Function} refreshOrgs - Refetches the org list.
- * @returns {object} The owner-context value.
+ * @param {Function} refreshOrgs - Refetches the org list (also exposed as `refreshRole`).
+ * @returns {object} The owner-context value, including the caller's `role` in the active
+ *   context.
  */
 export function buildOwnerContextValue(route, orgState, refreshOrgs) {
   return {
@@ -24,6 +44,8 @@ export function buildOwnerContextValue(route, orgState, refreshOrgs) {
     orgsLoaded: orgState.orgsLoaded,
     orgsError: orgState.orgsError,
     refreshOrgs,
+    role: resolveRole(route.context, orgState.orgs),
+    refreshRole: refreshOrgs,
   };
 }
 
