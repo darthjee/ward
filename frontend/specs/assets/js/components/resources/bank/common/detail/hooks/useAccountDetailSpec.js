@@ -48,14 +48,24 @@ describe('useAccountDetail', () => {
 
     expect(state.canManageAccounts).toBeTrue();
     expect(state.canDelete).toBeTrue();
+    expect(state.canEditPaymentTransactions).toBeTrue();
   });
 
-  it('denies managing and deleting to a user', () => {
+  it('lets an owner edit payment-generated transactions', () => {
+    installFakeWindow({ location: { hash: '#/orgs/5/bank/debts/7' } });
+
+    const { state } = probe('/bank/debts', { kind: 'organization', orgId: 5 }, 'owner');
+
+    expect(state.canEditPaymentTransactions).toBeTrue();
+  });
+
+  it('denies managing, deleting and editing payment transactions to a user', () => {
     installFakeWindow({ location: { hash: '#/orgs/5/bank/debts/7' } });
 
     const { state } = probe('/bank/debts', { kind: 'organization', orgId: 5 }, 'user');
 
     expect(state.canManageAccounts).toBeFalse();
     expect(state.canDelete).toBeFalse();
+    expect(state.canEditPaymentTransactions).toBeFalse();
   });
 });

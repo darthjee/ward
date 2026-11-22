@@ -38,12 +38,30 @@ function renderDelete(transaction, { canDelete, busy }, handlers) {
 }
 
 /**
- * Render a row's Edit / Delete buttons (hidden on an archived account). Edit is always
- * offered: payment-generated rows cannot be told apart, so a forbidden save falls back to the
- * permission message.
+ * Render a row's Edit button, hidden on a payment-generated row unless the caller's role may
+ * edit payment transactions.
+ *
+ * @param {object} transaction - The ledger row (`payment_generated`).
+ * @param {{canEditPaymentTransactions: boolean}} state - Table state.
+ * @param {{onEdit: Function}} handlers - Row handlers.
+ * @returns {React.ReactElement|null} The button, or `null`.
+ */
+function renderEdit(transaction, { canEditPaymentTransactions }, handlers) {
+  if (transaction.payment_generated && !canEditPaymentTransactions) {
+    return null;
+  }
+
+  return <Button size="sm" variant="link" onClick={() => handlers.onEdit(transaction)}>Edit</Button>;
+}
+
+/**
+ * Render a row's Edit / Delete buttons (hidden on an archived account). Edit is offered on
+ * ordinary rows, and on payment-generated rows only to a role that may edit payment
+ * transactions; Delete only to a role that may delete.
  *
  * @param {object} transaction - The ledger row.
- * @param {{readOnly: boolean, busy: boolean, canDelete: boolean}} state - Table state.
+ * @param {{readOnly: boolean, busy: boolean, canDelete: boolean,
+ *   canEditPaymentTransactions: boolean}} state - Table state.
  * @param {{onEdit: Function, onDeleteTransaction: Function}} handlers - Row handlers.
  * @returns {React.ReactElement|null} The actions cell, or `null`.
  */
@@ -54,7 +72,7 @@ function renderActions(transaction, state, handlers) {
 
   return (
     <td className="text-end text-nowrap">
-      <Button size="sm" variant="link" onClick={() => handlers.onEdit(transaction)}>Edit</Button>
+      {renderEdit(transaction, state, handlers)}
       {renderDelete(transaction, state, handlers)}
     </td>
   );
@@ -119,9 +137,10 @@ const LedgerTableHelper = {
    * "No transactions on this page" with a link to page 1.
    *
    * @param {{ledger: object, currency: string, editingId: (number|null), readOnly: boolean,
-   *   busy: boolean, canDelete: boolean, page: number, firstPageHref: string,
-   *   renderRowExtra: Function}} state - Table state (`canDelete`: whether the caller's role
-   *   may delete transactions); the optional `renderRowExtra(transaction)` adds content under a row's
+   *   busy: boolean, canDelete: boolean, canEditPaymentTransactions: boolean, page: number,
+   *   firstPageHref: string, renderRowExtra: Function}} state - Table state (`canDelete`:
+   *   whether the caller's role may delete transactions; `canEditPaymentTransactions`: whether
+   *   it may edit payment-generated ones); the optional `renderRowExtra(transaction)` adds content under a row's
    *   description (also on an archived account).
    * @param {{onEdit: Function, onDeleteTransaction: Function}} handlers - Row handlers.
    * @returns {React.ReactElement} The rendered ledger.

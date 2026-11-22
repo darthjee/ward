@@ -1,5 +1,6 @@
 import React from 'react';
 import AccountDetailHelper from '../../../../../../../../../assets/js/components/resources/bank/common/detail/helpers/AccountDetailHelper.jsx';
+import LedgerTableHelper from '../../../../../../../../../assets/js/components/resources/bank/common/detail/helpers/LedgerTableHelper.jsx';
 import { initialLedgerForm } from '../../../../../../../../../assets/js/components/resources/bank/common/detail/hooks/useLedgerForm.js';
 import { renderedOutput } from '../../../../../../../../support/renderedOutput.js';
 
@@ -29,6 +30,7 @@ function state(overrides = {}) {
     confirmation: null,
     canManageAccounts: true,
     canDelete: true,
+    canEditPaymentTransactions: true,
     ...overrides,
   };
 }
@@ -86,6 +88,17 @@ describe('AccountDetailHelper', () => {
     }));
     expect(page.contains('>Delete<')).toBeFalse();
     expect(page.contains('>Edit<')).toBeTrue();
+  });
+
+  it('passes the payment-transaction edit permission to the ledger table', () => {
+    spyOn(LedgerTableHelper, 'render').and.callThrough();
+
+    renderedOutput(AccountDetailHelper.render(state({ canEditPaymentTransactions: false }), HANDLERS, options));
+
+    expect(LedgerTableHelper.render).toHaveBeenCalledWith(
+      jasmine.objectContaining({ canEditPaymentTransactions: false, canDelete: true }),
+      HANDLERS,
+    );
   });
 
   it('renders the shortcuts slot between the Ledger heading and the inline form', () => {
