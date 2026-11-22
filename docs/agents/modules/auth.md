@@ -98,7 +98,7 @@ the uniform 404. See [Organizations](auth/organizations.md) for the rules and
 | `GET /orgs.json` | — | the caller's organizations, ordered by id | `user-scoped` |
 | `POST /orgs.json` | `{ name }` | the created organization; the caller is its `owner` | `never` |
 | `GET /orgs/:orgId.json` | — | the organization; 404 unless the caller is a member | `user-scoped` |
-| `PATCH /orgs/:orgId.json` | `{ name }` | the renamed organization (any member) | `never` |
+| `PATCH /orgs/:orgId.json` | `{ name }` | the renamed organization (`admin` or `owner`) | `never` |
 
 Each organization is `{ id, name, role, created_at, updated_at }`, `role` being the caller's.
 

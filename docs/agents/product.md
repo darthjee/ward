@@ -67,8 +67,10 @@ More modules will follow. Each one gets its own page under `modules/` once speci
     the owner. Personal records are visible to their owner only; organization records to every
     member of that organization.
 
-  Organizations are optional (none is created at registration), their roles are stored but not
-  enforced, and the active context lives in the URL. Admin tooling covers **accounts only** — it
+  Organizations are optional (none is created at registration), their roles are enforced
+  (reads for every member, everyday writes for `user`, destructive and structural writes for
+  `admin`; see [Organizations → Roles](modules/auth/organizations.md#roles)), and the active
+  context lives in the URL. Admin tooling covers **accounts only** — it
   grants no access to anyone's personal data nor to any organization's data. See
   [Organizations → Data ownership](modules/auth/organizations.md#data-ownership). A module that
   needs any other kind of sharing must decide and document it explicitly.
@@ -131,15 +133,16 @@ decided in each module's own issue and recorded in `modules/<name>.md`.
   [#99](https://github.com/darthjee/ward/issues/99) and
   [#98](https://github.com/darthjee/ward/issues/98).
 - **Bank and organization follow-ups** — every concern deferred by the bank and organization
-  specs is an open epic (#81–#104), linked from the page of [Bank](modules/bank.md) or
+  specs is an open epic (#82–#104), linked from the page of [Bank](modules/bank.md) or
   [Organizations](modules/auth/organizations.md) that mentions it.
 
 ## What's still open
 
 - Everything listed as "Open" under each planned module above.
 - Roles beyond regular user/admin (none planned so far). Organization roles (`owner` / `admin`
-  / `user`) are stored but not enforced until the permission-system epic
-  ([#81](https://github.com/darthjee/ward/issues/81)).
+  / `user`) are enforced; member management is the *Joining organizations* epic
+  ([#82](https://github.com/darthjee/ward/issues/82)) and closing an organization is
+  [#83](https://github.com/darthjee/ward/issues/83).
 
 ## When a module is specified
 

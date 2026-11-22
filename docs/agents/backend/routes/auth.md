@@ -235,6 +235,11 @@ Served by `OrganizationController`, delegating to `OrganizationService`
   An unknown, malformed or non-member id, a non-member global admin included, answers the
   uniform `404` (`{ error: { code: 'NOT_FOUND', message: 'Not Found' }, statusCode: 404,
   timestamp }`).
+- **Roles** — both `GET`s are open to every member and `POST /orgs.json` has no role gate (the
+  caller becomes `owner`). Renaming needs `admin` or `owner`; a member with a lower role answers
+  the uniform `403` (`{ error: { code: 'FORBIDDEN', message: 'Forbidden' }, statusCode: 403,
+  timestamp }`), only after the membership check. See
+  [Organizations → Roles](../../modules/auth/organizations.md#roles).
 - **Response** — each organization is `{ id, name, role, created_at, updated_at }`, `role`
   being the caller's role in it. Never member lists or other users' ids.
 - **Cache class** — `never` at controller level, narrowed to `user-scoped` on the two `GET`s;
@@ -283,14 +288,16 @@ never taken from input.
 | Property | Value |
 | --- | --- |
 | Controller | `OrganizationController` |
-| Auth | JWT, any member (roles are not enforced) |
+| Auth | JWT, `admin` or `owner` |
 | Request body | `OrganizationNameDto` — `{ name: string }` |
 | Success response | The renamed organization, with the caller's role |
 | HTTP status | `200` |
-| Errors | `400 VALIDATION_FAILED`; `404` |
+| Errors | `400 VALIDATION_FAILED`; `404`; `403 FORBIDDEN` (role `user`) |
 | Cache class | `never` |
 
-The body is validated before `:orgId` and membership, so an invalid body answers `400` even for
+The checks run in this order: `400` body, then `404` membership, then `403` role. The role check
+is in `OrganizationService.rename` (`hasMinRole(membership.role, ADMIN)`), not `@MinOrgRole`,
+because the route is not owner-scoped. The body is validated before `:orgId` and membership, so an invalid body answers `400` even for
 an unknown or foreign organization. The `400` depends only on the body, so it cannot be used to
 enumerate organizations. Concurrent renames: last write wins.
 

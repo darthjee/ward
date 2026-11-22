@@ -37,7 +37,17 @@ You will be given a list of changed files and/or a diff. Review them.
 
 1. **Authentication/authorization gaps** — does any new route that should require a logged-in
    user actually check for one? Is any newly-added `AllowAny`-equivalent justified by the
-   endpoint's genuinely public nature?
+   endpoint's genuinely public nature? For **organization roles** (see
+   `docs/agents/modules/auth/organizations.md` → *Roles* / *Security rules*):
+   - every owner-scoped write route declares a minimum role with `@MinOrgRole` (enforced by
+     `OwnerContextGuard`); organization routes outside that mechanism check it in the service
+     (as `OrganizationService.rename`), and record-dependent rules (payment-generated
+     transactions) check it in the service and fail closed;
+   - the role never comes from input — only the DB membership via `findRole`, re-read on every
+     request;
+   - the non-member 404 comes before any 403;
+   - the 403 body is uniform (`FORBIDDEN` / `Forbidden`, no resource or role named);
+   - there is no `is_admin` bypass.
 
 2. **Injection risks** — does any new code pass unsanitised request data into a Sequelize query
    (raw SQL, unvalidated `where` clauses built from user input)? Does any PHP proxy rule

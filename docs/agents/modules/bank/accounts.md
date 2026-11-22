@@ -90,8 +90,10 @@ Applies to every account type.
 Accounts and ledgers are financial data. These rules apply to the whole `bank` module.
 
 - **Who sees and edits** — in Personal, only the owner (from the JWT, never the URL or body),
-  never organization members; in an organization, every member, with equal rights. Ward's
-  global `is_admin` sees neither. Every miss is the uniform 404.
+  never organization members; in an organization, every member reads, and the role decides the
+  writes: creating, editing, archiving, unarchiving and deleting an account need `admin` (see
+  [Organizations → Roles](../auth/organizations.md#roles)). Ward's global `is_admin` sees
+  neither. Every miss is the uniform 404; a too-low role gets the uniform 403.
 - **Never stored** — bank credentials, card numbers or CVVs. Ward never connects to banks (no
   open banking, no scraping).
 - **Account number at rest** — not encrypted: it is not a credential, it is optional, and the
@@ -115,7 +117,6 @@ Accounts and ledgers are financial data. These rules apply to the whole `bank` m
 
 - Authorship / audit trail: [#95](https://github.com/darthjee/ward/issues/95)
 - Move an account between owners: [#93](https://github.com/darthjee/ward/issues/93)
-- Organization permission system: [#81](https://github.com/darthjee/ward/issues/81)
 
 ## Differences from the original spec
 

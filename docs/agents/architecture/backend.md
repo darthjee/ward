@@ -165,6 +165,11 @@ annotated `@AdminOnly()` (`core/admin-only.decorator.ts`), in which case it requ
 JWT itself. See `docs/agents/modules/auth.md`'s "Admin authorization" section for the
 `isAdmin` claim/provisioning details.
 
+Organization roles are a separate mechanism: `OwnerContextGuard` reads the route's
+`@MinOrgRole(role)` after resolving the owner context (404 first) and throws the uniform
+`403 FORBIDDEN` when the member's role is too low. Ward's global `isAdmin` never bypasses it.
+See [Organizations → Owner-context mechanism](../modules/auth/organizations.md#owner-context-mechanism).
+
 ## Error responses
 
 Every non-2xx JSON response has the same body, written by the global catch-all filter

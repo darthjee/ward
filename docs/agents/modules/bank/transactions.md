@@ -24,6 +24,18 @@ Endpoints: [Routes — Bank → Transactions](../../backend/routes/bank.md#trans
 Filtering the ledger by date or text is the *Ledger filters* epic
 ([#90](https://github.com/darthjee/ward/issues/90)).
 
+### Roles
+
+In an organization (see [Organizations → Roles](../auth/organizations.md#roles)):
+
+- creating and editing a transaction need `user`; deleting one needs `admin`;
+- editing a **payment-generated transaction** (one a bill payment created as its payment,
+  withdrawal or charge transaction) needs `admin`. This depends on the record, so
+  `TransactionService` checks it, not the route decorator; a `user` gets the uniform `403`;
+- **known limitation** — the UI still shows Edit on such a transaction to a `user`; the save
+  answers `403` and the UI shows the permission message. Hiding it is
+  [#148](https://github.com/darthjee/ward/issues/148).
+
 ## Balance
 
 - **Balances are computed, never stored** — derived in SQL on read.

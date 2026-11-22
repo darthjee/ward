@@ -4,6 +4,11 @@ Cross-cutting security posture decisions that span the backend, the Tent proxy a
 frontend. Per-module details (JWT, refresh tokens, admin authorization) live in
 [`docs/agents/modules/auth.md`](../modules/auth.md).
 
+Organization roles (`owner` / `admin` / `user`, `@MinOrgRole`, 404 before a uniform 403, no
+`is_admin` bypass) are described in
+[Organizations → Roles](../modules/auth/organizations.md#roles) and
+[Security rules](../modules/auth/organizations.md#security-rules).
+
 ## CSRF
 
 Ward authenticates browsers with a cookie (`access_token`, read only by `JwtGuard` in

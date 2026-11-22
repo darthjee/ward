@@ -61,9 +61,11 @@ provider bills (see [bills.md § Provider bills](bills.md#provider-bills)).
 - Provider bills are **personal financial data** and inherit their owner through the provider
   account; no bill stores an owner.
 - **Personal context** (`/bank`): owner only. The global admin gets **no** access.
-- **Organization context** (`/orgs/:orgId/bank`): every member has full read and write access,
-  because roles are stored but not enforced until
-  [#81](https://github.com/darthjee/ward/issues/81).
+- **Organization context** (`/orgs/:orgId/bank`): every member reads; a `user` creates and
+  edits provider bills and pays / skips their occurrences; deleting a provider bill, undoing a
+  payment and the provider account's structure (create, edit, archive, unarchive, delete) need
+  `admin` (see [Organizations → Roles](../auth/organizations.md#roles)). A too-low role gets the
+  uniform `403`.
 - A non-member and a global admin who is not a member both get the uniform `404`.
 - Every provider and provider-bill route sits under `@OwnerScopedController` and takes bodies
   only through `@StrictBody()` (an owner field in a body → `400`).
