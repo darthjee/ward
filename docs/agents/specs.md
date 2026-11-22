@@ -65,7 +65,7 @@ this file changes.
 
 | Feature | Spec | Epic |
 |---|---|---|
-| none | | |
+| Reconciliation (statement checkpoints, cleared transactions and their lock) | [specs/reconciliation/](specs/reconciliation/README.md) | [#85](https://github.com/darthjee/ward/issues/85) |
 
 ## Completed specs
 
