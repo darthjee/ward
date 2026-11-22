@@ -32,9 +32,8 @@ In an organization (see [Organizations → Roles](../auth/organizations.md#roles
 - editing a **payment-generated transaction** (one a bill payment created as its payment,
   withdrawal or charge transaction) needs `admin`. This depends on the record, so
   `TransactionService` checks it, not the route decorator; a `user` gets the uniform `403`;
-- **known limitation** — the UI still shows Edit on such a transaction to a `user`; the save
-  answers `403` and the UI shows the permission message. Hiding it is
-  [#148](https://github.com/darthjee/ward/issues/148).
+- every transaction in a response (ledger rows, create and update) carries
+  `payment_generated: boolean`, owner-scoped; the UI hides Edit on such a row from a `user`.
 
 ## Balance
 

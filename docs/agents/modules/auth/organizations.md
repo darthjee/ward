@@ -297,16 +297,14 @@ User-owned modules keep the usual per-user checks.
 - **A `user` cannot undo their own mistakes** — deleting a record and undoing a payment need
   `admin`, even for a record the `user` created. Authorship is deferred to the *Authorship /
   audit trail* epic ([#95](https://github.com/darthjee/ward/issues/95)).
-- **Known limitation** — a `user` still sees the **Edit** button on payment-generated
-  transactions. The backend rejects the save with the 403 and the UI shows the permission
-  message. Hiding it is [#148](https://github.com/darthjee/ward/issues/148).
+- **Edit on payment-generated transactions** — hidden from a `user`: each ledger row carries
+  `payment_generated`, and the UI shows Edit only on ordinary rows. The backend `403` stays as
+  the real enforcement.
 - **User deletion** — Ward has none; what would happen to personal data is left to a future
   decision.
 
 ## Deferred
 
-- Hide Edit on payment-generated transactions for `user`:
-  [#148](https://github.com/darthjee/ward/issues/148)
 - Joining organizations (invites, members, leave, transfer):
   [#82](https://github.com/darthjee/ward/issues/82)
 - Closing (deleting) organizations: [#83](https://github.com/darthjee/ward/issues/83)
