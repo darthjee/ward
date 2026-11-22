@@ -196,10 +196,12 @@ the check cannot be forgotten per route.
   shared with `cache-policy.coverage.spec.ts` (`core/tests/support/route-discovery.ts`).
 - **Record-dependent check** — editing a **payment-generated transaction** (one referenced by a
   bill payment as its payment, withdrawal or charge transaction) needs `admin`, which a route
-  decorator cannot express. `TransactionService#assertMayEdit` asks
+  decorator cannot express. `TransactionService#update` asks
   `PaymentGeneratedQuery.isPaymentGenerated(owner, id)` (`bank/payment-generated.query.ts`, one
-  owner-filtered `EXISTS` over `bank_bill_payments`) below `admin` and throws the uniform 403. It
-  fails closed for any role below `admin`. Delete needs `admin` anyway, so it is not checked
+  owner-filtered `EXISTS` over `bank_bill_payments`) once for every role, returns it as
+  `payment_generated`, and `#assertMayEdit` throws the uniform 403 below `admin` when it is
+  `true`. It fails closed for any role below `admin`. The ledger rows carry the same flag,
+  computed in the ledger SQL (see [Bank routes](../../backend/routes/bank.md)). Delete needs `admin` anyway, so it is not checked
   there.
 - **`@OwnerScopedController(path)`** (`core/owner-scoped.decorator.ts`) mounts a controller
   under both `<path>` and `orgs/:orgId/<path>`, adds `@OwnerScoped()` and sets the cache class
