@@ -40,7 +40,9 @@ URL is the frontend.
    [API Caching](architecture/caching.md#invalidation).
 
 5. **Session renewal.** When the access token expires, `ApiClient` refreshes it with the
-   rotating refresh token and retries; if that fails, the login modal opens again.
+   rotating refresh token and retries; if that fails, the login modal opens again and the
+   awaiting call rejects (marked `sessionExpired`). Public auth routes (login, register, ...)
+   never attempt renewal: a `401` there is a plain error, e.g. a wrong password.
 
 Per-module flows (e.g. paying a bill, logging a refuel) live in each module's page.
 
