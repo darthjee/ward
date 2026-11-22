@@ -80,6 +80,23 @@ and the bank ownership contract in `docs/agents/modules/bank.md`. For these modu
    must be rejected) and never written to responses.
 5. **Uniform 404** — unknown id, malformed (non-numeric) id, wrong owner context and non-member
    all return identical 404 responses, with no disclosure that a record or organization exists.
+6. **Minimum role declared** — every owner-scoped write route declares a minimum role with
+   `@MinOrgRole` (the closed-by-default `min-org-role.coverage.spec.ts` must keep passing with
+   no exemptions). Organization routes outside the owner-scoped mechanism check the role in the
+   service (as `OrganizationService.rename` does), and record-dependent rules (such as editing a
+   payment-generated transaction) check it in the service and fail closed. Reference:
+   `docs/agents/modules/auth/organizations.md` → *Roles* and *Security rules*, and the matrix in
+   `docs/agents/backend/routes/bank.md` → *Minimum role*.
+7. **Role never from input** — the role comes only from the DB membership (`findRole` on the
+   `ORGANIZATION_MEMBERSHIP_LOOKUP` port), re-read on every request; never from the URL, query,
+   body, JWT or a cache.
+8. **404 before 403** — the non-member 404 is always decided before any role 403, so a 403
+   never discloses that an organization or record exists.
+9. **Uniform 403** — every role failure answers the same body
+   (`{ error: { code: 'FORBIDDEN', message: 'Forbidden' }, ... }`), naming neither the resource
+   nor the required role.
+10. **No `is_admin` bypass** — Ward's global admin gets no organization role and no shortcut
+    past `@MinOrgRole` or a service-level role check.
 
 ## How to investigate
 
