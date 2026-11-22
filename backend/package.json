@@ -7,6 +7,7 @@
   "main": "dist/main.js",
   "scripts": {
     "build": "nest build",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
     "server": "node dist/main.js",
     "start": "nest start",
     "start:dev": "nest start --watch",
