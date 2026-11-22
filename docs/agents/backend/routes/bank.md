@@ -78,7 +78,9 @@ every `DELETE` (undoing a payment included) and every account-structure write ne
 **Payment-generated transactions** — a `PATCH` on a transaction referenced by a bill payment
 (its payment, withdrawal or charge transaction) needs `admin`. This depends on the record, so it
 is checked in `TransactionService` (`PaymentGeneratedQuery`), not by the decorator, and answers
-the same uniform `403`.
+the same uniform `403`. The transaction responses and every ledger row expose the same
+owner-scoped flag as `payment_generated`, so the frontend can hide Edit for a `user`; the `403`
+stays the enforcement.
 
 ## Account response
 
@@ -271,7 +273,12 @@ validated against the **account's** currency), `description` (required, trimmed,
 most 255 characters), `notes` (optional, at most 2000 characters). `UpdateTransactionDto`: the
 same fields, all optional. A transaction never moves between accounts.
 
-Transaction response: `{ id, date, amount, description, notes, created_at, updated_at }`.
+Transaction response: `{ id, date, amount, description, notes, payment_generated, created_at, updated_at }`.
+
+- **`payment_generated`** — boolean, never `null`: `true` when a bill payment of the same owner
+  (joined through its source account, filtered by the owner) references the transaction as its
+  payment, withdrawal or charge transaction. Always `false` on create. A PATCH runs the lookup
+  once and returns its value (for every role; a `user` editing a `true` one gets the `403`).
 
 - **`sent_to_accountant_at`** — present **only** on a charge (negative amount) of a
   `provider_expense` account: the ISO timestamp of the accountant hand-off mark, or `null` when
@@ -290,7 +297,8 @@ The project's first paginated route; the `pagination` block is the convention fo
 ```json
 {
   "transactions": [ { "id": 7, "date": "2026-11-01", "amount": "-12.50",
-                      "description": "…", "notes": null, "balance": "987.50" } ],
+                      "description": "…", "notes": null, "payment_generated": false,
+                      "balance": "987.50" } ],
   "opening": { "date": "2026-10-01", "amount": "1000.00", "balance": "1000.00" },
   "pagination": { "page": 1, "per_page": 50, "total_pages": 3, "total_count": 120 }
 }
@@ -300,6 +308,9 @@ The project's first paginated route; the `pagination` block is the convention fo
 - Rows of provider-expense **charges** also carry `sent_to_accountant_at` (ISO timestamp or
   `null`); the key is absent on every other row and on `opening` (see
   [Transactions](#transactions)).
+- `payment_generated` (boolean, never `null`) is computed per row inside the ledger query with
+  a correlated, owner-scoped `EXISTS` over `bank_bill_payments` (no query per row), with the same
+  rule as the transaction response.
 - `balance` is the running balance, computed with a window function over the account's whole
   ledger before the `LIMIT`, so it is correct across pages.
 - `opening` is the virtual opening row (`opening_balance` − SUM(transactions dated before
