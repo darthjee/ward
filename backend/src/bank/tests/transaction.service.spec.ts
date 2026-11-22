@@ -31,7 +31,7 @@ function buildTransaction(overrides: Partial<Transaction> = {}): Transaction {
 }
 
 function row(id: number, balance: bigint): LedgerRow {
-  return { id, date: '2026-01-10', amount: -100n, description: `t${id}`, notes: null, sentToAccountantAt: null, balance };
+  return { id, date: '2026-01-10', amount: -100n, description: `t${id}`, notes: null, sentToAccountantAt: null, paymentGenerated: false, balance };
 }
 
 function setup(account: Account | null = buildAccount(), stored: Transaction | null = buildTransaction()) {
@@ -109,9 +109,19 @@ describe('TransactionService', () => {
         amount: '-12.50',
         description: 'Coffee',
         notes: null,
+        payment_generated: false,
         created_at: expect.any(Date),
         updated_at: expect.any(Date),
       });
+    });
+
+    it('answers payment_generated: false without the payment-generated lookup', async () => {
+      const { service, paymentGenerated } = setup();
+
+      await expect(service.create({ ...ORGANIZATION, role: 'user' }, 1, createDto())).resolves.toMatchObject({
+        payment_generated: false,
+      });
+      expect(paymentGenerated.isPaymentGenerated).not.toHaveBeenCalled();
     });
 
     it.each([
@@ -301,20 +311,43 @@ describe('TransactionService', () => {
         ['an organization admin', asRole('admin')],
         ['an organization owner', asRole('owner')],
         ['the personal context', PERSONAL],
-      ])('allows %s without running the query', async (_label, owner) => {
+      ])('allows %s, running the lookup once', async (_label, owner) => {
         const { service, transactionRepository, paymentGenerated } = generatedBy('paymentTransactionId');
 
         await service.update(owner, 1, 5, { description: 'Tea' });
 
         expect(transactionRepository.save).toHaveBeenCalled();
-        expect(paymentGenerated.isPaymentGenerated).not.toHaveBeenCalled();
+        expect(paymentGenerated.isPaymentGenerated).toHaveBeenCalledTimes(1);
+        expect(paymentGenerated.isPaymentGenerated).toHaveBeenCalledWith(owner, 5);
+      });
+
+      it.each([
+        ['an organization admin', asRole('admin')],
+        ['an organization owner', asRole('owner')],
+      ])('answers payment_generated: true to %s', async (_label, owner) => {
+        const { service } = generatedBy('withdrawalTransactionId');
+
+        await expect(service.update(owner, 1, 5, { description: 'Tea' })).resolves.toMatchObject({
+          description: 'Tea',
+          payment_generated: true,
+        });
+      });
+
+      it('answers payment_generated: false when the payment belongs to another owner', async () => {
+        const { service } = generatedBy('paymentTransactionId', 2);
+
+        await expect(service.update(asRole('user'), 1, 5, { description: 'Tea' })).resolves.toMatchObject({
+          payment_generated: false,
+        });
       });
     });
 
     it('allows an organization user to edit a plain transaction', async () => {
       const { service, transactionRepository, paymentGenerated } = setup();
 
-      await service.update({ ...ORGANIZATION, role: 'user' }, 1, 5, { description: 'Tea' });
+      await expect(service.update({ ...ORGANIZATION, role: 'user' }, 1, 5, { description: 'Tea' })).resolves.toMatchObject({
+        payment_generated: false,
+      });
 
       expect(paymentGenerated.isPaymentGenerated).toHaveBeenCalledTimes(1);
       expect(transactionRepository.save).toHaveBeenCalled();
@@ -366,7 +399,7 @@ describe('TransactionService', () => {
 
       const result = await service.ledger(PERSONAL, 1, 1);
 
-      expect(ledgerQuery.page).toHaveBeenCalledWith(expect.objectContaining({ id: 1 }), 1, 50);
+      expect(ledgerQuery.page).toHaveBeenCalledWith(PERSONAL, expect.objectContaining({ id: 1 }), 1, 50);
       expect(result).toEqual({
         transactions: [],
         opening: { date: '2026-01-01', amount: '1000.00', balance: '1000.00' },
@@ -381,11 +414,11 @@ describe('TransactionService', () => {
 
       const result = await service.ledger(PERSONAL, 1, 2);
 
-      expect(ledgerQuery.page).toHaveBeenCalledWith(expect.anything(), 2, 50);
+      expect(ledgerQuery.page).toHaveBeenCalledWith(PERSONAL, expect.anything(), 2, 50);
       expect(ledgerQuery.openingEffective).not.toHaveBeenCalled();
       expect(result.opening).toBeNull();
       expect(result.transactions).toEqual([
-        { id: 120, date: '2026-01-10', amount: '-1.00', description: 't120', notes: null, balance: '50.00' },
+        { id: 120, date: '2026-01-10', amount: '-1.00', description: 't120', notes: null, payment_generated: false, balance: '50.00' },
       ]);
       expect(result.pagination).toEqual({ page: 2, per_page: 50, total_pages: 3, total_count: 120 });
     });

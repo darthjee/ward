@@ -68,6 +68,7 @@ describe('bank transaction routes (e2e)', () => {
         amount: '-1234.56',
         description: 'Rent',
         notes: 'January',
+        payment_generated: false,
         created_at: expect.any(String),
         updated_at: expect.any(String),
       });
@@ -76,7 +77,7 @@ describe('bank transaction routes (e2e)', () => {
       const edited = await send(app, 'patch', transactionPath(prefix, accountId, created.body.id), ALICE, {
         amount: '10', notes: null,
       }).expect(200);
-      expect(edited.body).toMatchObject({ amount: '10.00', notes: null, description: 'Rent' });
+      expect(edited.body).toMatchObject({ amount: '10.00', notes: null, description: 'Rent', payment_generated: false });
 
       await send(app, 'delete', transactionPath(prefix, accountId, created.body.id), ALICE).expect(204);
       expect(repos.transactions.rows.some((row) => row.id === created.body.id)).toBe(false);
@@ -239,8 +240,10 @@ describe('bank transaction routes (e2e)', () => {
       // 30 transactions dated before the anchor (Dec 2025): opening = 1000.00 - 30 × 1.00.
       expect(last.body.opening).toEqual({ date: '2026-01-01', amount: '970.00', balance: '970.00' });
       expect(first.body.transactions[0]).toEqual({
-        id: 100120, date: expect.any(String), amount: '1.00', description: 't120', notes: null, balance: '1090.00',
+        id: 100120, date: expect.any(String), amount: '1.00', description: 't120', notes: null, payment_generated: false, balance: '1090.00',
       });
+      expect([...first.body.transactions, ...second.body.transactions, ...last.body.transactions]
+        .every((row: { payment_generated: unknown }) => row.payment_generated === false)).toBe(true);
       expect(second.body.transactions[0].balance).toBe('1040.00');
       expect(last.body.transactions.at(-1)).toMatchObject({ description: 't1', balance: '971.00' });
       expect(ownerKeysIn(first.body)).toEqual([]);

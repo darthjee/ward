@@ -29,8 +29,8 @@ import { pageFromHash } from '../../pageQuery.js';
  *   reload: Function, setError: Function, ledgerForm: {form: object, actions: object}}} The
  *   owner context, whether to show Not-found, the helper state (`context`, `accountId`,
  *   `page`, `data`, `loadError`, `error`, `form`, `actionPending`, `confirmation`, and the
- *   caller's `canManageAccounts` / `canDelete` permissions), every
- *   handler (see `buildDetailHandlers`), the account + ledger reload, the page alert's error
+ *   caller's `canManageAccounts` / `canDelete` / `canEditPaymentTransactions`
+ *   permissions), every handler (see `buildDetailHandlers`), the account + ledger reload, the page alert's error
  *   setter and the inline form's state and actions.
  */
 export default function useAccountDetail(base) {
@@ -46,6 +46,7 @@ export default function useAccountDetail(base) {
   const [confirmation, setConfirmation] = useState(null);
   const canManageAccounts = useCan(ACTIONS.MANAGE_ACCOUNTS);
   const canDelete = useCan(ACTIONS.DELETE);
+  const canEditPaymentTransactions = useCan(ACTIONS.EDIT_PAYMENT_TRANSACTION);
   const detailController = useMemo(() => new BankAccountDetailController({
     context,
     accountId,
@@ -95,6 +96,7 @@ export default function useAccountDetail(base) {
       confirmation,
       canManageAccounts,
       canDelete,
+      canEditPaymentTransactions,
     },
     handlers,
     reload,

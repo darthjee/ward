@@ -283,7 +283,7 @@ The backend is the authority; the frontend only hides what the role cannot do.
   |---|---|
   | `WRITE` | `user` |
   | `UNDO_PAYMENT` | `admin` |
-  | `EDIT_PAYMENT_TRANSACTION` | `admin` (defined, not used yet; see #148) |
+  | `EDIT_PAYMENT_TRANSACTION` | `admin` |
   | `MANAGE_ACCOUNTS` | `admin` |
   | `RENAME_ORGANIZATION` | `admin` |
   | `DELETE` | `admin` |
@@ -299,16 +299,15 @@ The backend is the authority; the frontend only hides what the role cannot do.
   into one refresh. So a role changed mid-session is picked up on the next 403.
 - **Hidden controls for `user`** (`admin` and `owner` see everything): the account list's New
   button and empty-list call to action; on an account, Edit / Rename, Archive / Unarchive
-  (`MANAGE_ACCOUNTS`) and Delete (`DELETE`); the ledger's transaction Delete (Edit stays);
-  the bill-history Undo and its column; provider-bill Delete; the bill form's Delete; the
-  calendar's Undo on settled entries (Pay and Skip stay); the organization overview's Rename.
+  (`MANAGE_ACCOUNTS`) and Delete (`DELETE`); the ledger's transaction Delete, and its Edit
+  on payment-generated rows (`EDIT_PAYMENT_TRANSACTION`, read from each row's
+  `payment_generated`; Edit stays on ordinary rows); the bill-history Undo and its column;
+  provider-bill Delete; the bill form's Delete; the calendar's Undo on settled entries (Pay
+  and Skip stay); the organization overview's Rename.
 - **`PermissionDenied`** (`components/common/PermissionDenied.jsx`, a warning alert) — shown
   when a `user` opens by URL an admin-only page: the New and Edit pages of accounts, debts,
   investments and providers (the Edit page skips its load), and `#/orgs/:orgId/edit`. It
   renders nothing while `role` is `null`.
-- **Known limitation** — `LedgerTableHelper.jsx` always shows Edit, so a `user` sees Edit on a
-  payment-generated transaction. The backend answers 403 and the UI shows the permission
-  message. Hiding it is [#148](https://github.com/darthjee/ward/issues/148).
 
 ## API errors
 

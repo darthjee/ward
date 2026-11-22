@@ -1,7 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import type { InMemoryBankRepo } from './in-memory-bank-repos.js';
-import type { Account } from '../../entities/account.entity.js';
+import { paymentGeneratedIds } from './in-memory-payment-generated.query.js';
+import type { OwnerScope } from '../../../core/owner-context.js';
+import { Account } from '../../entities/account.entity.js';
+import { BillPayment } from '../../entities/bill-payment.entity.js';
 import { Transaction } from '../../entities/transaction.entity.js';
 import type { LedgerRow } from '../../ledger.query.js';
 
@@ -23,16 +26,25 @@ function sumOf(transactions: Transaction[]): bigint {
 @Injectable()
 export class LedgerQuery {
   private readonly repo: TransactionRepo;
+  private readonly billPayments: InMemoryBankRepo<BillPayment>;
+  private readonly accounts: InMemoryBankRepo<Account>;
 
-  constructor(@InjectRepository(Transaction) repo: TransactionRepo) {
+  constructor(
+    @InjectRepository(Transaction) repo: TransactionRepo,
+    @InjectRepository(BillPayment) billPayments: InMemoryBankRepo<BillPayment>,
+    @InjectRepository(Account) accounts: InMemoryBankRepo<Account>,
+  ) {
     this.repo = repo;
+    this.billPayments = billPayments;
+    this.accounts = accounts;
   }
 
   async count(accountId: number): Promise<number> {
     return this.repo.rows.filter((row) => row.accountId === accountId).length;
   }
 
-  async page(account: Account, page: number, perPage: number): Promise<LedgerRow[]> {
+  async page(owner: OwnerScope, account: Account, page: number, perPage: number): Promise<LedgerRow[]> {
+    const generated = paymentGeneratedIds(owner, this.billPayments, this.accounts);
     const ledger = this.repo.rows.filter((row) => row.accountId === account.id).sort(ledgerOrder);
     let balance = await this.openingEffective(account);
     const rows = ledger.map((row) => {
@@ -44,6 +56,7 @@ export class LedgerQuery {
         description: row.description,
         notes: row.notes,
         sentToAccountantAt: row.sentToAccountantAt ?? null,
+        paymentGenerated: generated.has(row.id),
         balance,
       };
     });

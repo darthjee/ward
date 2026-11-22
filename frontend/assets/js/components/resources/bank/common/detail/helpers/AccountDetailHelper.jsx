@@ -161,6 +161,7 @@ function renderLoaded(state, handlers, options) {
         readOnly,
         busy: Boolean(state.actionPending),
         canDelete: state.canDelete,
+        canEditPaymentTransactions: state.canEditPaymentTransactions,
         page: state.page,
         firstPageHref: hrefFor(1),
         renderRowExtra: bindRowExtra(options.renderRowExtra, handlers, state),
@@ -206,7 +207,8 @@ const AccountDetailHelper = {
    * @param {{context: object, accountId: (number|string), page: number,
    *   data: ({account: object, ledger: object}|null), loadError: (object|null),
    *   error: (object|null), form: object, actionPending: (string|null),
-   *   confirmation: (object|null), canManageAccounts: boolean, canDelete: boolean}} state -
+   *   confirmation: (object|null), canManageAccounts: boolean, canDelete: boolean,
+   *   canEditPaymentTransactions: boolean}} state -
    *   Page state, including the caller's permissions.
    * @param {object} handlers - Page handlers (see `buildDetailHandlers`).
    * @param {{base: string, backLabel: string, renderHeader: Function,

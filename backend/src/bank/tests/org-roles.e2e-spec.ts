@@ -279,6 +279,20 @@ describe('organization roles on bank writes (e2e)', () => {
       });
     };
 
+    it('flags the transaction as payment_generated in the ledger, and no other row', async () => {
+      const { accountId, transactionId } = await paidTransaction();
+      await expectOk('post', `${base(ALICE_ORG)}/accounts/${accountId}/transactions.json`, {
+        date: '2026-01-13', amount: '-10.00', description: 'Plain',
+      });
+
+      const response = await send(app, 'get', `${base(ALICE_ORG)}/accounts/${accountId}/transactions.json`, ORG_MEMBERS.user).expect(200);
+      const flags = Object.fromEntries((response.body.transactions as Body[]).map((row) => [row.id, row.payment_generated]));
+
+      expect(flags[transactionId]).toBe(true);
+      expect(Object.values(flags).filter((flag) => flag === true)).toHaveLength(1);
+      expect(Object.values(flags)).toHaveLength(2);
+    });
+
     it('answers the uniform 403 to a user', async () => {
       const response = await edit(OrgRole.USER);
 
@@ -286,11 +300,12 @@ describe('organization roles on bank writes (e2e)', () => {
       expect(withoutTimestamp(response)).toEqual(UNIFORM_403);
     });
 
-    it.each([OrgRole.ADMIN, OrgRole.OWNER])('may be edited by an %s', async (role) => {
+    it.each([OrgRole.ADMIN, OrgRole.OWNER])('may be edited by an %s, answering payment_generated: true', async (role) => {
       const response = await edit(role);
 
       expect(response.status).toBe(200);
       expect(response.body.description).toBe('Edited');
+      expect(response.body.payment_generated).toBe(true);
     });
 
     it('ignores a bill payment of another owner context referencing the same id', async () => {
@@ -309,6 +324,7 @@ describe('organization roles on bank writes (e2e)', () => {
 
       expect(response.status).toBe(200);
       expect(response.body.description).toBe('Edited');
+      expect(response.body.payment_generated).toBe(false);
     });
   });
 

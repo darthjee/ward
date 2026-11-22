@@ -6,10 +6,10 @@ import { renderedOutput } from '../../../../../../../../support/renderedOutput.j
 
 const ROWS = [
   {
-    id: 2, date: '2026-05-02', amount: '-12.50', description: 'Coffee', notes: 'beans', balance: '87.50',
+    id: 2, date: '2026-05-02', amount: '-12.50', description: 'Coffee', notes: 'beans', balance: '87.50', payment_generated: false,
   },
   {
-    id: 1, date: '2026-05-01', amount: '100.00', description: 'Salary', notes: null, balance: '100.00',
+    id: 1, date: '2026-05-01', amount: '100.00', description: 'Salary', notes: null, balance: '100.00', payment_generated: true,
   },
 ];
 const OPENING = { date: '2026-04-01', amount: '0.00', balance: '0.00' };
@@ -46,6 +46,7 @@ describe('LedgerTableHelper', () => {
       readOnly: false,
       busy: false,
       canDelete: true,
+      canEditPaymentTransactions: true,
       page: 1,
       firstPageHref: '#/bank/accounts/12?page=1',
       ...overrides,
@@ -107,6 +108,31 @@ describe('LedgerTableHelper', () => {
 
     expect(page.contains('Delete')).toBeFalse();
     expect(page.contains('Edit')).toBeTrue();
+  });
+
+  it('hides Edit on a payment-generated row without the payment permission', () => {
+    const page = output({ canEditPaymentTransactions: false, canDelete: false });
+
+    expect(page.containsInOrder('Coffee', 'Edit', 'Salary')).toBeTrue();
+    expect(page.containsInOrder('Salary', 'Edit')).toBeFalse();
+  });
+
+  it('shows Edit on every row with the payment permission', () => {
+    const editButtons = findAll(
+      LedgerTableHelper.render(state({ canDelete: false }), handlers),
+      (node) => typeof node.props?.onClick === 'function',
+    );
+
+    editButtons.forEach((button) => button.props.onClick());
+
+    expect(handlers.onEdit.calls.allArgs()).toEqual([[ROWS[0]], [ROWS[1]]]);
+  });
+
+  it('shows Edit on a row without the payment_generated field', () => {
+    const row = { ...ROWS[1], payment_generated: undefined };
+    const page = output({ canEditPaymentTransactions: false, ledger: { transactions: [row], opening: null } });
+
+    expect(page.containsInOrder('Salary', 'Edit')).toBeTrue();
   });
 
   it('hides every action on an archived account, keeping the ledger readable', () => {
