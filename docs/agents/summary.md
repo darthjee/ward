@@ -30,7 +30,7 @@ full file before loading it. For a bare link-only table of contents instead, see
     `approved` / `denied`), the optional `WARD_USER_APPROVAL_REQUIRED` flag, admin
     approve/deny, per-endpoint behavior by status and lifecycle edge cases.
   - **[Organizations](modules/auth/organizations.md)** — `auth_organizations` /
-    `auth_organization_memberships`, roles (stored, not enforced), the active context in the
+    `auth_organization_memberships`, roles enforced per action (`@MinOrgRole`, `can` / `useCan`), the active context in the
     URL, the user-or-organization data-ownership rule, `OwnerContextGuard` /
     `@OwnerScopedController()` and the `data-access` checks for user-or-organization-owned
     modules.

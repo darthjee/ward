@@ -28,7 +28,9 @@ frontend/assets/js/
                               #   contextSwitcher/ — Personal / organization switcher;
                               #   bankMenu/ — Bank NavDropdown (BANK_MENU_ENTRIES)
       ownerContext/           # OwnerContextProvider.jsx, hooks/useOwnerContext.js,
-                              #   controllers/OrgListController.js (org list per session)
+                              #   hooks/useCan.js, controllers/OrgListController.js (org list
+                              #   per session), controllers/forbiddenRefreshEffect.js
+      PermissionDenied.jsx    # permission message for admin-only pages opened by URL
       notFound/NotFound.jsx   # generic Not-found view ("Go to Personal")
       awaitingApproval/       # AwaitingApprovalGate.jsx, AwaitingApproval.jsx + controllers/,
                               #   helpers/, hooks/useWindowFocusRecheck.js — pending-account view
@@ -60,6 +62,7 @@ frontend/assets/js/
                                 #   OrganizationsClient, BankClient, AccountantClient,
                                 #   BillsClient (the bank clients are context-aware),
                                 #   AuthSession, AuthEvents, AuthStatus, LoginModalEvents,
+                                #   PermissionEvents (403 → role refresh),
                                 #   pickDefined.js (drops undefined keys from request bodies)
   utils/
     routing/                   # Router, Route, HashRouteResolver, routes.js (route tables
@@ -67,6 +70,7 @@ frontend/assets/js/
                                #   hashQuery.js (read/write the hash query string)
     context/                   # ownerContext.js (contextPath/contextHash/landingFor),
                                #   ContextStorage.js, entryResolution.js
+    permissions/orgPermissions.js # ROLES, ACTIONS, can(role, action)
     polling/AuthorizationRequestPoller.js
     validation/                # fieldValidators, formValidators (shared client-side form rules)
 
@@ -261,6 +265,51 @@ themselves are described in [Bank — UI](../modules/bank/ui.md).
   `#/orgs/:orgId/edit`. A backend 404 or malformed id renders the generic `NotFound` view, which
   forgets that id if it was remembered. Names are always rendered as React text.
 
+### Permissions (organization roles)
+
+The frontend side of [Organizations → Roles](../modules/auth/organizations.md#roles) (#144).
+The backend is the authority; the frontend only hides what the role cannot do.
+
+- **Role on the owner context** — `buildOwnerContextValue` (`OwnerContextProvider.jsx`) adds
+  `role` and `refreshRole`. `role` is `owner` in Personal, the active organization's `role`
+  from `GET /orgs.json` in an organization, and `null` while loading or when the organization is
+  not listed. There is no separate role request; `refreshRole` is the org-list refetch
+  (`refreshOrgs`). `DEFAULT_OWNER_CONTEXT` has `role: null`.
+- **`can(role, action)`** (`utils/permissions/orgPermissions.js`) mirrors the backend matrix,
+  ranked `user` < `admin` < `owner`. It fails closed: an unknown or `null` role, or an unknown
+  action, answers `false`.
+
+  | Action (`ACTIONS`) | Min role |
+  |---|---|
+  | `WRITE` | `user` |
+  | `UNDO_PAYMENT` | `admin` |
+  | `EDIT_PAYMENT_TRANSACTION` | `admin` (defined, not used yet; see #148) |
+  | `MANAGE_ACCOUNTS` | `admin` |
+  | `RENAME_ORGANIZATION` | `admin` |
+  | `DELETE` | `admin` |
+
+- **`useCan(action)`** (`ownerContext/hooks/useCan.js`) returns `can(role, action)` for the
+  active context. `useManageAccountsGate()` (`bank/common/form/hooks/`) returns
+  `{ forbidden, allowed }` for the account forms; `forbidden` is set only once the role is
+  known.
+- **Role refresh on 403** — `client/PermissionEvents.js` (window event
+  `permission:forbidden`; `emitForbidden()`, `onForbidden(listener)` returning an unsubscribe).
+  `ApiClient` emits it on any 403, before throwing the `ApiError`. The provider mounts
+  `forbiddenRefreshEffect` with `refreshOrgs`, and an in-flight flag collapses a burst of 403s
+  into one refresh. So a role changed mid-session is picked up on the next 403.
+- **Hidden controls for `user`** (`admin` and `owner` see everything): the account list's New
+  button and empty-list call to action; on an account, Edit / Rename, Archive / Unarchive
+  (`MANAGE_ACCOUNTS`) and Delete (`DELETE`); the ledger's transaction Delete (Edit stays);
+  the bill-history Undo and its column; provider-bill Delete; the bill form's Delete; the
+  calendar's Undo on settled entries (Pay and Skip stay); the organization overview's Rename.
+- **`PermissionDenied`** (`components/common/PermissionDenied.jsx`, a warning alert) — shown
+  when a `user` opens by URL an admin-only page: the New and Edit pages of accounts, debts,
+  investments and providers (the Edit page skips its load), and `#/orgs/:orgId/edit`. It
+  renders nothing while `role` is `null`.
+- **Known limitation** — `LedgerTableHelper.jsx` always shows Edit, so a `user` sees Edit on a
+  payment-generated transaction. The backend answers 403 and the UI shows the permission
+  message. Hiding it is [#148](https://github.com/darthjee/ward/issues/148).
+
 ## API errors
 
 Any non-`401` failure from `client/ApiClient.js` rejects with a `client/ApiError.js`, built from
@@ -276,6 +325,14 @@ status-to-code mapping):
   prefer branching on it over matching `message` text. `undefined` when the body carries none.
 - `details` — `error.details`, the full list of validation messages; only present on validation
   failures, `undefined` otherwise.
+
+A **403** also fires `PermissionEvents.emitForbidden()`, which refreshes the role (see
+[Permissions](#permissions-organization-roles)). In the bank pages, `classifyError`
+(`bank/common/bankErrors.js`) maps a 403 to the **`forbidden`** kind, with the message
+`PERMISSION_DENIED_MESSAGE` ("You don't have permission to do this", exported by
+`PermissionDenied.jsx`). `BankErrorAlert` renders it as a plain danger alert with **no Retry**
+(Retry is only for the `transient` kind). The organization rename form shows the same message
+on a 403.
 
 ## No Vite proxy to the backend
 

@@ -89,9 +89,17 @@ Every FK between these tables is real (same module). Column detail lives in each
   manual transactions, and a bill's paying account must have the bill's owner.
 - Responses **never** contain `user_id` / `organization_id`. A wrong context (an organization
   account on a personal route, or the reverse) answers **404**, like an unknown id.
-- **Permissions** — in Personal, only the owner; in an organization, every member can do
-  everything (roles are stored but not enforced, see
-  [Organizations → Roles](auth/organizations.md#roles)).
+- **Permissions** — in Personal, only the owner, who counts as `owner` and may do everything.
+  In an organization, the member's role decides (see
+  [Organizations → Roles](auth/organizations.md#roles)):
+  - **reads** are open to every member;
+  - **everyday writes** (transactions, bills, provider bills, pay / skip, accountant marks) need
+    `user`;
+  - **deletes, undoing a payment and the account structure** (create, edit, archive, unarchive,
+    delete accounts), and editing a payment-generated transaction, need `admin`;
+  - nothing is owner-only.
+
+  The per-route table is [Routes — Bank → Minimum role](../backend/routes/bank.md#minimum-role).
 
 Deferred: moving an account between owners
 ([#93](https://github.com/darthjee/ward/issues/93)) and sharing a personal record with an

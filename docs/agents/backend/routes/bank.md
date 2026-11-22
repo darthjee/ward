@@ -28,12 +28,15 @@ per-endpoint reference.
   fields, owner fields (`user_id`, `organization_id`, `userId`, `organizationId`), ids
   (`account_id`, `accountId`) and computed fields (`balance`) answer `400 VALIDATION_FAILED`.
   Responses never contain owner fields.
-- **404, never 403** — every miss answers the same body
+- **404 before 403** — every miss answers the same body
   (`{ error: { code: 'NOT_FOUND', message: 'Not Found' }, statusCode: 404, timestamp }`): an
   unknown or non-numeric id (ids go through `parseId`, never `ParseIntPipe`), another user's
   personal account, another organization's account, the wrong context (an organization account
   on a personal route, or the reverse), a transaction of another account, a non-member `:orgId`,
-  and a global admin who is not a member (no admin bypass).
+  and a global admin who is not a member (no admin bypass). A **member whose role is too low**
+  gets the uniform `403` (`{ error: { code: 'FORBIDDEN', message: 'Forbidden' }, statusCode:
+  403, timestamp }`), only after the membership is resolved, so a `403` never discloses anything
+  to a non-member. See [Minimum role](#minimum-role).
 - **Caching** — `GET` routes are `user-scoped` (`X-Cache-Allow: true`,
   `Cache-Control: private, no-store`; cached per caller by the proxy); writes are `never` (`X-Skip-Cache: true`,
   `Cache-Control: no-store`). None goes into Navi's warm-up.
@@ -42,6 +45,40 @@ per-endpoint reference.
   currency allows, or `|amount|` over 10¹³ minor units → `400`.
 - **Dates** are `YYYY-MM-DD`, never after UTC today + 1 day.
 - **Bodies are never logged** (only method, route and status).
+
+## Minimum role
+
+Every write route declares its minimum organization role with `@MinOrgRole`, enforced by
+`OwnerContextGuard` (see [Organizations → Roles](../../modules/auth/organizations.md#roles)).
+The same rule applies under both base paths; the personal context counts as `owner`, so it
+passes every check. Every `GET` is open to every member, and nothing needs `owner`.
+
+| Method | Path (after `<base>/`) | Min role |
+|---|---|---|
+| POST | `accounts.json` | `admin` |
+| PATCH / DELETE | `accounts/:accountId.json` | `admin` |
+| POST | `accounts/:accountId/archive.json`, `accounts/:accountId/unarchive.json` | `admin` |
+| POST | `accounts/:accountId/transactions.json` | `user` |
+| PATCH | `accounts/:accountId/transactions/:transactionId.json` | `user` (`admin` if payment-generated) |
+| DELETE | `accounts/:accountId/transactions/:transactionId.json` | `admin` |
+| POST / PATCH | `bills.json`, `bills/:id.json` | `user` |
+| DELETE | `bills/:id.json` | `admin` |
+| POST | `accounts/:accountId/occurrences/:dueDate/payment.json`, `bills/:id/payment.json` | `user` |
+| DELETE | `accounts/:accountId/occurrences/:dueDate/payment.json`, `bills/:id/payment.json` | `admin` |
+| POST | `accounts/:accountId/provider-bills.json` | `user` |
+| PATCH | `provider-bills/:id.json` | `user` |
+| DELETE | `provider-bills/:id.json` | `admin` |
+| POST | `provider-bills/:id/occurrences/:dueDate/payment.json` | `user` |
+| DELETE | `provider-bills/:id/occurrences/:dueDate/payment.json` | `admin` |
+| POST | `accountant/mark-sent.json`, `accountant/mark-unsent.json` | `user` |
+
+The pattern: everyday writes (transactions, bills, pay / skip, accountant marks) need `user`;
+every `DELETE` (undoing a payment included) and every account-structure write need `admin`.
+
+**Payment-generated transactions** — a `PATCH` on a transaction referenced by a bill payment
+(its payment, withdrawal or charge transaction) needs `admin`. This depends on the record, so it
+is checked in `TransactionService` (`PaymentGeneratedQuery`), not by the decorator, and answers
+the same uniform `403`.
 
 ## Account response
 
@@ -525,6 +562,7 @@ are in [Bank — Bills → Provider bills](../../modules/bank/bills.md#provider-
 | Status | Code | When |
 |---|---|---|
 | 400 | `VALIDATION_FAILED` / validation | Violation of the matrix; a field of the other group; bad `due_month` pairing; non-whitelisted field |
+| 403 | `FORBIDDEN` | Uniform: the member's role is below the route's [minimum role](#minimum-role) (every `DELETE` needs `admin`) |
 | 404 | `NOT_FOUND` | Uniform: unknown, foreign, other-context or debt id; malformed or not-an-occurrence `:dueDate`; a write on an archived provider's bill |
 | 409 | `PROVIDER_BILL_KIND_LOCKED` | PATCH sends a different `kind` |
 | 409 | `PROVIDER_BILL_PROVIDER_LOCKED` | PATCH moves a recurring bill to another provider |

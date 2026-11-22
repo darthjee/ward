@@ -21,6 +21,12 @@ Code: `frontend/assets/js/components/resources/bank/` and
   type.
 - User input (names, notes, descriptions) is always rendered escaped, and no owner field is
   shown or sent.
+- **Role-gated controls** — in an organization, a `user` does not see the admin-only controls
+  (account New / Edit / Archive / Unarchive / Delete, transaction and bill Delete, payment
+  Undo, organization Rename), and admin-only pages opened by URL show a permission message
+  instead. The list and the mechanics are in
+  [Frontend → Owner context](../../architecture/frontend.md#owner-context-organizations); the
+  rules are in [Organizations → Roles](../auth/organizations.md#roles).
 
 ## Display locale
 

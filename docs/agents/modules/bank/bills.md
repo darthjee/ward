@@ -353,8 +353,10 @@ On top of the [ownership contract](../bank.md#bank-ownership-contract):
    its own. One view across owners is the *Combined calendar across owners* epic
    ([#101](https://github.com/darthjee/ward/issues/101)).
 4. **Personal context**: owner only; the global admin gets **no** access. **Organization
-   context**: every member sees, edits and pays every bill of it (roles not enforced until
-   [#81](https://github.com/darthjee/ward/issues/81)). A non-member, including a global admin
+   context**: every member sees every bill of it; a `user` creates, edits, pays and skips;
+   deleting a bill and undoing a payment need `admin` (see
+   [Organizations → Roles](../auth/organizations.md#roles)); a too-low role gets the uniform
+   `403`, only after the owner-scoped resolve. A non-member, including a global admin
    who is not a member, gets the uniform `404`.
 5. Every `409` comes only **after** the owner-scoped resolve, so no code leaks the existence of a
    foreign record; the uniform `404` also covers a non-numeric id and a malformed `:dueDate`.
