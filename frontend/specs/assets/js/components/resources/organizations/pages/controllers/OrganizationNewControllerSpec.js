@@ -1,6 +1,7 @@
 import OrganizationNewController from '../../../../../../../../assets/js/components/resources/organizations/pages/controllers/OrganizationNewController.js';
 import ApiError from '../../../../../../../../assets/js/client/ApiError.js';
 import { installFakeWindow, uninstallFakeWindow } from '../../../../../../../support/fakeWindow.js';
+import sessionExpiredError from '../../../../../../../support/sessionExpiredError.js';
 
 const ORG = { id: 7, name: 'Acme', role: 'owner' };
 
@@ -70,10 +71,11 @@ describe('OrganizationNewController', () => {
     });
 
     it('does not navigate on an expired session', async () => {
-      deps.client.create.and.resolveTo(undefined);
+      deps.client.create.and.rejectWith(sessionExpiredError());
 
       await controller.handleSubmit({ name: 'Acme' });
 
+      expect(deps.setSubmitError).not.toHaveBeenCalledWith(jasmine.any(String));
       expect(deps.navigate).not.toHaveBeenCalled();
       expect(deps.refreshOrgs).not.toHaveBeenCalled();
       expect(deps.setPending.calls.mostRecent().args[0]).toBeFalse();
