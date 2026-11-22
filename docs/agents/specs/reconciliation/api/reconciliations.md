@@ -48,12 +48,14 @@ The order is fixed, and matches `OwnerContextGuard` and Routes — Bank ("404 be
    resolved), so a `user` calling cancel or undo gets 403 for any statement id, even one that does
    not exist.
 2. DTO-shape 400 from `@StrictBody()` (types, array size, unknown fields, the date rule). Pipes
-   run before the handler, so this precedes the path 404. It never depends on foreign data, so it
+   run before the handler, so this precedes the path 404. The ticks checks that do not need the
+   account (empty after de-duplication, overlapping `tick` and `untick`) are also 400s of this
+   step, run on the parsed body. It never depends on foreign data, so it
    leaks nothing.
 3. Path 404: `parseId` on the account, the owner-scoped account lookup, the statement by
    `{ id, accountId }`, then the ticks ids (a single account-scoped query).
-4. Account-dependent 400: the balance against the account currency, `statement_date` before
-   `opening_date`, empty or overlapping ticks.
+4. Account-dependent 400: the balance against the account currency, and `statement_date` before
+   `opening_date`.
 5. `ACCOUNT_ARCHIVED`, then the state 409s. Within a ticks batch the state order is
    `RECONCILIATION_FINISHED`, then `TRANSACTION_NOT_ELIGIBLE`.
 

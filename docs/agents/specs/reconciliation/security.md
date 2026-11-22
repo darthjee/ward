@@ -55,13 +55,19 @@ concerns still deferred to later spec-enhancement issues.
 
 ### Concurrency
 
-Every reconciliation write, and the account PATCH, archive and delete, runs in one DB
-transaction with a fixed lock order, so there is no deadlock to map:
+Every reconciliation write, the account PATCH, archive and delete, the transaction PATCH and
+DELETE, and the three payment undos run in one DB transaction with the same fixed lock order, so
+there is no deadlock between them:
 
 1. the account row, `SELECT … FOR UPDATE` (re-read inside the transaction, `archivedAt`
    rechecked there, and a missing row answers the uniform 404);
 2. the statement row, `FOR UPDATE`;
-3. the transaction rows, `FOR UPDATE` in ascending id order.
+3. the transaction rows, `FOR UPDATE` in ascending id order (including the several rows that
+   `undoPayment()` removes).
+
+`TransactionService.update()` and `delete()` therefore take the account lock first, and the
+auto-untick rule reads the open statement under it. An unexpected `ER_LOCK_DEADLOCK` maps to a
+uniform 409 retry-style error with fixed text, never a 500 carrying detail.
 
 - **Two concurrent starts.** The loser hits `ER_DUP_ENTRY` on the unique `open_key`. It is mapped
   with `isMysqlError(error, MYSQL_DUPLICATE_ENTRY)`, catching around the whole
@@ -143,8 +149,9 @@ to be settled in its issue**. Roles, security and data access were settled by #1
 - A `user` sending an invalid body to cancel or undo gets 403 (403 before 400, under the org
   base path), and a non-member gets 404.
 - Two concurrent starts: one 201 and one 409 `RECONCILIATION_OPEN`, never 500. A concurrent
-  tick and transaction PATCH or DELETE, and a finish and tick, end in the outcomes listed
-  under [Concurrency](#concurrency).
+  tick and transaction PATCH or DELETE (including a PATCH that moves the date), a finish and
+  tick, and a finish and a payment undo, end in the outcomes listed under
+  [Concurrency](#concurrency).
 - No 409 or 400 body contains a balance, difference, date, id or count.
 - Every GET sends `X-Cache-Allow` as user-scoped and every write sends `X-Skip-Cache`.
 

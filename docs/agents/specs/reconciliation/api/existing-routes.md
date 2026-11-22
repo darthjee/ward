@@ -13,7 +13,8 @@ implementation issue knows where to work.
   **ticked** row's date past the open statement's `statementDate`, or before the account's
   `opening_date`, unticks it. `update()` and `delete()` lock the row (`pessimistic_write`) inside
   a transaction and check `reconciliationId` on current data, so they cannot race a tick or a
-  finish (see [security.md](../security.md#concurrency)). The `reconciliation` field in the PATCH
+  finish. They take the account lock first, in the common lock order (see
+  [security.md](../security.md#concurrency)). The `reconciliation` field in the PATCH
   and POST responses comes from an account-scoped lookup.
 - **DELETE** (`delete()`): a cleared row answers 409 `TRANSACTION_CLEARED`. Deleting a ticked row
   is allowed and drops the tick.
