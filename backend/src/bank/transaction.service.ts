@@ -103,7 +103,8 @@ export class TransactionService {
       sentToAccountantAt: null,
     });
 
-    return serializeTransaction(await this.transactionRepository.save(transaction), account);
+    // A just-created transaction cannot be referenced by a bill payment yet.
+    return serializeTransaction(await this.transactionRepository.save(transaction), account, false);
   }
 
   /**
@@ -127,7 +128,9 @@ export class TransactionService {
     const account = await this.#writableAccount(owner, accountId);
     const transaction = await this.#findTransaction(account, transactionId);
 
-    await this.#assertMayEdit(owner, transaction);
+    const paymentGenerated = await this.paymentGenerated.isPaymentGenerated(owner, transaction.id);
+
+    this.#assertMayEdit(owner, paymentGenerated);
 
     if (dto.amount !== undefined) {
       transaction.amount = parseAmountInput('amount', dto.amount, account.currency, AMOUNT_RULES);
@@ -136,7 +139,7 @@ export class TransactionService {
 
     Object.assign(transaction, definedFields({ date: dto.date, description: dto.description, notes: dto.notes }));
 
-    return serializeTransaction(await this.transactionRepository.save(transaction), account);
+    return serializeTransaction(await this.transactionRepository.save(transaction), account, paymentGenerated);
   }
 
   /**
@@ -175,16 +178,12 @@ export class TransactionService {
     return account;
   }
 
-  // Fail-closed: every role below `admin` (known or not) is checked; `owner`, `admin` and the
-  // personal context skip the query. The check is one EXISTS over the three transaction
-  // references, joined to the payment's source account and scoped by the owner filter, so a bill
+  // Fail-closed: every role below `admin` (known or not) may not edit a payment-generated
+  // transaction; `owner`, `admin` and the personal context may. The flag is the single
+  // owner-scoped EXISTS `update()` runs for every role (and returns in the response), so a bill
   // payment of another owner or context never makes the transaction payment-generated.
-  async #assertMayEdit(owner: OwnerContext, transaction: Transaction): Promise<void> {
-    if (hasMinRole(ownerRole(owner), OrgRole.ADMIN)) {
-      return;
-    }
-
-    if (await this.paymentGenerated.isPaymentGenerated(owner, transaction.id)) {
+  #assertMayEdit(owner: OwnerContext, paymentGenerated: boolean): void {
+    if (paymentGenerated && !hasMinRole(ownerRole(owner), OrgRole.ADMIN)) {
       throw orgRoleForbidden();
     }
   }

@@ -22,6 +22,8 @@ export interface TransactionResponse extends HandOffMark {
   amount: string;
   description: string;
   notes: string | null;
+  /** Whether a bill payment of the same owner generated the transaction. */
+  payment_generated: boolean;
   created_at: Date;
   updated_at: Date;
 }
@@ -70,9 +72,10 @@ export function handOffMark(account: Account, amount: bigint, sentAt: Date | nul
 /**
  * @param {Transaction} transaction - The transaction.
  * @param {Account} account - Its account (for the currency and the hand-off mark).
+ * @param {boolean} paymentGenerated - Whether a bill payment of the same owner references it.
  * @returns {TransactionResponse} Its public view, `amount` as a decimal string.
  */
-export function serializeTransaction(transaction: Transaction, account: Account): TransactionResponse {
+export function serializeTransaction(transaction: Transaction, account: Account, paymentGenerated: boolean): TransactionResponse {
   return {
     id: transaction.id,
     date: transaction.date,
@@ -80,6 +83,7 @@ export function serializeTransaction(transaction: Transaction, account: Account)
     description: transaction.description,
     notes: transaction.notes,
     ...handOffMark(account, transaction.amount, transaction.sentToAccountantAt),
+    payment_generated: paymentGenerated,
     created_at: transaction.createdAt,
     updated_at: transaction.updatedAt,
   };

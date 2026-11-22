@@ -68,6 +68,7 @@ describe('bank transaction routes (e2e)', () => {
         amount: '-1234.56',
         description: 'Rent',
         notes: 'January',
+        payment_generated: false,
         created_at: expect.any(String),
         updated_at: expect.any(String),
       });
@@ -76,7 +77,7 @@ describe('bank transaction routes (e2e)', () => {
       const edited = await send(app, 'patch', transactionPath(prefix, accountId, created.body.id), ALICE, {
         amount: '10', notes: null,
       }).expect(200);
-      expect(edited.body).toMatchObject({ amount: '10.00', notes: null, description: 'Rent' });
+      expect(edited.body).toMatchObject({ amount: '10.00', notes: null, description: 'Rent', payment_generated: false });
 
       await send(app, 'delete', transactionPath(prefix, accountId, created.body.id), ALICE).expect(204);
       expect(repos.transactions.rows.some((row) => row.id === created.body.id)).toBe(false);

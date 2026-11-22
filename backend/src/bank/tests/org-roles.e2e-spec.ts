@@ -300,11 +300,12 @@ describe('organization roles on bank writes (e2e)', () => {
       expect(withoutTimestamp(response)).toEqual(UNIFORM_403);
     });
 
-    it.each([OrgRole.ADMIN, OrgRole.OWNER])('may be edited by an %s', async (role) => {
+    it.each([OrgRole.ADMIN, OrgRole.OWNER])('may be edited by an %s, answering payment_generated: true', async (role) => {
       const response = await edit(role);
 
       expect(response.status).toBe(200);
       expect(response.body.description).toBe('Edited');
+      expect(response.body.payment_generated).toBe(true);
     });
 
     it('ignores a bill payment of another owner context referencing the same id', async () => {
@@ -323,6 +324,7 @@ describe('organization roles on bank writes (e2e)', () => {
 
       expect(response.status).toBe(200);
       expect(response.body.description).toBe('Edited');
+      expect(response.body.payment_generated).toBe(false);
     });
   });
 

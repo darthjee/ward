@@ -41,30 +41,35 @@ describe('serializeTransaction', () => {
   it('returns the public fields with the amount in the currency exponent', () => {
     const transaction = buildTransaction();
 
-    expect(serializeTransaction(transaction, buildAccount({ currency: 'JPY' }))).toEqual({
+    expect(serializeTransaction(transaction, buildAccount({ currency: 'JPY' }), false)).toEqual({
       id: 3,
       date: '2026-01-02',
       amount: '500',
       description: 'Sushi',
       notes: 'n',
+      payment_generated: false,
       created_at: new Date(0),
       updated_at: new Date(1),
     });
   });
 
+  it('carries payment_generated: true for a payment-generated transaction', () => {
+    expect(serializeTransaction(buildTransaction(), buildAccount(), true)).toMatchObject({ payment_generated: true });
+  });
+
   it('carries sent_to_accountant_at on a provider-expense charge (sent or unsent)', () => {
-    expect(serializeTransaction(buildTransaction({ amount: -500n, sentToAccountantAt: SENT_AT }), provider))
+    expect(serializeTransaction(buildTransaction({ amount: -500n, sentToAccountantAt: SENT_AT }), provider, false))
       .toMatchObject({ amount: '-5.00', sent_to_accountant_at: SENT_AT });
-    expect(serializeTransaction(buildTransaction({ amount: -500n }), provider))
+    expect(serializeTransaction(buildTransaction({ amount: -500n }), provider, false))
       .toMatchObject({ sent_to_accountant_at: null });
   });
 
   it('omits the key on a provider-expense payment', () => {
-    expect(serializeTransaction(buildTransaction({ amount: 500n }), provider)).not.toHaveProperty('sent_to_accountant_at');
+    expect(serializeTransaction(buildTransaction({ amount: 500n }), provider, false)).not.toHaveProperty('sent_to_accountant_at');
   });
 
   it('omits the key on a charge of another account type', () => {
-    expect(serializeTransaction(buildTransaction({ amount: -500n }), buildAccount({ type: 'regular' })))
+    expect(serializeTransaction(buildTransaction({ amount: -500n }), buildAccount({ type: 'regular' }), false))
       .not.toHaveProperty('sent_to_accountant_at');
   });
 });

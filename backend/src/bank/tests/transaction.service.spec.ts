@@ -109,9 +109,19 @@ describe('TransactionService', () => {
         amount: '-12.50',
         description: 'Coffee',
         notes: null,
+        payment_generated: false,
         created_at: expect.any(Date),
         updated_at: expect.any(Date),
       });
+    });
+
+    it('answers payment_generated: false without the payment-generated lookup', async () => {
+      const { service, paymentGenerated } = setup();
+
+      await expect(service.create({ ...ORGANIZATION, role: 'user' }, 1, createDto())).resolves.toMatchObject({
+        payment_generated: false,
+      });
+      expect(paymentGenerated.isPaymentGenerated).not.toHaveBeenCalled();
     });
 
     it.each([
@@ -301,20 +311,43 @@ describe('TransactionService', () => {
         ['an organization admin', asRole('admin')],
         ['an organization owner', asRole('owner')],
         ['the personal context', PERSONAL],
-      ])('allows %s without running the query', async (_label, owner) => {
+      ])('allows %s, running the lookup once', async (_label, owner) => {
         const { service, transactionRepository, paymentGenerated } = generatedBy('paymentTransactionId');
 
         await service.update(owner, 1, 5, { description: 'Tea' });
 
         expect(transactionRepository.save).toHaveBeenCalled();
-        expect(paymentGenerated.isPaymentGenerated).not.toHaveBeenCalled();
+        expect(paymentGenerated.isPaymentGenerated).toHaveBeenCalledTimes(1);
+        expect(paymentGenerated.isPaymentGenerated).toHaveBeenCalledWith(owner, 5);
+      });
+
+      it.each([
+        ['an organization admin', asRole('admin')],
+        ['an organization owner', asRole('owner')],
+      ])('answers payment_generated: true to %s', async (_label, owner) => {
+        const { service } = generatedBy('withdrawalTransactionId');
+
+        await expect(service.update(owner, 1, 5, { description: 'Tea' })).resolves.toMatchObject({
+          description: 'Tea',
+          payment_generated: true,
+        });
+      });
+
+      it('answers payment_generated: false when the payment belongs to another owner', async () => {
+        const { service } = generatedBy('paymentTransactionId', 2);
+
+        await expect(service.update(asRole('user'), 1, 5, { description: 'Tea' })).resolves.toMatchObject({
+          payment_generated: false,
+        });
       });
     });
 
     it('allows an organization user to edit a plain transaction', async () => {
       const { service, transactionRepository, paymentGenerated } = setup();
 
-      await service.update({ ...ORGANIZATION, role: 'user' }, 1, 5, { description: 'Tea' });
+      await expect(service.update({ ...ORGANIZATION, role: 'user' }, 1, 5, { description: 'Tea' })).resolves.toMatchObject({
+        payment_generated: false,
+      });
 
       expect(paymentGenerated.isPaymentGenerated).toHaveBeenCalledTimes(1);
       expect(transactionRepository.save).toHaveBeenCalled();
