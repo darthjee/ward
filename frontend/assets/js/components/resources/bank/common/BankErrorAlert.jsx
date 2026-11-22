@@ -41,7 +41,8 @@ function renderMessages(messages) {
  *
  * @description Renders nothing without an error or for a `notFound` (the page renders
  * `NotFound` instead). A `transient` error is dismissible and offers **Retry**; a `conflict`
- * shows its message; a `validation` error lists its details.
+ * shows its message; a `forbidden` error shows the permission message (no Retry); a
+ * `validation` error lists its details.
  * @param {object} props - Component props.
  * @param {object|null} props.error - A classified error (see `classifyError`).
  * @param {Function} [props.onRetry] - Retries the failed request (transient errors).

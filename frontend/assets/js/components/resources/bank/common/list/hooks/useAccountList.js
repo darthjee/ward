@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import useOwnerContext from '../../../../../common/ownerContext/hooks/useOwnerContext.js';
+import useCan from '../../../../../common/ownerContext/hooks/useCan.js';
+import { ACTIONS } from '../../../../../../utils/permissions/orgPermissions.js';
 import BankAccountsLoader, { buildBankAccountsLoadEffect } from '../controllers/BankAccountsLoader.js';
 import { hashQuery } from '../../../../../../utils/routing/hashQuery.js';
 import { currentHash } from '../../currentHash.js';
@@ -14,8 +16,9 @@ import { currentHash } from '../../currentHash.js';
  * @param {string} type - The account type listed (`'regular'`, `'debt'`, `'investment'` or
  *   `'provider_expense'`).
  * @returns {{context: object, accounts: (Array<object>|null), error: (object|null),
- *   archived: boolean, notFound: boolean, handlers: {onRetry: Function, onDismiss: Function}}}
- *   The list state and its alert handlers.
+ *   archived: boolean, notFound: boolean, canManageAccounts: boolean,
+ *   handlers: {onRetry: Function, onDismiss: Function}}} The list state (including whether the
+ *   caller's role may create accounts) and its alert handlers.
  */
 export default function useAccountList(type) {
   const { context: routeContext } = useOwnerContext();
@@ -26,6 +29,7 @@ export default function useAccountList(type) {
   const [attempt, setAttempt] = useState(0);
   const loader = useMemo(() => new BankAccountsLoader(undefined, { type }), [type]);
   const archived = hashQuery(currentHash()).get('archived') === 'true';
+  const canManageAccounts = useCan(ACTIONS.MANAGE_ACCOUNTS);
 
   useEffect(() => buildBankAccountsLoadEffect(loader, context, archived, {
     onLoaded: (loaded) => {
@@ -45,6 +49,6 @@ export default function useAccountList(type) {
   };
 
   return {
-    context, accounts, error, archived, notFound, handlers,
+    context, accounts, error, archived, notFound, canManageAccounts, handlers,
   };
 }

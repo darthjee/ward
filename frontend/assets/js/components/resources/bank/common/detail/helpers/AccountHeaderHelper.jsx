@@ -6,14 +6,40 @@ import { contextHash } from '../../../../../../utils/context/ownerContext.js';
 export const ARCHIVED_BANNER = 'This account is archived: it is read-only. You can only unarchive or rename it.';
 
 /**
- * Render the Archive or Unarchive button.
+ * Render the Edit (Rename when archived) link, offered only to a role that manages accounts.
  *
+ * @param {object} state - Header state (`account`, `context`, `base`, `canManageAccounts`).
+ * @param {boolean} archived - Whether the account is archived.
+ * @returns {React.ReactElement|null} The link, or `null`.
+ */
+function renderEditLink(state, archived) {
+  if (!state.canManageAccounts) {
+    return null;
+  }
+
+  const href = contextHash(state.context, `${state.base}/${state.account.id}/edit`);
+
+  return (
+    <a className="btn btn-outline-primary" href={href}>
+      {archived ? 'Rename' : 'Edit'}
+    </a>
+  );
+}
+
+/**
+ * Render the Archive or Unarchive button, offered only to a role that manages accounts.
+ *
+ * @param {boolean} allowed - Whether the caller's role manages accounts.
  * @param {boolean} archived - Whether the account is archived.
  * @param {boolean} busy - Whether an action is in flight.
  * @param {object} handlers - `onArchive` / `onUnarchive`.
- * @returns {React.ReactElement} The button.
+ * @returns {React.ReactElement|null} The button, or `null`.
  */
-function renderArchiveButton(archived, busy, handlers) {
+function renderArchiveButton(allowed, archived, busy, handlers) {
+  if (!allowed) {
+    return null;
+  }
+
   if (archived) {
     return <Button variant="outline-secondary" onClick={handlers.onUnarchive} disabled={busy}>Unarchive</Button>;
   }
@@ -22,9 +48,10 @@ function renderArchiveButton(archived, busy, handlers) {
 }
 
 /**
- * Render the Delete button, offered only for an active account without transactions.
+ * Render the Delete button, offered only for an active account without transactions, to a
+ * role that may delete.
  *
- * @param {boolean} deletable - Whether the account may be deleted.
+ * @param {boolean} deletable - Whether the account may be deleted (state and role).
  * @param {boolean} busy - Whether an action is in flight.
  * @param {Function} onDelete - Opens the delete confirmation.
  * @returns {React.ReactElement|null} The button, or `null`.
@@ -53,21 +80,23 @@ function renderBanner(archived) {
 const AccountHeaderHelper = {
   /**
    * Render the account header: the archived banner, the name, the actions — Edit (Rename when
-   * archived) linking to `<base>/:id/edit`, Archive / Unarchive, and Delete only when the
-   * account is active and has no transactions —, the current balance, then the section's own
-   * details block.
+   * archived) linking to `<base>/:id/edit` and Archive / Unarchive when the role manages
+   * accounts, and Delete only when the account is active, has no transactions and the role may
+   * delete —, the current balance, then the section's own details block.
    *
    * @param {{account: object, hasTransactions: boolean, actionPending: (string|null),
-   *   context: object, base: string, details: React.ReactNode}} state - The account, the "has
-   *   transactions" signal, the in-flight action, the owner context, the section base path and
-   *   the details block (e.g. the regular `<dl>`, or the debt info block).
+   *   context: object, base: string, details: React.ReactNode, canManageAccounts: boolean,
+   *   canDelete: boolean}} state - The account, the "has transactions" signal, the in-flight
+   *   action, the owner context, the section base path, the details block (e.g. the regular
+   *   `<dl>`, or the debt info block) and the caller's permissions.
    * @param {{onArchive: Function, onUnarchive: Function, onDeleteAccount: Function}} handlers -
    *   Action handlers.
    * @returns {React.ReactElement} The rendered header.
    */
-  render({
-    account, hasTransactions, actionPending, context, base, details,
-  }, handlers) {
+  render(state, handlers) {
+    const {
+      account, hasTransactions, actionPending, details, canManageAccounts, canDelete,
+    } = state;
     const archived = Boolean(account.archived_at);
     const busy = Boolean(actionPending);
 
@@ -76,11 +105,9 @@ const AccountHeaderHelper = {
         {renderBanner(archived)}
         <div className="d-flex flex-wrap align-items-center gap-2 mb-3">
           <h1 className="me-auto mb-0 text-break">{account.name}</h1>
-          <a className="btn btn-outline-primary" href={contextHash(context, `${base}/${account.id}/edit`)}>
-            {archived ? 'Rename' : 'Edit'}
-          </a>
-          {renderArchiveButton(archived, busy, handlers)}
-          {renderDeleteButton(!archived && !hasTransactions, busy, handlers.onDeleteAccount)}
+          {renderEditLink(state, archived)}
+          {renderArchiveButton(Boolean(canManageAccounts), archived, busy, handlers)}
+          {renderDeleteButton(Boolean(canDelete) && !archived && !hasTransactions, busy, handlers.onDeleteAccount)}
         </div>
         <p className="fs-4">
           Balance:

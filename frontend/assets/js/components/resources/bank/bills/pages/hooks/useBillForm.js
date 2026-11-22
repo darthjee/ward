@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import useOwnerContext from '../../../../../common/ownerContext/hooks/useOwnerContext.js';
+import useCan from '../../../../../common/ownerContext/hooks/useCan.js';
+import { ACTIONS } from '../../../../../../utils/permissions/orgPermissions.js';
 import BillFormController from '../controllers/BillFormController.js';
 import { buildBillFormLoadEffect, mergeLoadedBill } from '../controllers/billFormLoad.js';
 import { emptyBillFields, findProvider, withBillFieldChange } from '../controllers/billFormFields.js';
@@ -100,6 +102,7 @@ function deriveBillView({
  * `?provider=:id` pre-selects the provider on the new page. The paying-account options follow
  * the selected provider's currency; changing the provider clears a paying account in another
  * currency. The owner context is captured on mount (the page is remounted on a context change).
+ * Delete is offered only on the edit page, to a role that may delete (`state.canDelete`).
  * @param {{edit: boolean, idPrefix: string}} options - Whether this is the edit page and the
  *   input id prefix.
  * @returns {{context: object, notFound: boolean, cancelHref: string, state: object,
@@ -121,6 +124,7 @@ export default function useBillForm({ edit = false, idPrefix }) {
   const [pending, setPending] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const [notFound, setNotFound] = useState(false);
+  const canDeleteBills = useCan(ACTIONS.DELETE);
   const controller = useMemo(() => new BillFormController({
     context, setFieldErrors, setSubmitError, setPending, setConfirming, onNotFound: () => setNotFound(true),
   }), [context]);
@@ -154,7 +158,7 @@ export default function useBillForm({ edit = false, idPrefix }) {
       accounts: lists.accounts,
       currency,
       confirming,
-      canDelete: edit,
+      canDelete: edit && canDeleteBills,
       edit,
       kind: fields?.kind ?? 'one_off',
       idPrefix,

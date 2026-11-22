@@ -40,7 +40,7 @@ const handlers = { onRetry: () => undefined, onDismiss: () => undefined };
 
 function output(state = {}) {
   return renderedOutput(BankInvestmentListHelper.render({
-    accounts: INVESTMENTS, error: null, archived: false, context: PERSONAL, ...state,
+    accounts: INVESTMENTS, error: null, archived: false, context: PERSONAL, canManageAccounts: true, ...state,
   }, handlers));
 }
 
@@ -96,6 +96,16 @@ describe('BankInvestmentListHelper', () => {
     expect(page.containsAttribute('href', '#/orgs/5/bank/investments/1')).toBeTrue();
     expect(page.containsAttribute('href', '#/orgs/5/bank/investments/new')).toBeTrue();
     expect(page.containsInOrder('href="#/orgs/5/bank/investments"', 'Hide archived')).toBeTrue();
+  });
+
+  it('hides New and the empty-state create link without the manage-accounts permission', () => {
+    const list = output({ canManageAccounts: false });
+    const empty = output({ accounts: [], canManageAccounts: false });
+
+    expect(list.contains('New investment')).toBeFalse();
+    expect(list.containsAttribute('href', '#/bank/investments/new')).toBeFalse();
+    expect(empty.contains('No investments yet')).toBeTrue();
+    expect(empty.contains('Create an investment')).toBeFalse();
   });
 
   it('renders the empty state with a create button', () => {

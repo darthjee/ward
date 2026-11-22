@@ -6,7 +6,7 @@ import { ACCOUNTS_BASE } from '../../../common/sections.js';
  * Render the regular account header.
  *
  * @param {object} header - Header state (`account`, `hasTransactions`, `actionPending`,
- *   `context`).
+ *   `context`, `canManageAccounts`, `canDelete`).
  * @param {object} handlers - Action handlers.
  * @returns {React.ReactElement} The header.
  */

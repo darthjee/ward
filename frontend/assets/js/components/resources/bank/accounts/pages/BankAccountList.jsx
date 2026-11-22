@@ -11,7 +11,7 @@ import BankAccountListHelper from './helpers/BankAccountListHelper.jsx';
  */
 export default function BankAccountList() {
   const {
-    context, accounts, error, archived, notFound, handlers,
+    context, accounts, error, archived, notFound, canManageAccounts, handlers,
   } = useAccountList('regular');
 
   if (notFound) {
@@ -19,6 +19,6 @@ export default function BankAccountList() {
   }
 
   return BankAccountListHelper.render({
-    accounts, error, archived, context,
+    accounts, error, archived, context, canManageAccounts,
   }, handlers);
 }

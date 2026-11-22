@@ -30,7 +30,28 @@ function dueLabel(bill) {
 }
 
 /**
- * Render a row's Edit and Delete actions, hidden while the provider is archived.
+ * Render a row's Delete button, offered only to a role that may delete.
+ *
+ * @param {object} bill - The bill.
+ * @param {object} state - Helper state (`canDelete`, `pending`).
+ * @param {{onDelete: Function}} handlers - Row handlers.
+ * @returns {React.ReactElement|null} The button, or `null`.
+ */
+function renderDelete(bill, state, handlers) {
+  if (!state.canDelete) {
+    return null;
+  }
+
+  return (
+    <button type="button" className="btn btn-sm btn-link text-danger" onClick={() => handlers.onDelete(bill)} disabled={state.pending}>
+      Delete
+    </button>
+  );
+}
+
+/**
+ * Render a row's Edit and Delete actions, hidden while the provider is archived; Delete is
+ * also hidden when the caller's role may not delete.
  *
  * @param {object} bill - The bill.
  * @param {object} state - Helper state.
@@ -48,9 +69,7 @@ function renderEditDelete(bill, state, handlers) {
   return (
     <>
       <a className="btn btn-sm btn-link" href={editHref}>Edit</a>
-      <button type="button" className="btn btn-sm btn-link text-danger" onClick={() => handlers.onDelete(bill)} disabled={state.pending}>
-        Delete
-      </button>
+      {renderDelete(bill, state, handlers)}
     </>
   );
 }
@@ -137,7 +156,8 @@ const ProviderBillsHelper = {
    *
    * @param {{account: object, context: object, page: number, data: (object|null),
    *   error: (object|null), pending: boolean, confirmation: (object|null),
-   *   selfHref: string}} state - Helper state.
+   *   selfHref: string, canDelete: boolean}} state - Helper state (`canDelete`: whether the
+   *   caller's role may delete bills).
    * @param {object} handlers - Handlers.
    * @returns {React.ReactElement} The section.
    */

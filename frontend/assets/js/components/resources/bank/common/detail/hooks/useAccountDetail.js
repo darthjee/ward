@@ -1,5 +1,7 @@
 import { useMemo, useState } from 'react';
 import useOwnerContext from '../../../../../common/ownerContext/hooks/useOwnerContext.js';
+import useCan from '../../../../../common/ownerContext/hooks/useCan.js';
+import { ACTIONS } from '../../../../../../utils/permissions/orgPermissions.js';
 import useAccountLedger from './useAccountLedger.js';
 import useLedgerForm from './useLedgerForm.js';
 import BankAccountDetailController from '../controllers/BankAccountDetailController.js';
@@ -26,7 +28,8 @@ import { pageFromHash } from '../../pageQuery.js';
  * @returns {{context: object, notFound: boolean, state: object, handlers: object,
  *   reload: Function, setError: Function, ledgerForm: {form: object, actions: object}}} The
  *   owner context, whether to show Not-found, the helper state (`context`, `accountId`,
- *   `page`, `data`, `loadError`, `error`, `form`, `actionPending`, `confirmation`), every
+ *   `page`, `data`, `loadError`, `error`, `form`, `actionPending`, `confirmation`, and the
+ *   caller's `canManageAccounts` / `canDelete` permissions), every
  *   handler (see `buildDetailHandlers`), the account + ledger reload, the page alert's error
  *   setter and the inline form's state and actions.
  */
@@ -41,6 +44,8 @@ export default function useAccountDetail(base) {
   const [actionPending, setActionPending] = useState(null);
   const [error, setError] = useState(null);
   const [confirmation, setConfirmation] = useState(null);
+  const canManageAccounts = useCan(ACTIONS.MANAGE_ACCOUNTS);
+  const canDelete = useCan(ACTIONS.DELETE);
   const detailController = useMemo(() => new BankAccountDetailController({
     context,
     accountId,
@@ -88,6 +93,8 @@ export default function useAccountDetail(base) {
       form,
       actionPending,
       confirmation,
+      canManageAccounts,
+      canDelete,
     },
     handlers,
     reload,

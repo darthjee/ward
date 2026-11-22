@@ -10,6 +10,7 @@ import {
 } from '../../../../../../../../assets/js/components/common/ownerContext/hooks/useOwnerContext.js';
 import { renderedOutput } from '../../../../../../../support/renderedOutput.js';
 import { installFakeWindow, uninstallFakeWindow } from '../../../../../../../support/fakeWindow.js';
+import { itGatesThePageByRole } from '../../../../../../../support/roleGatedPageExamples.js';
 
 const PERSONAL = { kind: 'personal' };
 const ORG = { kind: 'organization', orgId: 5 };
@@ -17,7 +18,7 @@ const ORG = { kind: 'organization', orgId: 5 };
 function inContext(Page, context = PERSONAL) {
   return () => React.createElement(
     OwnerContext.Provider,
-    { value: { ...DEFAULT_OWNER_CONTEXT, context, userId: 1 } },
+    { value: { ...DEFAULT_OWNER_CONTEXT, context, userId: 1, role: 'owner' } },
     React.createElement(Page),
   );
 }
@@ -42,6 +43,8 @@ describe('bank debt form pages', () => {
   });
 
   describe('BankDebtNew', () => {
+    itGatesThePageByRole({ Page: BankDebtNew, Helper: BankDebtFormHelper, hash: '#/orgs/5/bank/debts/new' });
+
     it('renders an idle debt create form in Personal', () => {
       const page = renderedOutput(React.createElement(inContext(BankDebtNew)));
 
@@ -82,6 +85,8 @@ describe('bank debt form pages', () => {
   });
 
   describe('BankDebtEdit', () => {
+    itGatesThePageByRole({ Page: BankDebtEdit, Helper: BankDebtFormHelper, hash: '#/orgs/5/bank/debts/12/edit' });
+
     beforeEach(() => {
       installFakeWindow({ location: { hash: '#/orgs/5/bank/debts/7/edit' } });
     });

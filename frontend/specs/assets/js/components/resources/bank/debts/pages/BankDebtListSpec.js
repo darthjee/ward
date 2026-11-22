@@ -10,10 +10,10 @@ import { installFakeWindow, uninstallFakeWindow } from '../../../../../../../sup
 
 const ORG = { kind: 'organization', orgId: 5 };
 
-function inContext(context = DEFAULT_OWNER_CONTEXT.context) {
+function inContext(context = DEFAULT_OWNER_CONTEXT.context, role = 'owner') {
   return () => React.createElement(
     OwnerContext.Provider,
-    { value: { ...DEFAULT_OWNER_CONTEXT, context, userId: 1 } },
+    { value: { ...DEFAULT_OWNER_CONTEXT, context, userId: 1, role } },
     React.createElement(BankDebtList),
   );
 }
@@ -43,6 +43,20 @@ describe('BankDebtList', () => {
     expect(page.containsAttribute('href', '#/bank/debts/new')).toBeTrue();
   });
 
+  it('hides the create link for a user member', () => {
+    const page = renderedOutput(React.createElement(inContext(ORG, 'user')));
+
+    expect(page.containsAttribute('href', '#/orgs/5/bank/debts/new')).toBeFalse();
+  });
+
+  it('grants the manage-accounts permission to an admin', () => {
+    expect(capture(inContext(ORG, 'admin')).state.canManageAccounts).toBeTrue();
+  });
+
+  it('denies the manage-accounts permission to a user', () => {
+    expect(capture(inContext(ORG, 'user')).state.canManageAccounts).toBeFalse();
+  });
+
   it('renders under an organization with org links', () => {
     const page = renderedOutput(React.createElement(inContext(ORG)));
 
@@ -53,7 +67,7 @@ describe('BankDebtList', () => {
     installFakeWindow({ location: { hash: '#/orgs/5/bank/debts?archived=true' } });
 
     expect(capture(inContext(ORG)).state).toEqual({
-      accounts: null, error: null, archived: true, context: ORG,
+      accounts: null, error: null, archived: true, context: ORG, canManageAccounts: true,
     });
   });
 

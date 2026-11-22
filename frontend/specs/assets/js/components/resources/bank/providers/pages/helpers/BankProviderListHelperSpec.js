@@ -62,7 +62,7 @@ const handlers = { onRetry: () => undefined, onDismiss: () => undefined };
 
 function output(state = {}) {
   return renderedOutput(BankProviderListHelper.render({
-    accounts: PROVIDERS, error: null, archived: false, context: PERSONAL, ...state,
+    accounts: PROVIDERS, error: null, archived: false, context: PERSONAL, canManageAccounts: true, ...state,
   }, handlers));
 }
 
@@ -146,6 +146,16 @@ describe('BankProviderListHelper', () => {
     expect(page.containsAttribute('href', '#/orgs/5/bank/providers/new')).toBeTrue();
     expect(page.containsAttribute('href', '#/orgs/5/bank/providers/accountant')).toBeTrue();
     expect(page.containsInOrder('href="#/orgs/5/bank/providers"', 'Hide archived')).toBeTrue();
+  });
+
+  it('hides New and the empty-state create link without the manage-accounts permission', () => {
+    const list = output({ canManageAccounts: false });
+    const empty = output({ accounts: [], canManageAccounts: false });
+
+    expect(list.contains('New provider')).toBeFalse();
+    expect(list.containsAttribute('href', '#/bank/providers/new')).toBeFalse();
+    expect(empty.contains('No providers yet')).toBeTrue();
+    expect(empty.contains('Create a provider')).toBeFalse();
   });
 
   it('renders the empty state with a create button and keeps the hand-off link', () => {

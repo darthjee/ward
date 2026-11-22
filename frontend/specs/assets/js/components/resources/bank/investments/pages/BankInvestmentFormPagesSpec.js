@@ -10,6 +10,7 @@ import {
 } from '../../../../../../../../assets/js/components/common/ownerContext/hooks/useOwnerContext.js';
 import { renderedOutput } from '../../../../../../../support/renderedOutput.js';
 import { installFakeWindow, uninstallFakeWindow } from '../../../../../../../support/fakeWindow.js';
+import { itGatesThePageByRole } from '../../../../../../../support/roleGatedPageExamples.js';
 
 const PERSONAL = { kind: 'personal' };
 const ORG = { kind: 'organization', orgId: 5 };
@@ -17,7 +18,7 @@ const ORG = { kind: 'organization', orgId: 5 };
 function inContext(Page, context = PERSONAL) {
   return () => React.createElement(
     OwnerContext.Provider,
-    { value: { ...DEFAULT_OWNER_CONTEXT, context, userId: 1 } },
+    { value: { ...DEFAULT_OWNER_CONTEXT, context, userId: 1, role: 'owner' } },
     React.createElement(Page),
   );
 }
@@ -42,6 +43,8 @@ describe('bank investment form pages', () => {
   });
 
   describe('BankInvestmentNew', () => {
+    itGatesThePageByRole({ Page: BankInvestmentNew, Helper: BankInvestmentFormHelper, hash: '#/orgs/5/bank/investments/new' });
+
     it('renders an idle investment create form in Personal', () => {
       const page = renderedOutput(React.createElement(inContext(BankInvestmentNew)));
 
@@ -74,6 +77,8 @@ describe('bank investment form pages', () => {
   });
 
   describe('BankInvestmentEdit', () => {
+    itGatesThePageByRole({ Page: BankInvestmentEdit, Helper: BankInvestmentFormHelper, hash: '#/orgs/5/bank/investments/12/edit' });
+
     it('renders the loading state', () => {
       installFakeWindow({ location: { hash: '#/bank/investments/3/edit' } });
       const page = renderedOutput(React.createElement(inContext(BankInvestmentEdit)));

@@ -12,10 +12,10 @@ import { installFakeWindow, uninstallFakeWindow } from '../../../../../../../sup
 const PERSONAL = { kind: 'personal' };
 const ORG = { kind: 'organization', orgId: 5 };
 
-function inContext(Page, context = PERSONAL) {
+function inContext(Page, context = PERSONAL, role = 'owner') {
   return () => React.createElement(
     OwnerContext.Provider,
-    { value: { ...DEFAULT_OWNER_CONTEXT, context, userId: 1 } },
+    { value: { ...DEFAULT_OWNER_CONTEXT, context, userId: 1, role } },
     React.createElement(Page),
   );
 }
@@ -73,6 +73,18 @@ describe('bank bill pages', () => {
       expect(options.cancelHref).toBe('#/orgs/5/bank/providers');
       expect(state.canDelete).toBeTrue();
       expect(state.idPrefix).toBe('bank-bill-edit-');
+    });
+
+    it('offers Delete to an admin', () => {
+      installFakeWindow({ location: { hash: '#/orgs/5/bank/bills/9/edit' } });
+
+      expect(capture(inContext(BankBillEdit, ORG, 'admin')).state.canDelete).toBeTrue();
+    });
+
+    it('hides Delete from a user', () => {
+      installFakeWindow({ location: { hash: '#/orgs/5/bank/bills/9/edit' } });
+
+      expect(capture(inContext(BankBillEdit, ORG, 'user')).state.canDelete).toBeFalse();
     });
   });
 });

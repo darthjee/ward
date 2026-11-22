@@ -6,7 +6,9 @@ const CONTEXT = { kind: 'organization', orgId: 5 };
 
 describe('OrganizationOverviewHelper', () => {
   const output = (state) => renderedOutput(React.createElement(
-    'div', null, OrganizationOverviewHelper.render({ org: null, loadError: null, context: CONTEXT, ...state }),
+    'div', null, OrganizationOverviewHelper.render({
+      org: null, loadError: null, context: CONTEXT, canRename: true, ...state,
+    }),
   ));
 
   it('renders the name, role and Rename link', () => {
@@ -16,6 +18,15 @@ describe('OrganizationOverviewHelper', () => {
     expect(page.contains('admin')).toBeTrue();
     expect(page.containsAttribute('href', '#/orgs/5/edit')).toBeTrue();
     expect(page.contains('Rename')).toBeTrue();
+  });
+
+  it('hides the Rename link without the rename permission, keeping the name and role', () => {
+    const page = output({ org: { id: 5, name: 'Acme', role: 'user' }, canRename: false });
+
+    expect(page.containsElement('h1', 'Acme')).toBeTrue();
+    expect(page.contains('user')).toBeTrue();
+    expect(page.containsAttribute('href', '#/orgs/5/edit')).toBeFalse();
+    expect(page.contains('Rename')).toBeFalse();
   });
 
   it('escapes the name', () => {

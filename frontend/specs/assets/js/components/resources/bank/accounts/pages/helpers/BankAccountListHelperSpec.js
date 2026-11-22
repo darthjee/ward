@@ -19,7 +19,7 @@ const handlers = { onRetry: () => undefined, onDismiss: () => undefined };
 
 function output(state = {}) {
   return renderedOutput(BankAccountListHelper.render({
-    accounts: ACCOUNTS, error: null, archived: false, context: PERSONAL, ...state,
+    accounts: ACCOUNTS, error: null, archived: false, context: PERSONAL, canManageAccounts: true, ...state,
   }, handlers));
 }
 
@@ -72,6 +72,16 @@ describe('BankAccountListHelper', () => {
 
   it('renders a New account button', () => {
     expect(output().containsInOrder('href="#/bank/accounts/new"', 'New account')).toBeTrue();
+  });
+
+  it('hides New and the empty-state create link without the manage-accounts permission', () => {
+    const list = output({ canManageAccounts: false });
+    const empty = output({ accounts: [], canManageAccounts: false });
+
+    expect(list.contains('New account')).toBeFalse();
+    expect(list.containsAttribute('href', '#/bank/accounts/new')).toBeFalse();
+    expect(empty.contains('No accounts yet')).toBeTrue();
+    expect(empty.contains('Create an account')).toBeFalse();
   });
 
   it('renders the empty state with a create button', () => {

@@ -1,6 +1,7 @@
 import ApiError from './ApiError.js';
 import AuthSession from './AuthSession.js';
 import LoginModalEvents from './LoginModalEvents.js';
+import PermissionEvents from './PermissionEvents.js';
 
 const REFRESH_PATH = '/auth/refresh.json';
 const FALLBACK_ERROR_MESSAGE = 'Request failed';
@@ -109,7 +110,8 @@ function sessionExpired() {
  * Submit a JSON request, always sending same-origin credentials so the session cookie set
  * by the backend (via `Set-Cookie`) is stored/sent automatically. On a `401`, delegates to
  * {@link handleUnauthorized} unless this is already a retried request, in which case the
- * session is treated as expired directly.
+ * session is treated as expired directly. On a `403`, announces it on the shared
+ * {@link PermissionEvents} bus (so the caller's role is refreshed) before throwing.
  *
  * @param {string} method - HTTP method.
  * @param {string} path - Request path.
@@ -129,6 +131,10 @@ async function sendJson(method, path, body, isRetry = false) {
     return isRetry
       ? sessionExpired()
       : handleUnauthorized(method, path, body);
+  }
+
+  if (response.status === 403) {
+    PermissionEvents.emitForbidden();
   }
 
   throw buildApiError(response, data);

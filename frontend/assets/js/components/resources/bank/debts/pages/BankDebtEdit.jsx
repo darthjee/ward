@@ -1,4 +1,5 @@
 import NotFound from '../../../../common/notFound/NotFound.jsx';
+import PermissionDenied from '../../../../common/PermissionDenied.jsx';
 import useAccountEditPage from '../../common/form/hooks/useAccountEditPage.js';
 import useScheduleForm from '../../common/form/hooks/useScheduleForm.js';
 import BankDebtEditController from './controllers/BankDebtEditController.js';
@@ -12,6 +13,8 @@ import { DEBTS_BASE } from '../../common/sections.js';
  * positive) and ledger page 1, whose `total_count` locks the currency once the debt has
  * transactions. An archived debt can only be renamed. A `409` shows its message and reloads.
  *
+ * A role that may not manage accounts sees the permission message instead of the form.
+ *
  * @returns {React.ReactElement} The rendered page.
  */
 export default function BankDebtEdit() {
@@ -19,12 +22,16 @@ export default function BankDebtEdit() {
     base: DEBTS_BASE, fieldsFrom: debtFieldsFromAccount, idPrefix: 'bank-debt-edit-',
   });
   const {
-    context, notFound, accountId, account,
+    context, notFound, forbidden, accountId, account,
   } = page;
   const { state, handlers } = useScheduleForm(page);
 
   if (notFound) {
     return <NotFound orgId={context.orgId ?? null} />;
+  }
+
+  if (forbidden) {
+    return <PermissionDenied />;
   }
 
   return BankDebtFormHelper.render(state, handlers, {

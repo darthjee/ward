@@ -11,13 +11,18 @@ import {
   OwnerContext,
 } from '../../../../../../../assets/js/components/common/ownerContext/hooks/useOwnerContext.js';
 import { renderedOutput } from '../../../../../../support/renderedOutput.js';
+import { itGatesThePageByRole } from '../../../../../../support/roleGatedPageExamples.js';
 
 const ORG_CONTEXT = { kind: 'organization', orgId: 5 };
 
 function inContext(Page, value = {}) {
   return () => React.createElement(
     OwnerContext.Provider,
-    { value: { ...DEFAULT_OWNER_CONTEXT, context: ORG_CONTEXT, userId: 1, ...value } },
+    {
+      value: {
+        ...DEFAULT_OWNER_CONTEXT, context: ORG_CONTEXT, userId: 1, role: 'owner', ...value,
+      },
+    },
     React.createElement(Page),
   );
 }
@@ -61,11 +66,35 @@ describe('organization pages', () => {
     it('renders the loading state for the context organization', () => {
       const { state } = capture(inContext(OrganizationOverview), OrganizationOverviewHelper);
 
-      expect(state).toEqual({ org: null, loadError: null, context: ORG_CONTEXT });
+      expect(state).toEqual({
+        org: null, loadError: null, context: ORG_CONTEXT, canRename: true,
+      });
+    });
+
+    ['owner', 'admin'].forEach((role) => {
+      it(`allows an ${role} to rename`, () => {
+        const { state } = capture(inContext(OrganizationOverview, { role }), OrganizationOverviewHelper);
+
+        expect(state.canRename).toBeTrue();
+      });
+    });
+
+    it('does not allow rename while the role is unknown', () => {
+      const { state } = capture(inContext(OrganizationOverview, { role: null }), OrganizationOverviewHelper);
+
+      expect(state.canRename).toBeFalse();
+    });
+
+    it('does not allow a user to rename', () => {
+      const { state } = capture(inContext(OrganizationOverview, { role: 'user' }), OrganizationOverviewHelper);
+
+      expect(state.canRename).toBeFalse();
     });
   });
 
   describe('OrganizationEdit', () => {
+    itGatesThePageByRole({ Page: OrganizationEdit, Helper: OrganizationFormHelper, loadingWhileUnknown: false });
+
     it('renders the rename form', () => {
       const page = renderedOutput(React.createElement(inContext(OrganizationEdit)));
 

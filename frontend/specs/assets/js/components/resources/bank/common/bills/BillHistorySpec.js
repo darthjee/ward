@@ -1,6 +1,10 @@
 import React from 'react';
 import BillHistory from '../../../../../../../../assets/js/components/resources/bank/common/bills/BillHistory.jsx';
 import BillHistoryHelper from '../../../../../../../../assets/js/components/resources/bank/common/bills/helpers/BillHistoryHelper.jsx';
+import {
+  DEFAULT_OWNER_CONTEXT,
+  OwnerContext,
+} from '../../../../../../../../assets/js/components/common/ownerContext/hooks/useOwnerContext.js';
 import { renderedOutput } from '../../../../../../../support/renderedOutput.js';
 
 describe('BillHistory', () => {
@@ -19,6 +23,22 @@ describe('BillHistory', () => {
       }),
       jasmine.objectContaining({ onUndo: jasmine.any(Function), onNavigate: jasmine.any(Function) }),
     );
+  });
+
+  ['owner', 'admin', 'user'].forEach((role) => {
+    it(`passes the undo permission of a ${role}`, () => {
+      spyOn(BillHistoryHelper, 'render').and.returnValue(React.createElement('div'));
+
+      renderedOutput(React.createElement(
+        OwnerContext.Provider,
+        { value: { ...DEFAULT_OWNER_CONTEXT, role } },
+        React.createElement(BillHistory, {
+          context: { kind: 'organization', orgId: 5 }, account: { id: 7, currency: 'BRL' }, sourceType: 'debt',
+        }),
+      ));
+
+      expect(BillHistoryHelper.render.calls.mostRecent().args[0].canUndo).toBe(role !== 'user');
+    });
   });
 
   it('renders the loading Bill history', () => {

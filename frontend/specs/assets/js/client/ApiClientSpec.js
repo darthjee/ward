@@ -2,6 +2,7 @@ import ApiClient from '../../../../assets/js/client/ApiClient.js';
 import ApiError from '../../../../assets/js/client/ApiError.js';
 import AuthSession from '../../../../assets/js/client/AuthSession.js';
 import LoginModalEvents from '../../../../assets/js/client/LoginModalEvents.js';
+import PermissionEvents from '../../../../assets/js/client/PermissionEvents.js';
 import { installFakeWindow, uninstallFakeWindow } from '../../../support/fakeWindow.js';
 import { expectSessionExpired, fetchSequence, stubRefreshFlow } from '../../../support/fetchSequence.js';
 
@@ -16,6 +17,7 @@ describe('ApiClient', () => {
     originalFetch = globalThis.fetch;
     installFakeWindow({ location: { hash: '' } });
     spyOn(LoginModalEvents, 'open');
+    spyOn(PermissionEvents, 'emitForbidden');
   });
 
   afterEach(() => {
@@ -259,6 +261,35 @@ describe('ApiClient', () => {
       expect(data).toBeUndefined();
       expect(globalThis.fetch).toHaveBeenCalledTimes(3);
       expectSessionExpired();
+    });
+  });
+
+  describe('403 handling', () => {
+    it('emits forbidden and rejects with the ApiError', async () => {
+      globalThis.fetch = fetchSequence([{
+        ok: false, status: 403, json: errorBody(403, 'FORBIDDEN', 'Forbidden'),
+      }]);
+
+      await expectAsync(ApiClient.deleteJson('/orgs/5/bank/accounts/1.json', {}))
+        .toBeRejectedWith(jasmine.objectContaining({ status: 403, code: 'FORBIDDEN' }));
+      expect(PermissionEvents.emitForbidden).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not emit forbidden on other failures', async () => {
+      globalThis.fetch = fetchSequence([{
+        ok: false, status: 409, json: errorBody(409, 'CONFLICT', 'Conflict'),
+      }]);
+
+      await expectAsync(ApiClient.postJson('/orgs.json', {})).toBeRejected();
+      expect(PermissionEvents.emitForbidden).not.toHaveBeenCalled();
+    });
+
+    it('does not emit forbidden on success', async () => {
+      globalThis.fetch = fetchSequence([{ ok: true, status: 200, json: {} }]);
+
+      await ApiClient.getJson('/orgs.json');
+
+      expect(PermissionEvents.emitForbidden).not.toHaveBeenCalled();
     });
   });
 });

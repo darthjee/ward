@@ -10,6 +10,8 @@ export const DEFAULT_OWNER_CONTEXT = Object.freeze({
   orgsLoaded: false,
   orgsError: null,
   refreshOrgs: () => Promise.resolve(),
+  role: null,
+  refreshRole: () => Promise.resolve(),
 });
 
 /** React context carrying the active owner context and the organization list. */
@@ -19,7 +21,8 @@ export const OwnerContext = createContext(DEFAULT_OWNER_CONTEXT);
  * Read the active owner context.
  *
  * @returns {{context: object, page: string, userId: (number|null), orgs: Array<object>,
- *   orgsLoaded: boolean, orgsError: (string|null), refreshOrgs: Function}} The provider value.
+ *   orgsLoaded: boolean, orgsError: (string|null), refreshOrgs: Function,
+ *   role: (string|null), refreshRole: Function}} The provider value.
  */
 export default function useOwnerContext() {
   return useContext(OwnerContext);

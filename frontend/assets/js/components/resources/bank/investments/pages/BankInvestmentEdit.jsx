@@ -1,4 +1,5 @@
 import NotFound from '../../../../common/notFound/NotFound.jsx';
+import PermissionDenied from '../../../../common/PermissionDenied.jsx';
 import useAccountEditPage from '../../common/form/hooks/useAccountEditPage.js';
 import BankInvestmentEditController from './controllers/BankInvestmentEditController.js';
 import { investmentFieldsFromAccount } from './controllers/investmentFormFields.js';
@@ -12,17 +13,23 @@ import { INVESTMENTS_BASE } from '../../common/sections.js';
  * transactions. An archived investment can only be renamed. A `409` shows its message and
  * reloads. An account of another type is redirected to its own edit page.
  *
+ * A role that may not manage accounts sees the permission message instead of the form.
+ *
  * @returns {React.ReactElement} The rendered page.
  */
 export default function BankInvestmentEdit() {
   const {
-    context, notFound, accountId, account, state, handlers,
+    context, notFound, forbidden, accountId, account, state, handlers,
   } = useAccountEditPage(BankInvestmentEditController, {
     base: INVESTMENTS_BASE, fieldsFrom: investmentFieldsFromAccount, idPrefix: 'bank-investment-edit-',
   });
 
   if (notFound) {
     return <NotFound orgId={context.orgId ?? null} />;
+  }
+
+  if (forbidden) {
+    return <PermissionDenied />;
   }
 
   return BankInvestmentFormHelper.render(state, handlers, {

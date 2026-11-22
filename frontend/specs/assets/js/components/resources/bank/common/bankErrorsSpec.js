@@ -6,6 +6,15 @@ describe('classifyError', () => {
     expect(classifyError(new ApiError(404, 'Not found', 'NOT_FOUND')).kind).toBe('notFound');
   });
 
+  it('classifies a 403 as forbidden, with the permission message', () => {
+    expect(classifyError(new ApiError(403, 'Forbidden', 'FORBIDDEN'))).toEqual({
+      kind: 'forbidden',
+      code: 'FORBIDDEN',
+      message: "You don't have permission to do this",
+      messages: ["You don't have permission to do this"],
+    });
+  });
+
   it('classifies a 409 as a conflict, keeping the code and message', () => {
     expect(classifyError(new ApiError(409, 'Archived', 'ACCOUNT_ARCHIVED'))).toEqual({
       kind: 'conflict', code: 'ACCOUNT_ARCHIVED', message: 'Archived', messages: ['Archived'],

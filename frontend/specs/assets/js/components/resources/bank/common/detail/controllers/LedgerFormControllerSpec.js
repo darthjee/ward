@@ -96,6 +96,18 @@ describe('LedgerFormController', () => {
     expect(deps.reload).toHaveBeenCalled();
   });
 
+  it('shows the permission message when editing a payment-generated transaction is forbidden', async () => {
+    deps.client.updateTransaction.and.rejectWith(new ApiError(403, 'Forbidden', 'FORBIDDEN'));
+
+    await controller.submit({ editing: TRANSACTION, values: VALUES }, { currency: 'BRL', page: 1 });
+
+    const error = deps.setError.calls.mostRecent().args[0];
+
+    expect(error.kind).toBe('forbidden');
+    expect(error.messages).toEqual(["You don't have permission to do this"]);
+    expect(error.retry).toBeUndefined();
+  });
+
   it('reloads on a 404 (the reload shows Not-found for a missing account)', async () => {
     deps.client.updateTransaction.and.rejectWith(new ApiError(404, 'Not Found'));
 

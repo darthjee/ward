@@ -146,6 +146,8 @@ function renderLoaded(state, handlers, options) {
         hasTransactions: ledger.pagination.total_count > 0,
         actionPending: state.actionPending,
         context: state.context,
+        canManageAccounts: state.canManageAccounts,
+        canDelete: state.canDelete,
       }, handlers)}
       {renderSlot(options.renderAfterHeader, account, handlers, state)}
       <BankErrorAlert error={state.error} onRetry={handlers.onRetry} onDismiss={handlers.onDismiss} />
@@ -158,6 +160,7 @@ function renderLoaded(state, handlers, options) {
         editingId: state.form.editing?.id ?? null,
         readOnly,
         busy: Boolean(state.actionPending),
+        canDelete: state.canDelete,
         page: state.page,
         firstPageHref: hrefFor(1),
         renderRowExtra: bindRowExtra(options.renderRowExtra, handlers, state),
@@ -203,13 +206,14 @@ const AccountDetailHelper = {
    * @param {{context: object, accountId: (number|string), page: number,
    *   data: ({account: object, ledger: object}|null), loadError: (object|null),
    *   error: (object|null), form: object, actionPending: (string|null),
-   *   confirmation: (object|null)}} state - Page state.
+   *   confirmation: (object|null), canManageAccounts: boolean, canDelete: boolean}} state -
+   *   Page state, including the caller's permissions.
    * @param {object} handlers - Page handlers (see `buildDetailHandlers`).
    * @param {{base: string, backLabel: string, renderHeader: Function,
    *   renderShortcuts: Function, renderRowExtra: Function, renderAfterHeader: Function,
    *   renderAfterLedger: Function}} options - The section base path,
    *   the back link label, the header renderer (called with `{ account, hasTransactions,
-   *   actionPending, context }` and the handlers), the optional shortcuts renderer (called
+   *   actionPending, context, canManageAccounts, canDelete }` and the handlers), the optional shortcuts renderer (called
    *   with the account, the handlers and the page state, which may carry section extras),
    *   the optional block after the header (called like the shortcuts; e.g. the provider's
    *   Bills), the optional per-row renderer (called with the transaction, the handlers and the page
