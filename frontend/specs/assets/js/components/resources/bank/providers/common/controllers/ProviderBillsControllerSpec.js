@@ -4,6 +4,7 @@ import ProviderBillsController, {
 import { BILL_PAID_MESSAGE } from '../../../../../../../../../assets/js/components/resources/bank/bills/pages/controllers/BillFormController.js';
 import ProviderBillsClient from '../../../../../../../../../assets/js/client/ProviderBillsClient.js';
 import ApiError from '../../../../../../../../../assets/js/client/ApiError.js';
+import sessionExpiredError from '../../../../../../../../support/sessionExpiredError.js';
 
 const CONTEXT = { kind: 'personal' };
 const RECURRING = { id: 4, kind: 'recurring' };
@@ -71,10 +72,13 @@ describe('ProviderBillsController', () => {
     });
 
     it('does not reload when the session expired', async () => {
-      client.deleteProviderBill.and.resolveTo(undefined);
+      client.deleteProviderBill.and.rejectWith(sessionExpiredError());
       await build().delete(RECURRING);
 
       expect(deps.reload).not.toHaveBeenCalled();
+      expect(deps.setError).not.toHaveBeenCalledWith(jasmine.objectContaining({ kind: jasmine.any(String) }));
+      expect(deps.setPending).toHaveBeenCalledWith(false);
+      expect(deps.setConfirmation).toHaveBeenCalledWith(null);
     });
 
     it('explains a recurring bill with payments', async () => {

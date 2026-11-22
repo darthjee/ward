@@ -3,6 +3,7 @@ import OrganizationLoader, {
 } from '../../../../../../../../assets/js/components/resources/organizations/pages/controllers/OrganizationLoader.js';
 import OrganizationsClient from '../../../../../../../../assets/js/client/OrganizationsClient.js';
 import ApiError from '../../../../../../../../assets/js/client/ApiError.js';
+import sessionExpiredError from '../../../../../../../support/sessionExpiredError.js';
 
 const ORG = { id: 5, name: 'Acme', role: 'owner' };
 
@@ -43,7 +44,7 @@ describe('OrganizationLoader', () => {
   });
 
   it('reports nothing on an expired session', async () => {
-    client.show.and.resolveTo(undefined);
+    client.show.and.rejectWith(sessionExpiredError());
 
     await loader.load(5, callbacks);
 

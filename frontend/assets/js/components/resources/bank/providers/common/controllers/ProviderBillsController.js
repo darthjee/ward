@@ -16,7 +16,8 @@ export const EMPTY_BILLS = {
  *
  * @description `PROVIDER_BILL_PAID` is mapped to a message by kind (recurring vs one-off); any
  * other failure is classified with `classifyError` and shown with its server message (a
- * network / 5xx failure offers Retry).
+ * network / 5xx failure offers Retry). A session-expired failure shows nothing (the login modal
+ * is already open) and only resets the pending / confirmation state.
  */
 export default class ProviderBillsController {
   /**
@@ -72,13 +73,10 @@ export default class ProviderBillsController {
     this.setPending(true);
 
     try {
-      const reply = await this.client.deleteProviderBill(this.context, bill.id);
+      await this.client.deleteProviderBill(this.context, bill.id);
 
       this.finish();
-
-      if (reply !== undefined) {
-        this.reload();
-      }
+      this.reload();
     } catch (error) {
       this.handleError(error, bill);
     }
@@ -105,6 +103,10 @@ export default class ProviderBillsController {
     const classified = classifyError(error);
 
     this.finish();
+
+    if (classified.kind === 'sessionExpired') {
+      return;
+    }
 
     if (classified.code === 'PROVIDER_BILL_PAID') {
       const message = bill.kind === 'recurring' ? RECURRING_PAID_MESSAGE : BILL_PAID_MESSAGE;

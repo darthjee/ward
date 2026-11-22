@@ -2,6 +2,7 @@ import CalendarListController, {
   dedupeUpcoming, groupByWeek,
 } from '../../../../../../../../../assets/js/components/resources/bank/calendar/pages/controllers/CalendarListController.js';
 import ApiError from '../../../../../../../../../assets/js/client/ApiError.js';
+import sessionExpiredError from '../../../../../../../../support/sessionExpiredError.js';
 
 const CONTEXT = { kind: 'organization', orgId: 5 };
 
@@ -71,7 +72,7 @@ describe('CalendarListController', () => {
     });
 
     it('reports nothing when the session expired', async () => {
-      client.getOverdue.and.resolveTo(undefined);
+      client.getOverdue.and.rejectWith(sessionExpiredError());
       await controller.load();
 
       expect(deps.setData).not.toHaveBeenCalled();

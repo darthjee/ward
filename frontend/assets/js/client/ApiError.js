@@ -13,6 +13,8 @@ export default class ApiError extends Error {
    *   `VALIDATION_FAILED`); `undefined` when the response carried none.
    * @param {string[]} [details] - Full list of validation messages; only present on
    *   validation failures, `undefined` otherwise.
+   * @description Also carries a `sessionExpired` flag (default `false`), set by the
+   *   `ApiClient` when the error is the result of a failed session recovery.
    */
   constructor(status, message, code, details) {
     super(message);
@@ -20,5 +22,6 @@ export default class ApiError extends Error {
     this.status = status;
     this.code = code;
     this.details = details;
+    this.sessionExpired = false;
   }
 }

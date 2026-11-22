@@ -13,7 +13,9 @@ import { initialPayFields, validatePayFields } from '../payFields.js';
  * legacy one-off entry (`bill` without `source_bill`) through the bill routes. After a success,
  * or a `409` / `404` (the entry changed elsewhere), the dialog closes and `onChanged` reloads
  * the view. A network / 5xx failure closes the dialog and shows the alert with Retry; a
- * validation failure of the Pay dialog keeps it open with the error.
+ * validation failure of the Pay dialog keeps it open with the error. A session-expired failure
+ * (the login modal is already open) only resets the in-flight flag: nothing is shown, the dialog
+ * stays and the view is not reloaded.
  */
 export default class CalendarActionsController {
   /**
@@ -89,7 +91,7 @@ export default class CalendarActionsController {
    *
    * @param {object} occ - The occurrence.
    * @param {object} body - The payment body.
-   * @returns {Promise<object|undefined>} The response body.
+   * @returns {Promise<object>} The response body.
    */
   sendPayment(occ, body) {
     if (occ.source_bill) {
@@ -107,7 +109,7 @@ export default class CalendarActionsController {
    * Send the undo request matching the entry.
    *
    * @param {object} occ - The occurrence.
-   * @returns {Promise<object|undefined>} The response body.
+   * @returns {Promise<object>} The response body.
    */
   sendUndo(occ) {
     if (occ.source_bill) {
@@ -170,13 +172,10 @@ export default class CalendarActionsController {
     this.setPending(true);
 
     try {
-      const reply = await request();
+      await request();
 
       this.close();
-
-      if (reply !== undefined) {
-        this.onChanged();
-      }
+      this.onChanged();
     } catch (error) {
       this.handleError(error, () => this.run(occ, request));
     }
@@ -193,6 +192,10 @@ export default class CalendarActionsController {
     const classified = classifyError(error);
 
     this.setPending(false);
+
+    if (classified.kind === 'sessionExpired') {
+      return;
+    }
 
     if (classified.kind === 'validation') {
       this.setError(classified);

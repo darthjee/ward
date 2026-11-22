@@ -1,6 +1,7 @@
 import MarkUnsentController from '../../../../../../../../../assets/js/components/resources/bank/providers/common/controllers/MarkUnsentController.js';
 import AccountantClient from '../../../../../../../../../assets/js/client/AccountantClient.js';
 import ApiError from '../../../../../../../../../assets/js/client/ApiError.js';
+import sessionExpiredError from '../../../../../../../../support/sessionExpiredError.js';
 
 const ORG = { kind: 'organization', orgId: 5 };
 
@@ -29,12 +30,13 @@ describe('MarkUnsentController', () => {
   });
 
   it('does not reload when the session expired', async () => {
-    deps.client.markUnsent.and.resolveTo(undefined);
+    deps.client.markUnsent.and.rejectWith(sessionExpiredError());
 
     await new MarkUnsentController(deps).markUnsent({ id: 9 });
 
     expect(deps.setPending).toHaveBeenCalledWith(false);
     expect(deps.reload).not.toHaveBeenCalled();
+    expect(deps.setError).not.toHaveBeenCalledWith(jasmine.objectContaining({ kind: jasmine.any(String) }));
   });
 
   it('shows a network failure with Retry', async () => {

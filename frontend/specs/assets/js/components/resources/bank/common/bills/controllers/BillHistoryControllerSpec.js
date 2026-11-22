@@ -4,6 +4,7 @@ import BillHistoryController, {
 import BillsClient from '../../../../../../../../../assets/js/client/BillsClient.js';
 import ProviderBillsClient from '../../../../../../../../../assets/js/client/ProviderBillsClient.js';
 import ApiError from '../../../../../../../../../assets/js/client/ApiError.js';
+import sessionExpiredError from '../../../../../../../../support/sessionExpiredError.js';
 
 const CONTEXT = { kind: 'organization', orgId: 5 };
 const DERIVED = {
@@ -136,11 +137,12 @@ describe('BillHistoryController', () => {
     });
 
     it('does not reload when the session expired', async () => {
-      client.undoOccurrencePayment.and.resolveTo(undefined);
+      client.undoOccurrencePayment.and.rejectWith(sessionExpiredError());
       await build().undo(DERIVED);
 
       expect(deps.reload).not.toHaveBeenCalled();
       expect(deps.setPending).toHaveBeenCalledWith(false);
+      expect(deps.setError).not.toHaveBeenCalledWith(jasmine.objectContaining({ kind: jasmine.any(String) }));
     });
 
     it('shows a 404 (already undone) as an alert and reloads', async () => {

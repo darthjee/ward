@@ -5,6 +5,7 @@ import AccountantHandoffController, {
 import AccountantClient from '../../../../../../../../../assets/js/client/AccountantClient.js';
 import Download from '../../../../../../../../../assets/js/components/resources/bank/common/download.js';
 import ApiError from '../../../../../../../../../assets/js/client/ApiError.js';
+import sessionExpiredError from '../../../../../../../../support/sessionExpiredError.js';
 
 const ORG = { kind: 'organization', orgId: 5 };
 const QUERY = { from: '2026-02-01', to: '2026-02-28', unsentOnly: true };
@@ -141,7 +142,7 @@ describe('AccountantHandoffController', () => {
     });
 
     it('stops loading when the session expired', async () => {
-      deps.client.listCharges.and.resolveTo(undefined);
+      deps.client.listCharges.and.rejectWith(sessionExpiredError());
 
       await new AccountantHandoffController(deps).load(QUERY);
 
@@ -206,10 +207,11 @@ describe('AccountantHandoffController', () => {
     });
 
     it('neither reloads nor reports when the session expired', async () => {
-      deps.client.markSent.and.resolveTo(undefined);
+      deps.client.markSent.and.rejectWith(sessionExpiredError());
 
       await new AccountantHandoffController(deps).markSent({ charges: CHARGES });
 
+      expect(merged()).toEqual(jasmine.objectContaining({ marking: false, confirming: false, error: null }));
       expect(merged().success).toBeNull();
       expect(deps.reload).not.toHaveBeenCalled();
     });

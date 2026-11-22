@@ -4,6 +4,7 @@ import BankAccountsLoader, {
 import ApiError from '../../../../../../../../../assets/js/client/ApiError.js';
 import { fetchSequence } from '../../../../../../../../support/fetchSequence.js';
 import { flushMicrotasks } from '../../../../../../../../support/flushMicrotasks.js';
+import sessionExpiredError from '../../../../../../../../support/sessionExpiredError.js';
 
 const PERSONAL = { kind: 'personal' };
 const ACCOUNTS = [{ id: 1, name: 'Main' }];
@@ -59,7 +60,7 @@ describe('BankAccountsLoader', () => {
   });
 
   it('reports nothing on an expired session', async () => {
-    client.listAccounts.and.resolveTo(undefined);
+    client.listAccounts.and.rejectWith(sessionExpiredError());
 
     await loader.load(PERSONAL, false, callbacks);
 

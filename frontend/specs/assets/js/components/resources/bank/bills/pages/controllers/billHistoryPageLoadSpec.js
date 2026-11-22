@@ -3,6 +3,7 @@ import BankClient from '../../../../../../../../../assets/js/client/BankClient.j
 import ProviderBillsClient from '../../../../../../../../../assets/js/client/ProviderBillsClient.js';
 import ApiError from '../../../../../../../../../assets/js/client/ApiError.js';
 import { flushMicrotasks } from '../../../../../../../../support/flushMicrotasks.js';
+import sessionExpiredError from '../../../../../../../../support/sessionExpiredError.js';
 
 const CONTEXT = { kind: 'organization', orgId: 5 };
 const BILL = { id: 9, provider_account_id: 3, description: 'Internet' };
@@ -59,7 +60,7 @@ describe('billHistoryPageLoad', () => {
   });
 
   it('reports nothing when the session expired', async () => {
-    clients.bills.getProviderBill.and.resolveTo(undefined);
+    clients.bills.getProviderBill.and.rejectWith(sessionExpiredError());
     buildBillHistoryPageLoadEffect(CONTEXT, '9', callbacks, clients)();
     await flushMicrotasks();
 
@@ -67,7 +68,7 @@ describe('billHistoryPageLoad', () => {
     expect(callbacks.onError).not.toHaveBeenCalled();
 
     clients.bills.getProviderBill.and.resolveTo(BILL);
-    clients.bank.getAccount.and.resolveTo(undefined);
+    clients.bank.getAccount.and.rejectWith(sessionExpiredError());
     buildBillHistoryPageLoadEffect(CONTEXT, '9', callbacks, clients)();
     await flushMicrotasks();
 

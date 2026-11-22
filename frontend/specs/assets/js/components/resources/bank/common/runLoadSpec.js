@@ -1,5 +1,6 @@
 import { buildLoadEffect, runLoad } from '../../../../../../../assets/js/components/resources/bank/common/runLoad.js';
 import ApiError from '../../../../../../../assets/js/client/ApiError.js';
+import sessionExpiredError from '../../../../../../support/sessionExpiredError.js';
 
 describe('runLoad', () => {
   let callbacks;
@@ -15,9 +16,11 @@ describe('runLoad', () => {
   });
 
   it('reports nothing for an expired session', async () => {
-    await runLoad(() => Promise.resolve(undefined), callbacks);
+    await runLoad(() => Promise.reject(sessionExpiredError()), callbacks);
 
     expect(callbacks.onLoaded).not.toHaveBeenCalled();
+    expect(callbacks.onNotFound).not.toHaveBeenCalled();
+    expect(callbacks.onError).not.toHaveBeenCalled();
   });
 
   it('reports Not-found on a 404', async () => {

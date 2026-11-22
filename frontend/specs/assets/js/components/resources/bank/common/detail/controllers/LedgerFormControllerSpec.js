@@ -1,5 +1,6 @@
 import LedgerFormController from '../../../../../../../../../assets/js/components/resources/bank/common/detail/controllers/LedgerFormController.js';
 import ApiError from '../../../../../../../../../assets/js/client/ApiError.js';
+import sessionExpiredError from '../../../../../../../../support/sessionExpiredError.js';
 
 const VALUES = {
   date: '2000-01-01', direction: 'out', amount: '12,50', description: 'Coffee', notes: '',
@@ -69,7 +70,7 @@ describe('LedgerFormController', () => {
   });
 
   it('resets pending on an expired session', async () => {
-    deps.client.createTransaction.and.resolveTo(undefined);
+    deps.client.createTransaction.and.rejectWith(sessionExpiredError());
 
     await controller.submit({ editing: null, values: VALUES }, { currency: 'BRL', page: 1 });
 

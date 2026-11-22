@@ -3,6 +3,7 @@ import BillFormController, {
 } from '../../../../../../../../../assets/js/components/resources/bank/bills/pages/controllers/BillFormController.js';
 import ProviderBillsClient from '../../../../../../../../../assets/js/client/ProviderBillsClient.js';
 import ApiError from '../../../../../../../../../assets/js/client/ApiError.js';
+import sessionExpiredError from '../../../../../../../../support/sessionExpiredError.js';
 
 const VALID = {
   kind: 'one_off', provider_account_id: '3', paying_account_id: '1', due_date: '2026-03-10', expected_amount: '120.50', description: 'Repair', notes: '',
@@ -74,11 +75,12 @@ const BILL = {
     });
 
     it('stays on the form when the session expired', async () => {
-      client.createProviderBill.and.resolveTo(undefined);
+      client.createProviderBill.and.rejectWith(sessionExpiredError());
       await build().create(VALID, 'BRL');
 
       expect(deps.navigate).not.toHaveBeenCalled();
       expect(deps.setPending).toHaveBeenCalledWith(false);
+      expect(deps.setSubmitError).not.toHaveBeenCalledWith(jasmine.objectContaining({ kind: jasmine.any(String) }));
     });
 
     it('sends only the changed fields on update', async () => {
@@ -211,7 +213,7 @@ const BILL = {
       });
 
       it('stays when the session expired', async () => {
-        client.deleteProviderBill.and.resolveTo(undefined);
+        client.deleteProviderBill.and.rejectWith(sessionExpiredError());
         await build().destroy(BILL);
 
         expect(deps.navigate).not.toHaveBeenCalled();

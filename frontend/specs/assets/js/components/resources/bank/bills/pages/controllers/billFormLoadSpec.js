@@ -6,6 +6,7 @@ import BankClient from '../../../../../../../../../assets/js/client/BankClient.j
 import ProviderBillsClient from '../../../../../../../../../assets/js/client/ProviderBillsClient.js';
 import ApiError from '../../../../../../../../../assets/js/client/ApiError.js';
 import { flushMicrotasks } from '../../../../../../../../support/flushMicrotasks.js';
+import sessionExpiredError from '../../../../../../../../support/sessionExpiredError.js';
 
 const CONTEXT = { kind: 'organization', orgId: 5 };
 const PROVIDERS = [{ id: 3, name: 'Plumber', currency: 'BRL' }];
@@ -62,7 +63,7 @@ describe('billFormLoad', () => {
     });
 
     it('reports nothing when the session expired', async () => {
-      clients.bills.getProviderBill.and.resolveTo(undefined);
+      clients.bills.getProviderBill.and.rejectWith(sessionExpiredError());
       buildBillFormLoadEffect(CONTEXT, '9', callbacks, clients)();
       await flushMicrotasks();
 

@@ -1,3 +1,4 @@
+import ApiError from '../../assets/js/client/ApiError.js';
 import AuthSession from '../../assets/js/client/AuthSession.js';
 import LoginModalEvents from '../../assets/js/client/LoginModalEvents.js';
 
@@ -66,4 +67,27 @@ export function expectSessionExpired() {
   expect(AuthSession.clear).toHaveBeenCalled();
   expect(LoginModalEvents.open).toHaveBeenCalledWith('password');
   expect(globalThis.window.location.hash).toBe('');
+}
+
+/**
+ * Asserts that a call rejected with the session-expired `ApiError` of a `401`
+ * `UNAUTHORIZED`/`Unauthorized` response.
+ *
+ * @param {Promise<*>} promise - The call under test.
+ * @returns {Promise<void>} Resolves once the assertions ran.
+ */
+export async function expectSessionExpiredRejection(promise) {
+  let caught;
+
+  try {
+    await promise;
+  } catch (error) {
+    caught = error;
+  }
+
+  expect(caught instanceof ApiError).toBe(true);
+  expect(caught.status).toBe(401);
+  expect(caught.code).toBe('UNAUTHORIZED');
+  expect(caught.message).toBe('Unauthorized');
+  expect(caught.sessionExpired).toBe(true);
 }

@@ -7,7 +7,8 @@ import { classifyError } from '../../../common/bankErrors.js';
  * @description Posts the single id to `mark-unsent.json` without confirmation, then reloads
  * the account and its ledger. While it runs the pending flag is set (the link is disabled). A
  * network / 5xx failure shows the page alert with Retry; a `400` / `404` shows its message and
- * reloads.
+ * reloads. A session-expired failure shows nothing (the login modal is already open) and only
+ * resets the pending flag.
  */
 export default class MarkUnsentController {
   /**
@@ -41,13 +42,10 @@ export default class MarkUnsentController {
     this.setPending(true);
 
     try {
-      const reply = await this.client.markUnsent(this.context, [transaction.id]);
+      await this.client.markUnsent(this.context, [transaction.id]);
 
       this.setPending(false);
-
-      if (reply !== undefined) {
-        this.reload();
-      }
+      this.reload();
     } catch (error) {
       this.handleError(error, () => this.markUnsent(transaction));
     }
@@ -64,6 +62,10 @@ export default class MarkUnsentController {
     const classified = classifyError(error);
 
     this.setPending(false);
+
+    if (classified.kind === 'sessionExpired') {
+      return;
+    }
 
     if (classified.kind === 'transient') {
       this.setError({ ...classified, retry });

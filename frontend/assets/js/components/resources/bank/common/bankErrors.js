@@ -1,4 +1,5 @@
 import ApiError from '../../../../client/ApiError.js';
+import { isSessionExpired } from '../../../../client/isSessionExpired.js';
 import { PERMISSION_DENIED_MESSAGE } from '../../../common/PermissionDenied.jsx';
 
 /**
@@ -16,7 +17,8 @@ function validationMessages(error) {
  * Classify an error raised by a bank request.
  *
  * @description Branches on `status` / `code`, never on the message text:
- * `notFound` (404), `forbidden` (403, with the permission message), `conflict` (409, with its
+ * `sessionExpired` (the `ApiClient` could not recover the session, and has already re-opened the
+ * login modal — callers must show nothing), `notFound` (404), `forbidden` (403, with the permission message), `conflict` (409, with its
  * `code`), `validation` (400, with its messages; 422, with its message alone) and `transient` (network failure, 5xx, or anything that is not
  * an {@link ApiError}).
  * @param {*} error - The caught error.
@@ -24,6 +26,12 @@ function validationMessages(error) {
  *   The classification.
  */
 export function classifyError(error) {
+  if (isSessionExpired(error)) {
+    return {
+      kind: 'sessionExpired', code: error.code, message: error.message, messages: [],
+    };
+  }
+
   if (!(error instanceof ApiError) || error.status >= 500) {
     return {
       kind: 'transient', code: undefined, message: 'Something went wrong. Please try again.', messages: [],

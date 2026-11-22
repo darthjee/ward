@@ -5,6 +5,7 @@ import OrgListController, {
 import AuthEvents from '../../../../../../../assets/js/client/AuthEvents.js';
 import OrganizationsClient from '../../../../../../../assets/js/client/OrganizationsClient.js';
 import { installFakeWindow, uninstallFakeWindow } from '../../../../../../support/fakeWindow.js';
+import sessionExpiredError from '../../../../../../support/sessionExpiredError.js';
 
 const ORGS = [{ id: 5, name: 'Acme', role: 'owner' }];
 const loggedIn = (userId = 1) => ({ detail: { loggedIn: true, isAdmin: false, userId } });
@@ -104,9 +105,9 @@ describe('OrgListController', () => {
     });
   });
 
-  describe('on an expired session (undefined result)', () => {
+  describe('on an expired session (session-expired rejection)', () => {
     beforeEach(() => {
-      client.list.and.resolveTo(undefined);
+      client.list.and.rejectWith(sessionExpiredError());
     });
 
     it('leaves the list unloaded and does not report a session load', async () => {

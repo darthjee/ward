@@ -1,3 +1,4 @@
+import { isSessionExpired } from '../../../../../client/isSessionExpired.js';
 import OrganizationsClient from '../../../../../client/OrganizationsClient.js';
 import { landingFor, organizationContext } from '../../../../../utils/context/ownerContext.js';
 import { validateOrganizationName } from '../../../../../utils/validation/fieldValidators.js';
@@ -7,7 +8,8 @@ import navigate from './navigation.js';
  * Shared submit flow of the organization name forms (create and rename): validates the name,
  * sets `pending` while the request runs, then refreshes the org list and navigates to the
  * organization's overview. A failure (e.g. a `400`) shows the backend message and resets
- * `pending`; an `undefined` result (session expired) resets `pending` without navigating.
+ * `pending`; a session-expired rejection resets `pending` without showing an error or
+ * navigating.
  */
 export default class OrganizationFormController {
   /**
@@ -55,11 +57,6 @@ export default class OrganizationFormController {
     try {
       const org = await request(name.trim());
 
-      if (!org) {
-        this.setPending(false);
-        return;
-      }
-
       await this.refreshOrgs();
       this.navigate(landingFor(organizationContext(org.id)));
     } catch (error) {
@@ -68,13 +65,17 @@ export default class OrganizationFormController {
   }
 
   /**
-   * Handle a failed request: show its message and reset `pending`.
+   * Handle a failed request: show its message and reset `pending` (a session-expired
+   * rejection only resets `pending`).
    *
    * @param {Error} error - The error thrown by the client.
    * @returns {void} Nothing.
    */
   handleSubmitError(error) {
-    this.setSubmitError(error.message);
+    if (!isSessionExpired(error)) {
+      this.setSubmitError(error.message);
+    }
+
     this.setPending(false);
   }
 }

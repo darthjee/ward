@@ -33,6 +33,12 @@ describe('ApiError', () => {
     expect(error.details).toBeUndefined();
   });
 
+  it('is not marked as a session expiry by default', () => {
+    const error = new ApiError(401, 'Unauthorized');
+
+    expect(error.sessionExpired).toBe(false);
+  });
+
   it('is named ApiError', () => {
     const error = new ApiError(400, 'bad request');
 

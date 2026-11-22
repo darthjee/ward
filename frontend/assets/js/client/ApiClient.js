@@ -89,48 +89,64 @@ async function request(method, path, body) {
 }
 
 /**
- * End the client-side session: clear the stored refresh token and open the login modal in
- * Password mode via the shared {@link LoginModalEvents} bus — a pure client-side state
- * transition, with no API call of its own. SSR/spec-safe — a no-op when `window` is not
- * defined, the same way the shared `redirectHome` helper guards it.
+ * End the client-side session and reject: clear the stored refresh token and open the login
+ * modal in Password mode via the shared {@link LoginModalEvents} bus — a pure client-side state
+ * transition, with no API call of its own. The modal opening is SSR/spec-safe — skipped when
+ * `window` is not defined, the same way the shared `redirectHome` helper guards it.
  *
- * @returns {undefined} Always `undefined`, so callers can `return` it directly.
+ * @description The given error is marked with `sessionExpired = true` (see
+ * {@link isSessionExpired}) and then thrown, so callers can tell a session expiry (which they
+ * must not display) apart from a real failure.
+ * @param {ApiError} error - The `ApiError` built from the original `401` response.
+ * @returns {never} Never returns; always throws `error`.
+ * @throws {ApiError} The given error, marked as `sessionExpired`.
  */
-function sessionExpired() {
+function sessionExpired(error) {
   AuthSession.clear();
 
   if (typeof window !== 'undefined') {
     LoginModalEvents.open('password');
   }
 
-  return undefined;
+  error.sessionExpired = true;
+
+  throw error;
 }
 
 /**
  * Submit a JSON request, always sending same-origin credentials so the session cookie set
  * by the backend (via `Set-Cookie`) is stored/sent automatically. On a `401`, delegates to
  * {@link handleUnauthorized} unless this is already a retried request, in which case the
- * session is treated as expired directly. On a `403`, announces it on the shared
- * {@link PermissionEvents} bus (so the caller's role is refreshed) before throwing.
+ * session is treated as expired directly; with `skipAuthRecovery` a `401` is instead thrown as
+ * a plain {@link ApiError}, with no refresh and no session change. On a `403`, announces it on
+ * the shared {@link PermissionEvents} bus (so the caller's role is refreshed) before throwing.
  *
  * @param {string} method - HTTP method.
  * @param {string} path - Request path.
  * @param {object} body - Fields to serialize as the JSON request body.
- * @param {boolean} [isRetry] - Whether this call is already a post-refresh retry.
- * @returns {Promise<object>} The parsed JSON response body, on success; `undefined` when the
- *   session turned out to be expired.
+ * @param {object} [options] - Internal call options.
+ * @param {boolean} [options.skipAuthRecovery] - Whether a `401` must be thrown as-is, without
+ *   attempting a refresh (for `@Public()` routes, where a `401` is a real credential error).
+ * @param {boolean} [options.isRetry] - Whether this call is already a post-refresh retry.
+ * @param {ApiError} [options.originalError] - The `ApiError` of the first `401`, carried over
+ *   to a retry so a failed recovery rejects with it.
+ * @returns {Promise<object>} The parsed JSON response body, on success.
+ * @throws {ApiError} On any failed response, including an expired session (see
+ *   {@link isSessionExpired}).
  */
-async function sendJson(method, path, body, isRetry = false) {
+async function sendJson(method, path, body, { skipAuthRecovery = false, isRetry = false, originalError } = {}) {
   const { response, data } = await request(method, path, body);
 
   if (response.ok) {
     return data;
   }
 
-  if (response.status === 401) {
+  if (response.status === 401 && !skipAuthRecovery) {
+    const error = originalError ?? buildApiError(response, data);
+
     return isRetry
-      ? sessionExpired()
-      : handleUnauthorized(method, path, body);
+      ? sessionExpired(error)
+      : handleUnauthorized(method, path, body, error);
   }
 
   if (response.status === 403) {
@@ -148,32 +164,37 @@ async function sendJson(method, path, body, isRetry = false) {
  * @param {string} method - Original request's HTTP method.
  * @param {string} path - Original request's path.
  * @param {object} body - Original request's JSON body.
- * @returns {Promise<object>} The retried request's parsed JSON body, on success; `undefined`
- *   when the session turned out to be expired.
+ * @param {ApiError} originalError - The `ApiError` built from the original `401` response.
+ * @returns {Promise<object>} The retried request's parsed JSON body, on success.
+ * @throws {ApiError} `originalError`, marked as `sessionExpired`, when the session turned out
+ *   to be expired.
  */
-async function handleUnauthorized(method, path, body) {
+async function handleUnauthorized(method, path, body, originalError) {
   const refreshToken = AuthSession.get();
 
   if (!refreshToken) {
-    return sessionExpired();
+    return sessionExpired(originalError);
   }
 
   const refreshResponse = await request('POST', REFRESH_PATH, { refreshToken });
 
   if (!refreshResponse.response.ok) {
-    return sessionExpired();
+    return sessionExpired(originalError);
   }
 
   AuthSession.set(refreshResponse.data.refreshToken);
 
-  return sendJson(method, path, body, true);
+  return sendJson(method, path, body, { isRetry: true, originalError });
 }
 
 /**
  * Generic JSON HTTP client used by resource-specific clients. Transparently recovers from an
  * expired access token: on a `401`, it refreshes the session once (via the stored refresh
  * token) and retries the original request; if there is no refresh token to use, or the
- * refresh itself fails, the session is treated as expired.
+ * refresh itself fails, the session is cleared, the login modal is opened and the call rejects
+ * with the original `401`'s {@link ApiError}, marked as `sessionExpired`. Every method accepts
+ * a trailing `{ skipAuthRecovery: true }` option, which turns that recovery off so a `401` is
+ * thrown as a plain {@link ApiError} (used for `@Public()` routes).
  */
 const ApiClient = {
   /**
@@ -181,11 +202,13 @@ const ApiClient = {
    * {@link ApiClient.postJson}.
    *
    * @param {string} path - Request path.
-   * @returns {Promise<object>} The parsed JSON response body, on success; `undefined` when the
-   *   session turned out to be expired.
+   * @param {{skipAuthRecovery?: boolean}} [options] - Call options; `skipAuthRecovery` disables
+   *   the `401` refresh-and-retry recovery (default `false`).
+   * @returns {Promise<object>} The parsed JSON response body, on success.
+   * @throws {ApiError} On a failed response, including an expired session.
    */
-  async getJson(path) {
-    return sendJson('GET', path, undefined);
+  async getJson(path, options) {
+    return sendJson('GET', path, undefined, options);
   },
 
   /**
@@ -194,11 +217,13 @@ const ApiClient = {
    *
    * @param {string} path - Request path.
    * @param {object} body - Fields to serialize as the JSON request body.
-   * @returns {Promise<object>} The parsed JSON response body, on success; `undefined` when the
-   *   session turned out to be expired.
+   * @param {{skipAuthRecovery?: boolean}} [options] - Call options; `skipAuthRecovery` disables
+   *   the `401` refresh-and-retry recovery (default `false`).
+   * @returns {Promise<object>} The parsed JSON response body, on success.
+   * @throws {ApiError} On a failed response, including an expired session.
    */
-  async postJson(path, body) {
-    return sendJson('POST', path, body);
+  async postJson(path, body, options) {
+    return sendJson('POST', path, body, options);
   },
 
   /**
@@ -207,11 +232,13 @@ const ApiClient = {
    *
    * @param {string} path - Request path.
    * @param {object} body - Fields to serialize as the JSON request body.
-   * @returns {Promise<object>} The parsed JSON response body, on success; `undefined` when the
-   *   session turned out to be expired.
+   * @param {{skipAuthRecovery?: boolean}} [options] - Call options; `skipAuthRecovery` disables
+   *   the `401` refresh-and-retry recovery (default `false`).
+   * @returns {Promise<object>} The parsed JSON response body, on success.
+   * @throws {ApiError} On a failed response, including an expired session.
    */
-  async deleteJson(path, body) {
-    return sendJson('DELETE', path, body);
+  async deleteJson(path, body, options) {
+    return sendJson('DELETE', path, body, options);
   },
 
   /**
@@ -220,11 +247,13 @@ const ApiClient = {
    *
    * @param {string} path - Request path.
    * @param {object} body - Fields to serialize as the JSON request body.
-   * @returns {Promise<object>} The parsed JSON response body, on success; `undefined` when the
-   *   session turned out to be expired.
+   * @param {{skipAuthRecovery?: boolean}} [options] - Call options; `skipAuthRecovery` disables
+   *   the `401` refresh-and-retry recovery (default `false`).
+   * @returns {Promise<object>} The parsed JSON response body, on success.
+   * @throws {ApiError} On a failed response, including an expired session.
    */
-  async patchJson(path, body) {
-    return sendJson('PATCH', path, body);
+  async patchJson(path, body, options) {
+    return sendJson('PATCH', path, body, options);
   },
 };
 

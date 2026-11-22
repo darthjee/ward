@@ -1,7 +1,16 @@
 import { classifyError } from '../../../../../../../assets/js/components/resources/bank/common/bankErrors.js';
 import ApiError from '../../../../../../../assets/js/client/ApiError.js';
+import sessionExpiredError from '../../../../../../support/sessionExpiredError.js';
 
 describe('classifyError', () => {
+  it('classifies a session-expired rejection as sessionExpired, before any status rule', () => {
+    expect(classifyError(sessionExpiredError())).toEqual(jasmine.objectContaining({ kind: 'sessionExpired' }));
+  });
+
+  it('does not treat a plain 401 as sessionExpired', () => {
+    expect(classifyError(new ApiError(401, 'Unauthorized', 'UNAUTHORIZED')).kind).toBe('transient');
+  });
+
   it('classifies a 404 as notFound', () => {
     expect(classifyError(new ApiError(404, 'Not found', 'NOT_FOUND')).kind).toBe('notFound');
   });
