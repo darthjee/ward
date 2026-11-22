@@ -3,10 +3,20 @@ import AuthSession from './AuthSession.js';
 import pickDefined from './pickDefined.js';
 
 /**
+ * `ApiClient` options for the backend's `@Public()` routes: a `401` there is a real error to
+ * show (e.g. wrong credentials), not an expired session, so no refresh/retry is attempted.
+ */
+const PUBLIC = { skipAuthRecovery: true };
+
+/**
  * HTTP client for auth-related requests (registration, login, refresh, logout). Every method
  * that receives a fresh refresh token persists it via {@link AuthSession} before resolving,
  * and `logout` clears it regardless of whether the request itself succeeds — the client-side
- * session should still end.
+ * session should still end. Methods hitting a `@Public()` route (everything except `logout`,
+ * the authorization-request review/approve/deny calls and the account calls) opt out of the
+ * `ApiClient`'s `401` session recovery, so a `401` rejects with its own `ApiError`; the other
+ * methods reject with a session-expired `ApiError` (see `isSessionExpired`) when the session
+ * cannot be recovered.
  */
 const AccountsClient = {
   /**
@@ -25,7 +35,7 @@ const AccountsClient = {
       email,
       password,
       password_confirmation: passwordConfirmation,
-    });
+    }, PUBLIC);
 
     AuthSession.set(result.refreshToken);
 
@@ -40,7 +50,7 @@ const AccountsClient = {
    *   refresh token.
    */
   async login({ username, password }) {
-    const result = await ApiClient.postJson('/auth/login.json', { username, password });
+    const result = await ApiClient.postJson('/auth/login.json', { username, password }, PUBLIC);
 
     AuthSession.set(result.refreshToken);
 
@@ -55,7 +65,7 @@ const AccountsClient = {
    *   refresh token.
    */
   async refresh(refreshToken) {
-    const result = await ApiClient.postJson('/auth/refresh.json', { refreshToken });
+    const result = await ApiClient.postJson('/auth/refresh.json', { refreshToken }, PUBLIC);
 
     AuthSession.set(result.refreshToken);
 
@@ -90,7 +100,7 @@ const AccountsClient = {
    *   when `loggedIn` is `true`) and `status: 'pending'` for a user awaiting approval.
    */
   async status(refreshToken) {
-    return ApiClient.postJson('/auth/status.json', { refreshToken });
+    return ApiClient.postJson('/auth/status.json', { refreshToken }, PUBLIC);
   },
 
   /**
@@ -103,7 +113,7 @@ const AccountsClient = {
    *   email matched an account.
    */
   async recover(email) {
-    return ApiClient.postJson('/auth/recover.json', { email });
+    return ApiClient.postJson('/auth/recover.json', { email }, PUBLIC);
   },
 
   /**
@@ -121,7 +131,7 @@ const AccountsClient = {
       token,
       password,
       password_confirmation: passwordConfirmation,
-    });
+    }, PUBLIC);
   },
 
   /**
@@ -135,7 +145,7 @@ const AccountsClient = {
    *   identifier, the token used to poll it, and its ISO-8601 expiry timestamp.
    */
   async createAuthorizationRequest(username) {
-    return ApiClient.postJson('/auth/authorization-requests.json', { username });
+    return ApiClient.postJson('/auth/authorization-requests.json', { username }, PUBLIC);
   },
 
   /**
@@ -156,6 +166,7 @@ const AccountsClient = {
     const result = await ApiClient.postJson(
       `/auth/authorization-requests/${uuid}/poll.json`,
       { pollToken },
+      PUBLIC,
     );
 
     if (result.status === 'approved') {

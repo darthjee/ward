@@ -227,11 +227,14 @@ describe('buildPollTick', () => {
     expect(onRejected).not.toHaveBeenCalled();
   });
 
-  it('treats a falsy resolve as open', async () => {
-    client.pollAuthorizationRequest.and.resolveTo(undefined);
+  it('reschedules, without rejecting, when the poll fails with a 401 ApiError', async () => {
+    const error = new Error('Unauthorized');
+    error.status = 401;
+    client.pollAuthorizationRequest.and.rejectWith(error);
 
     await buildTick()();
 
+    expect(onTick).toHaveBeenCalledTimes(1);
     expect(reschedule).toHaveBeenCalledTimes(1);
     expect(onRejected).not.toHaveBeenCalled();
   });
