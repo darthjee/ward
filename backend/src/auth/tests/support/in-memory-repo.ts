@@ -35,6 +35,14 @@ export function matchesCondition(rowValue: unknown, conditionValue: unknown): bo
 }
 
 // Standing in for a real database, mirroring the CI comment on
+// The chainable `update().set().where().execute()` stub returned by `createQueryBuilder`.
+interface FakeUpdateQueryBuilder {
+  update(): FakeUpdateQueryBuilder;
+  set(payload: Record<string, unknown>): FakeUpdateQueryBuilder;
+  where(sql: string, params: Record<string, unknown>): FakeUpdateQueryBuilder;
+  execute(): Promise<{ affected: number }>;
+}
+
 // `backend_tests`'s "No DB service container yet" strategy: backend specs
 // inject mocked TypeORM repositories rather than hitting a live database.
 // Shared by every auth e2e spec/support file — includes a
@@ -126,13 +134,13 @@ export function createInMemoryRepo<T extends { id?: number }>() {
     createQueryBuilder: () => {
       let setPayload: Record<string, unknown> = {};
       let whereParams: Record<string, unknown> = {};
-      const builder = {
-        update: (): typeof builder => builder,
-        set: (payload: Record<string, unknown>): typeof builder => {
+      const builder: FakeUpdateQueryBuilder = {
+        update: () => builder,
+        set: (payload: Record<string, unknown>) => {
           setPayload = payload;
           return builder;
         },
-        where: (_sql: string, params: Record<string, unknown>): typeof builder => {
+        where: (_sql: string, params: Record<string, unknown>) => {
           whereParams = params;
           return builder;
         },
@@ -147,7 +155,7 @@ export function createInMemoryRepo<T extends { id?: number }>() {
           }
 
           Object.entries(setPayload).forEach(([key, value]) => {
-            (row as never)[key] = typeof value === 'function' ? new Date() : value;
+            Object.assign(row, { [key]: typeof value === 'function' ? new Date() : value });
           });
 
           return { affected: 1 };

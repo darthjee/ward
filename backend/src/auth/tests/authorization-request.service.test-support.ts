@@ -18,6 +18,9 @@ export type RepoMock<T extends object> = {
   createQueryBuilder: jest.Mock;
 } & Partial<T>;
 
+/** A chainable `update/set/where/execute` query builder mock. */
+export type QueryBuilderMock = { update: jest.Mock; set: jest.Mock; where: jest.Mock; execute: jest.Mock };
+
 /**
  * Builds a fake TypeORM query builder mock resolving to a fixed UPDATE result.
  *
@@ -25,13 +28,8 @@ export type RepoMock<T extends object> = {
  * @param executeResult.affected - the number of rows the UPDATE affected.
  * @returns a chainable `update/set/where/execute` mock.
  */
-export function queryBuilderMock(executeResult: { affected: number }): {
-  update: jest.Mock;
-  set: jest.Mock;
-  where: jest.Mock;
-  execute: jest.Mock;
-} {
-  const builder = {
+export function queryBuilderMock(executeResult: { affected: number }): QueryBuilderMock {
+  const builder: QueryBuilderMock = {
     update: jest.fn(() => builder),
     set: jest.fn(() => builder),
     where: jest.fn(() => builder),
