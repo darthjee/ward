@@ -2,7 +2,7 @@ import type { OwnerContext } from '../../core/owner-context.js';
 import { Account } from '../entities/account.entity.js';
 
 export const PERSONAL: OwnerContext = { kind: 'user', userId: 7 };
-export const ORGANIZATION: OwnerContext = { kind: 'organization', organizationId: 3, role: 'owner' };
+export const ORGANIZATION: Extract<OwnerContext, { kind: 'organization' }> = { kind: 'organization', organizationId: 3, role: 'owner' };
 
 export function buildAccount(overrides: Partial<Account> = {}): Account {
   return Object.assign(new Account(), {
