@@ -17,6 +17,7 @@ import { BillPayment } from '../entities/bill-payment.entity.js';
 import { ProviderBill } from '../entities/provider-bill.entity.js';
 import { todayUtc } from '../ledger-date.js';
 import { addDays } from '../occurrence-generator.js';
+import type { OccurrenceResponse } from '../occurrence-response.js';
 
 jest.mock('../ledger.query.js', () => jest.requireActual('./support/in-memory-ledger.query.js'));
 jest.mock('../account-balances.query.js', () => jest.requireActual('./support/in-memory-ledger.query.js'));
@@ -282,7 +283,7 @@ describe('calendar (e2e)', () => {
         await addPayment({ sourceAccountId: fee.id, billId: paidBill.id, dueDate: paidBill.dueDate as string });
 
         const response = await overdue(orgId).expect(200);
-        const rows = response.body.occurrences as Body[];
+        const rows = response.body.occurrences as OccurrenceResponse[];
 
         expect(rows.length).toBeGreaterThanOrEqual(3);
         rows.forEach((row) => {
@@ -292,7 +293,7 @@ describe('calendar (e2e)', () => {
         });
         expect(rows.map((row) => row.effective_date)).toEqual([...rows.map((row) => row.effective_date)].sort());
         expect(rows.filter((row) => row.kind === 'bill')).toEqual([expect.objectContaining({ expected_amount: '12.34' })]);
-        expect(rows.filter((row) => row.kind === 'debt').every((row) => (row.source_account as Body).id === loan.id)).toBe(true);
+        expect(rows.filter((row) => row.kind === 'debt').every((row) => row.source_account.id === loan.id)).toBe(true);
         expect(response.body.totals).toEqual([
           { currency: 'BRL', open: ((rows.length - 1) * 500 + 12.34).toFixed(2) },
         ]);

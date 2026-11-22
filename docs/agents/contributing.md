@@ -50,7 +50,7 @@ folder to its CircleCI job(s) and the equivalent local commands.
 
 | Modified folder | CI job(s) | Local commands |
 |------------------|-----------|-----------------|
-| `backend/` | `backend_tests`, `backend_integration`, `backend_checks` | `docker-compose run ward_tests yarn coverage`, `docker-compose run --rm ward_tests yarn test:integration` and `docker-compose run ward_tests yarn lint` |
+| `backend/` | `backend_tests`, `backend_integration`, `backend_checks`, `backend_build`, `backend_typecheck` | `docker-compose run ward_tests yarn coverage`, `docker-compose run --rm ward_tests yarn test:integration`, `docker-compose run ward_tests yarn lint`, `docker-compose run --rm --no-deps ward_tests yarn build` and `docker-compose run --rm --no-deps ward_tests yarn typecheck` |
 | `frontend/` | `jasmine`, `frontend-checks` | `docker-compose run ward_fe yarn coverage` and `docker-compose run ward_fe yarn lint` |
 | `proxy/` | `proxy_extension_tests` | `docker-compose run proxy_tests` and `docker-compose run --rm proxy_lint` (PSR-12 check, local only — no CI job) |
 | `.circleci/`, `scripts/`, `bin/`, `dockerfiles/`, `docker-compose.yml`, `proxy/prod_configuration/` | `release-*-base` (base images), `upload_extension`, `upload_proxy_files`, `upload_fe_files`, `copy_proxy_configuration`, `build-and-release`, `release`, `coverage-final` | The jobs themselves run only in CI / on tagged releases. For `.circleci/config.yml`, validate the config locally with `docker-compose run --rm circleci config validate` (use `... circleci config process .circleci/config.yml` to inspect the expanded jobs); for the rest, verify by reading the job definitions in `.circleci/config.yml`. |

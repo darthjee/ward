@@ -43,7 +43,8 @@ docker-compose run --rm ward_tests yarn test          # run Jest specs
 docker-compose run --rm ward_tests yarn coverage       # Jest with coverage (CI: backend_tests)
 docker-compose run --rm ward_tests yarn lint           # ESLint check (CI: backend_checks)
 docker-compose run --rm ward_tests yarn lint_fix       # ESLint auto-fix
-docker-compose run --rm ward_tests yarn build          # nest build (tsc, via tsconfig.build.json)
+docker-compose run --rm ward_tests yarn build          # nest build (tsc, via tsconfig.build.json; CI: backend_build)
+docker-compose run --rm ward_tests yarn typecheck      # tsc --noEmit over prod + test sources (CI: backend_typecheck)
 docker-compose run --rm ward_app yarn migration:run    # apply TypeORM migrations
 docker-compose run --rm ward_app yarn migration:revert # revert the last migration
 ```

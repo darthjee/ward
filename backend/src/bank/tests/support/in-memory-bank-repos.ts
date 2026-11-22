@@ -289,7 +289,7 @@ export function createInMemoryBankRepos(): InMemoryBankRepos {
     // Bills and payments cascade from their provider / source account; paying accounts are SET NULL.
     keep(bills.rows, (row) => !doomed.has(row.providerAccountId));
     keep(billPayments.rows, (row) => !doomed.has(row.sourceAccountId));
-    for (const row of [...bills.rows, ...billPayments.rows, ...debtDetails.rows, ...providerExpenseDetails.rows]) {
+    for (const row of [...bills.rows, ...billPayments.rows, ...debtDetails.rows]) {
       if (row.payingAccountId !== null && doomed.has(row.payingAccountId)) row.payingAccountId = null;
     }
 

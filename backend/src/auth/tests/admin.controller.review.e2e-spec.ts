@@ -231,7 +231,7 @@ describe('AdminController review (e2e)', () => {
     describe.each([
       ['darth-pending', UserStatus.PENDING],
       ['leia', UserStatus.APPROVED],
-    ])('for %s (%s)', (username) => {
+    ])('for %s (%s)', (username, _status) => {
       let response: request.Response;
 
       beforeEach(async () => {

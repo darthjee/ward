@@ -21,7 +21,9 @@ tag, and `skip_if_unchanged` makes even tag builds a no-op when neither `dockerf
 ```
 release-circleci_ward-base(-arm64) ─┬─ backend_tests ──┐
                                         ├─ backend_integration ─┤
-                                        └─ backend_checks ─┤
+                                        ├─ backend_checks ─┤
+                                        ├─ backend_build ──┤
+                                        └─ backend_typecheck ┤
                                           jasmine ─────────┼─ build-and-release ─────────────────┐
                                     frontend-checks ───────┤                                      │
                               proxy_extension_tests ───────┤                                      │
@@ -38,9 +40,9 @@ jasmine ───────┘
 release-ward-base(-arm64)  — published for local/dev use; nothing in this workflow requires it
 ```
 
-The six boxes feeding `build-and-release`/`upload_proxy_files`/`upload_fe_files`
-(`backend_tests`, `backend_integration`, `backend_checks`, `jasmine`, `frontend-checks`,
-`proxy_extension_tests`) are
+The eight boxes feeding `build-and-release`/`upload_proxy_files`/`upload_fe_files`
+(`backend_tests`, `backend_integration`, `backend_checks`, `backend_build`, `backend_typecheck`,
+`jasmine`, `frontend-checks`, `proxy_extension_tests`) are
 each required directly by all three of those jobs — the diagram only draws the edges once to
 stay readable. `coverage-final` requires only `backend_tests` and `jasmine` (the two jobs that
 upload partial Codacy coverage) and isn't required by anything else — it doesn't gate the release
@@ -98,7 +100,8 @@ holds transitively.
 
 `release-ward-base(-arm64)` and `release-circleci_ward-base(-arm64)` don't need a direct
 `build-and-release`/`release` dependency either: `release-circleci_ward-base(-arm64)` is
-already required by `backend_tests`/`backend_integration`/`backend_checks`, all of which run before
+already required by `backend_tests`/`backend_integration`/`backend_checks`/`backend_build`/
+`backend_typecheck`, all of which run before
 `build-and-release`/`release` in the graph, so they're safely ordered transitively too.
 `release-ward-base(-arm64)` (the dev-only base image) isn't required by anything in this
 workflow at all — nothing downstream depends on it being fresh.
@@ -106,7 +109,7 @@ workflow at all — nothing downstream depends on it being fresh.
 ## CI jobs
 
 The every-push jobs on `circleci_ward-base` (`backend_tests`, `backend_integration`,
-`backend_checks`, `coverage-final`) stay pinned to the published `0.1.0` until the first tag
+`backend_checks`, `backend_build`, `backend_typecheck`, `coverage-final`) stay pinned to the published `0.1.0` until the first tag
 build publishes `0.2.0` (the version in `version`); `release-image` is a no-op on branch
 builds, so a pin to an unpublished tag fails to pull. Move them to `0.2.0` once it exists.
 
@@ -115,6 +118,8 @@ builds, so a pin to an unpublished tag fails to pull. Move them to `0.2.0` once 
 | `backend_tests` | `darthjee/circleci_ward-base:0.1.0` | every push | `yarn_project` instance (`dir: backend`, `script: coverage`, `upload_coverage: true`): backend test suite + coverage; uploads a partial Codacy coverage report afterward (best-effort, non-blocking) |
 | `backend_integration` | `darthjee/circleci_ward-base:0.1.0` + `mysql:9.3.0` service container | every push | Standalone job (not a `yarn_project` instance, since it needs a second image): `setup_project` (`dir: backend`), then `npm run test:integration` — the `*.integration-spec.ts` suite against a throwaway MySQL database (`ward_test`, reached at `127.0.0.1:3306` via the job-level `WARD_TEST_MYSQL_*` env). No wait step (the suite's Jest `globalSetup` retries the connection) and no coverage upload |
 | `backend_checks` | `darthjee/circleci_ward-base:0.1.0` | every push | `yarn_project` instance (`dir: backend`, `script: lint`): backend ESLint |
+| `backend_build` | `darthjee/circleci_ward-base:0.1.0` | every push | `yarn_project` instance (`dir: backend`, `script: build`): `nest build` with `tsconfig.build.json` (production sources only; tests excluded) |
+| `backend_typecheck` | `darthjee/circleci_ward-base:0.1.0` | every push | `yarn_project` instance (`dir: backend`, `script: typecheck`): `tsc --noEmit -p tsconfig.json` over production **and** test sources, since `@swc/jest` strips types without checking them |
 | `jasmine` | `darthjee/circleci_node:0.2.1` | every push | `yarn_project` instance (`dir: frontend`, `script: coverage`, `upload_coverage: true`): frontend test suite + coverage; uploads a partial Codacy coverage report afterward (best-effort, non-blocking) |
 | `frontend-checks` | `darthjee/circleci_node:0.2.1` | every push | `yarn_project` instance (`dir: frontend`, `script: lint`): frontend ESLint |
 | `proxy_extension_tests` | `darthjee/tent-test:1.1.0` | every push | PHPUnit tests for `proxy/extension/` |
@@ -139,7 +144,7 @@ step strips the leading `-` from `suffix` before calling `bin/image.sh push <ima
 | Instance name | `image` param | Publishes |
 |---------------|----------------|-----------|
 | `release-ward-base(-arm64)` | `ward-base` | Dev backend base image |
-| `release-circleci_ward-base(-arm64)` | `circleci_ward-base` | CI backend base image (used by `backend_tests`/`backend_checks`) |
+| `release-circleci_ward-base(-arm64)` | `circleci_ward-base` | CI backend base image (used by `backend_tests`/`backend_integration`/`backend_checks`/`backend_build`/`backend_typecheck`/`coverage-final`) |
 | `release-production_ward-base(-arm64)` | `production_ward-base` | Production backend base image (`production_ward` is `FROM` this, by `:latest`) |
 | `release-vite_ward-base(-arm64)` | `vite_ward-base` | Frontend/proxy build base image |
 
@@ -171,7 +176,8 @@ of `bin/image.sh`; the only per-image content left in the Dockerfile is each tar
 
 ## CI setup pattern (backend/frontend jobs)
 
-`backend_tests`, `backend_checks`, `jasmine` and `frontend-checks` are four workflow entries of one
+`backend_tests`, `backend_checks`, `backend_build`, `backend_typecheck`, `jasmine` and
+`frontend-checks` are six workflow entries of one
 `yarn_project` job (parameters: `dir` — `backend` | `frontend`, `image`, `script`, `step_name`,
 `upload_coverage`), each setting `name:` to the job name shown above. The job runs `checkout`,
 the shared `setup_project` command, `npm run <script>`, and — when `upload_coverage` is true — the

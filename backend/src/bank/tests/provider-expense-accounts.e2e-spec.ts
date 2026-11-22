@@ -11,6 +11,7 @@ import {
   send,
   withoutTimestamp,
 } from './support/build-bank-test-app.js';
+import type { ProviderExpenseResponse } from '../account-types/provider-expense-details.js';
 import type { InMemoryBankRepos } from './support/in-memory-bank-repos.js';
 import { AccountBalancesQuery } from './support/in-memory-ledger.query.js';
 import { ProviderBillsSummaryQuery } from './support/in-memory-provider-bills-summary.query.js';
@@ -170,8 +171,8 @@ describe('provider-expense accounts (e2e)', () => {
         const trimmed = await createProvider(orgId, { provider_expense: { provider_tax_id: '  123.456  ' } });
         const blank = await createProvider(orgId, { provider_expense: { provider_tax_id: '   ' } });
 
-        expect(trimmed.provider_expense.provider_tax_id).toBe('123.456');
-        expect(blank.provider_expense.provider_tax_id).toBeNull();
+        expect((trimmed.provider_expense as ProviderExpenseResponse).provider_tax_id).toBe('123.456');
+        expect((blank.provider_expense as ProviderExpenseResponse).provider_tax_id).toBeNull();
       });
 
       it.each(['0.00', '150.00', '-80.00'])('accepts the opening balance %p', async (opening) => {

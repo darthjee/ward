@@ -34,6 +34,7 @@ describe('BillHistoryService', () => {
       { findAndCount, manager } as never,
       { find: async () => [{ id: 8, description: 'Fine' }] } as never,
       { resolve: async () => source } as never,
+      {} as never,
     );
 
     const result = await service.history(PERSONAL, 3, 1);
@@ -56,7 +57,7 @@ describe('BillHistoryService per provider bill', () => {
   const billA = recurring(21, 5, 'Plan A');
   const billB = recurring(22, 15, 'Plan B');
   const oneOff = Object.assign(new ProviderBill(), { id: 30, providerAccountId: 4, kind: 'one_off', description: 'Fix', dueDate: '2026-01-20' });
-  const build = (payments: BillPayment[], peeked = billA) => {
+  const build = (payments: BillPayment[], peeked: ProviderBill = billA) => {
     const findAndCount = jest.fn(async () => [payments, payments.length]);
     const find = jest.fn(async () => [billA, billB, oneOff]);
     const peek = jest.fn(async () => ({ bill: peeked, provider: fee }));
