@@ -43,6 +43,7 @@ Out of scope for the release pipeline:
 
 ```
 tests + lint (backend_tests, backend_integration, backend_checks,
+              backend_build, backend_typecheck,
               jasmine, frontend-checks, proxy_extension_tests)
   |
   |-- build-and-release          (+ release-production_ward-base(-arm64); Render, waits until live)
@@ -57,8 +58,8 @@ release  <- build-and-release, upload_proxy_files, upload_extension,
             (swap, then cleanup)
 ```
 
-- `build-and-release`, `upload_proxy_files` and `upload_fe_files` each require all six test and
-  lint jobs. A failing test or lint job blocks the whole deploy.
+- `build-and-release`, `upload_proxy_files` and `upload_fe_files` each require all eight test, lint, build and
+  typecheck jobs. A failing one blocks the whole deploy.
 - `upload_extension` and `copy_proxy_configuration` require `upload_proxy_files`, so they also
   wait for the tests.
 - `build-and-release` requires the `production_ward-base` matrix entries (amd64 and arm64), so
@@ -78,7 +79,7 @@ release  <- build-and-release, upload_proxy_files, upload_extension,
 | `upload_proxy_files`, `upload_extension`, `copy_proxy_configuration` | `darthjee/tent:1.1.0` |
 | `upload_fe_files`, `release` | `darthjee/vite_ward-base:0.2.0` |
 | `proxy_extension_tests` | `darthjee/tent-test:1.1.0` |
-| `backend_tests`, `backend_integration`, `backend_checks`, `coverage-final` | `darthjee/circleci_ward-base:0.1.0` (see below) |
+| `backend_tests`, `backend_integration`, `backend_checks`, `backend_build`, `backend_typecheck`, `coverage-final` | `darthjee/circleci_ward-base:0.1.0` (see below) |
 | `jasmine`, `frontend-checks` | `darthjee/circleci_node:0.2.1` |
 
 The `circleci_ward-base` jobs run on every push, but `release-image` only publishes on tags. They
