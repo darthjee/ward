@@ -17,7 +17,8 @@ import { changedFields, fieldsFromAccount, validateAccountFields } from './accou
  * masked account number, so it is never displayed. Errors are classified: `404` → Not-found;
  * `409 ACCOUNT_NAME_TAKEN` → a field error on `name` (values kept); any other `409` → the message
  * in an alert, then `onConflict` (the edit page reloads); `400` → its details; network / 5xx →
- * a transient alert with Retry.
+ * a transient alert with Retry; a session-expired failure shows nothing (the login modal is
+ * already open) and only resets `pending`.
  */
 export default class AccountFormController {
   /**
@@ -96,7 +97,7 @@ export default class AccountFormController {
    * Send the create request (hook; default: a regular account, `createAccount`).
    *
    * @param {object} body - The validated body.
-   * @returns {Promise<object|undefined>} The created account.
+   * @returns {Promise<object>} The created account.
    */
   sendCreate(body) {
     return this.client.createAccount(this.context, body);
@@ -107,7 +108,7 @@ export default class AccountFormController {
    *
    * @param {number|string} accountId - The account id.
    * @param {object} body - The PATCH body.
-   * @returns {Promise<object|undefined>} The updated account.
+   * @returns {Promise<object>} The updated account.
    */
   sendUpdate(accountId, body) {
     return this.client.updateAccount(this.context, accountId, body);
@@ -181,11 +182,6 @@ export default class AccountFormController {
     try {
       const account = await request(body);
 
-      if (!account) {
-        this.setPending(false);
-        return;
-      }
-
       this.navigate(this.detailHash(account.id ?? fallbackId));
     } catch (error) {
       this.handleSubmitError(error);
@@ -202,6 +198,10 @@ export default class AccountFormController {
     const classified = classifyError(error);
 
     this.setPending(false);
+
+    if (classified.kind === 'sessionExpired') {
+      return;
+    }
 
     if (classified.kind === 'notFound') {
       this.onNotFound();

@@ -1,10 +1,11 @@
+import { isSessionExpired } from '../../../../../client/isSessionExpired.js';
 import OrganizationsClient from '../../../../../client/OrganizationsClient.js';
 
 /**
  * Loads one organization for the overview and edit pages.
  *
  * @description A `404` (identical for unknown, malformed and non-member ids) reports Not-found;
- * other failures report their message. An `undefined` result (session expired) reports nothing.
+ * other failures report their message. A session-expired rejection reports nothing.
  * Answers arriving after `isActive()` turned false are ignored.
  */
 export default class OrganizationLoader {
@@ -32,11 +33,11 @@ export default class OrganizationLoader {
     try {
       const org = await this.#client.show(orgId);
 
-      if (org && isActive()) {
+      if (isActive()) {
         onLoaded(org);
       }
     } catch (error) {
-      if (!isActive()) {
+      if (!isActive() || isSessionExpired(error)) {
         return;
       }
 

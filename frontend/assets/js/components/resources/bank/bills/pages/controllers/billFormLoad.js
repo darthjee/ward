@@ -10,8 +10,8 @@ import { findProvider, billFieldsFromBill } from './billFormFields.js';
  * @param {object} context - The owner context.
  * @param {string|null} billId - The bill id (edit page), or `null`.
  * @param {{bank: typeof BankClient, bills: typeof ProviderBillsClient}} clients - HTTP clients.
- * @returns {Promise<{providers: Array<object>, accounts: Array<object>, bill: (object|null)}|undefined>}
- *   The loaded data, or `undefined` when the session expired.
+ * @returns {Promise<{providers: Array<object>, accounts: Array<object>, bill: (object|null)}>}
+ *   The loaded data.
  */
 async function fetchBillForm(context, billId, { bank, bills }) {
   const [providers, accounts, bill] = await Promise.all([
@@ -19,10 +19,6 @@ async function fetchBillForm(context, billId, { bank, bills }) {
     bank.listAccounts(context, { type: 'regular' }),
     billId ? bills.getProviderBill(context, billId) : Promise.resolve(null),
   ]);
-
-  if (!providers || !accounts || (billId && !bill)) {
-    return undefined;
-  }
 
   return { providers, accounts, bill };
 }
@@ -32,7 +28,7 @@ async function fetchBillForm(context, billId, { bank, bills }) {
  *
  * @description Outcomes follow `runLoad`: a `404` (unknown bill, a bill of an archived provider
  * or a non-member organization) reports Not-found, other failures the classified error, an
- * expired session nothing; late answers are dropped.
+ * session-expired rejection nothing; late answers are dropped.
  * @param {object} context - The owner context.
  * @param {string|null} billId - The bill id (edit page), or `null`.
  * @param {{onLoaded: Function, onNotFound: Function, onError: Function}} callbacks - Outcome

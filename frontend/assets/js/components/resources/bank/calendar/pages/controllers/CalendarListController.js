@@ -66,10 +66,10 @@ export default class CalendarListController {
   }
 
   /**
-   * Fetch both lists; resolves `undefined` when either one answers nothing (expired session).
+   * Fetch both lists.
    *
    * @param {string} today - The local today, `YYYY-MM-DD`.
-   * @returns {Promise<{overdue: object, upcoming: object}|undefined>} The lists.
+   * @returns {Promise<{overdue: object, upcoming: object}>} The lists.
    */
   async fetchBoth(today) {
     const { from, to } = upcomingRange(today);
@@ -78,7 +78,7 @@ export default class CalendarListController {
       this.client.getCalendar(this.context, from, to),
     ]);
 
-    return overdue && upcoming ? { overdue, upcoming } : undefined;
+    return { overdue, upcoming };
   }
 
   /**

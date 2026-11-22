@@ -56,7 +56,7 @@ export default class BankDebtFormController extends AccountFormController {
    * Create the debt (`type: "debt"` with its `debt` object).
    *
    * @param {object} body - The validated body.
-   * @returns {Promise<object|undefined>} The created debt.
+   * @returns {Promise<object>} The created debt.
    */
   sendCreate(body) {
     return this.client.createDebt(this.context, body);
@@ -67,7 +67,7 @@ export default class BankDebtFormController extends AccountFormController {
    *
    * @param {number|string} accountId - The account id.
    * @param {object} body - The PATCH body.
-   * @returns {Promise<object|undefined>} The updated debt.
+   * @returns {Promise<object>} The updated debt.
    */
   sendUpdate(accountId, body) {
     return this.client.updateDebt(this.context, accountId, body);

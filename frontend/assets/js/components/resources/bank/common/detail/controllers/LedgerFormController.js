@@ -10,7 +10,8 @@ import { validateLedgerValues } from './ledgerFormFields.js';
  * (where the newest rows are) — or reloads when already there; after an **edit** it reloads the
  * current page (running balances change). Errors: `400` → shown on the row, values kept; `409`
  * and `404` → the message in the page alert, then a reload (an account `404` then shows
- * Not-found); network / 5xx → the page alert with Retry.
+ * Not-found); network / 5xx → the page alert with Retry; a session-expired failure shows nothing (the
+ * login modal is already open) and only resets `pending`.
  */
 export default class LedgerFormController {
   /**
@@ -44,7 +45,7 @@ export default class LedgerFormController {
    *
    * @param {object|null} editing - The transaction being edited, or `null` to create.
    * @param {object} body - The validated body.
-   * @returns {Promise<object|undefined>} The saved transaction.
+   * @returns {Promise<object>} The saved transaction.
    */
   request(editing, body) {
     if (editing) {
@@ -76,12 +77,7 @@ export default class LedgerFormController {
     this.update({ pending: true });
 
     try {
-      const saved = await this.request(editing, body);
-
-      if (!saved) {
-        this.update({ pending: false });
-        return;
-      }
+      await this.request(editing, body);
 
       this.reset();
       this.afterSave(editing, page);
@@ -117,6 +113,10 @@ export default class LedgerFormController {
     const classified = classifyError(error);
 
     this.update({ pending: false });
+
+    if (classified.kind === 'sessionExpired') {
+      return;
+    }
 
     if (classified.kind === 'validation') {
       this.update({ error: classified });

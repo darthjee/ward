@@ -1,4 +1,5 @@
 import AccountsClient from '../../../../../client/AccountsClient.js';
+import { isSessionExpired } from '../../../../../client/isSessionExpired.js';
 import DisplayLocale from '../../../../../utils/locale/DisplayLocale.js';
 import AccountEditFormController from '../../../../common/forms/controllers/AccountEditFormController.js';
 
@@ -27,7 +28,8 @@ export default class MyAccountController extends AccountEditFormController {
 
   /**
    * Load the account and pre-fill the form; it also becomes the baseline for change detection.
-   * A failure shows the error and leaves the fields blank.
+   * A failure shows the error and leaves the fields blank; a session-expired rejection shows
+   * nothing.
    *
    * @returns {Promise<void>} Resolves once loading finishes; never rejects.
    */
@@ -45,7 +47,9 @@ export default class MyAccountController extends AccountEditFormController {
         locale: account.locale ?? '',
       }));
     } catch (error) {
-      this.setSubmitError(error.message);
+      if (!isSessionExpired(error)) {
+        this.setSubmitError(error.message);
+      }
     }
   }
 

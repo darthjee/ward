@@ -105,14 +105,23 @@ thin `localStorage` wrapper (`get`/`set`/`clear`/`isLoggedIn`) around a single k
 token itself is never touched by the frontend at all, since the backend sets it as an `httpOnly`
 cookie (see `docs/agents/modules/auth.md`'s JWT/refresh-token flow).
 
-`client/ApiClient.js` reacts to a `401` transparently rather than surfacing it to callers: it
+`client/ApiClient.js` recovers from a `401` before surfacing it to callers: it
 reads the stored refresh token, calls `POST /auth/refresh.json` directly (a plain internal
 request, not through `AccountsClient`, to avoid a circular import), persists the renewed
 `refreshToken`, and retries the original request exactly once. If there is no stored refresh
 token, or the refresh call itself fails (invalid/expired/already-revoked refresh token) or the
 retried request comes back `401` again, `ApiClient` treats the session as expired: it clears
-`AuthSession` and opens the login modal in Password mode via `client/LoginModalEvents.js`,
-instead of resolving/rejecting the original call normally or redirecting to a dedicated route.
+`AuthSession`, opens the login modal in Password mode via `client/LoginModalEvents.js`, and
+**rejects** the original call with the original (first) `401`'s `ApiError`, marked
+`sessionExpired: true` (see "API errors" below). It never resolves `undefined`.
+
+Every `ApiClient` method (`getJson`, `postJson`, `deleteJson`, `patchJson`) accepts a trailing
+`{ skipAuthRecovery: true }` option. With it, a `401` skips the whole recovery above and rejects
+as a plain `ApiError`, with no refresh request, no retry and no `AuthSession` or modal change.
+`AccountsClient`'s `@Public()` methods — `register`, `login`, `refresh`, `status`, `recover`,
+`resetPassword`, `createAuthorizationRequest` and `pollAuthorizationRequest` — all pass it,
+since a `401` there is a real credential error (e.g. a wrong password), not an expired session.
+The authenticated methods (e.g. `logout`) keep the default recovery.
 
 ### Login modal
 
@@ -126,8 +135,9 @@ right mode) and driven by `LoginModalController`/`useLoginModal`/`useDeviceCount
 - **Password** / **Register** — the classic username/password flows; both converge on the same
   success path: re-check `status.json` through `AuthStatus.refresh` (see "User approval" below),
   close the modal, redirect home. A `403 USER_DENIED` login shows **"This account has been
-  denied access."** (`LoginErrorMessages.forLogin` maps `error.code` to a frontend message,
-  falling back to `error.message` for other codes).
+  denied access."** and a wrong password shows the backend's **"Invalid username or password"**
+  (`LoginErrorMessages.forLogin` maps `error.code` to a frontend message, falling back to
+  `error.message` for other codes, e.g. `401 UNAUTHORIZED`).
 - **Recover** / **Set-new-password** — `AccountsClient.recover`/`resetPassword`; the modal stays
   open on a neutral/success result panel instead of redirecting.
 - **Authorize-with-logged-device** — drives `AccountsClient.createAuthorizationRequest` then
@@ -311,7 +321,7 @@ The backend is the authority; the frontend only hides what the role cannot do.
 
 ## API errors
 
-Any non-`401` failure from `client/ApiClient.js` rejects with a `client/ApiError.js`, built from
+Any failure from `client/ApiClient.js` rejects with a `client/ApiError.js`, built from
 the backend's standard error body (`{ error: { code, message, details? }, statusCode, timestamp }`
 — see `architecture/backend.md`'s `## Error responses` section for the format and the
 status-to-code mapping):
@@ -324,6 +334,16 @@ status-to-code mapping):
   prefer branching on it over matching `message` text. `undefined` when the body carries none.
 - `details` — `error.details`, the full list of validation messages; only present on validation
   failures, `undefined` otherwise.
+- `sessionExpired` — boolean, `false` by default; `true` only on the rejection `ApiClient` raises
+  after a failed session recovery (see "Auth flow"). The `client/isSessionExpired.js` helper
+  (`isSessionExpired(error)`) returns `true` only for an `ApiError` with this flag. Consumers
+  use it, **not** `status === 401`, because a public-route `401` is a real error that must be
+  shown.
+
+**Consumers stay silent on session expiry**: the login modal is already open, so a
+`sessionExpired` rejection is never shown as an error. The consumer resets its
+pending/loading/confirm state and returns. In the bank pages, `classifyError` returns the
+`sessionExpired` kind for it, and `runLoad` reports nothing.
 
 A **403** also fires `PermissionEvents.emitForbidden()`, which refreshes the role (see
 [Permissions](#permissions-organization-roles)). In the bank pages, `classifyError`

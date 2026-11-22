@@ -1,6 +1,7 @@
 import MyAccountController from '../../../../../../../../assets/js/components/resources/accounts/pages/controllers/MyAccountController.js';
 import DisplayLocale from '../../../../../../../../assets/js/utils/locale/DisplayLocale.js';
 import ApiError from '../../../../../../../../assets/js/client/ApiError.js';
+import sessionExpiredError from '../../../../../../../support/sessionExpiredError.js';
 import { itBehavesLikeAnAccountEditFormController } from '../../../../../../../support/accountEditFormControllerExamples.js';
 
 describe('MyAccountController', () => {
@@ -115,6 +116,16 @@ describe('MyAccountController', () => {
       await controller.load();
 
       expect(context.setSubmitError).toHaveBeenCalledWith('boom');
+      expect(context.setFields).not.toHaveBeenCalled();
+    });
+
+    it('shows no error and keeps the fields when the session expired', async () => {
+      context.client.getAccount = jasmine.createSpy('getAccount').and.rejectWith(sessionExpiredError());
+      const controller = context.buildController();
+
+      await controller.load();
+
+      expect(context.setSubmitError).not.toHaveBeenCalled();
       expect(context.setFields).not.toHaveBeenCalled();
     });
 

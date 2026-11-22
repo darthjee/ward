@@ -8,7 +8,7 @@ import { buildLoadEffect, runLoad } from '../../runLoad.js';
  * @description The ledger's `pagination.total_count` (real transactions only) is the "has
  * transactions" signal: it decides whether Delete is shown and whether the currency is locked.
  * Outcomes follow `runLoad`: `404` → Not-found, failures → the classified error, an expired
- * session → nothing, late answers dropped.
+ * session (a session-expired rejection) → nothing, late answers dropped.
  */
 export default class BankAccountLoader {
   #client;
@@ -40,7 +40,7 @@ export default class BankAccountLoader {
         this.#client.listTransactions(context, accountId, page),
       ]);
 
-      return account && ledger ? { account, ledger } : undefined;
+      return { account, ledger };
     }, callbacks, isActive);
   }
 

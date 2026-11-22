@@ -1,5 +1,6 @@
 import BankAccountNewController from '../../../../../../../../../assets/js/components/resources/bank/accounts/pages/controllers/BankAccountNewController.js';
 import ApiError from '../../../../../../../../../assets/js/client/ApiError.js';
+import sessionExpiredError from '../../../../../../../../support/sessionExpiredError.js';
 
 const FIELDS = {
   name: 'Main', bank_name: '', branch: '', account_number: '', currency: 'BRL', opening_date: '2000-01-01', opening_balance: '0', notes: '',
@@ -64,7 +65,7 @@ describe('BankAccountNewController', () => {
   });
 
   it('resets pending on an expired session', async () => {
-    deps.client.createAccount.and.resolveTo(undefined);
+    deps.client.createAccount.and.rejectWith(sessionExpiredError());
 
     await controller.handleSubmit(FIELDS);
 

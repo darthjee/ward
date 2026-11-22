@@ -1,5 +1,6 @@
 import AuthorizationRequestsController from '../../../../../../../../assets/js/components/resources/accounts/pages/controllers/AuthorizationRequestsController.js';
 import ApiError from '../../../../../../../../assets/js/client/ApiError.js';
+import sessionExpiredError from '../../../../../../../support/sessionExpiredError.js';
 
 describe('AuthorizationRequestsController', () => {
   let setRequests;
@@ -55,7 +56,7 @@ describe('AuthorizationRequestsController', () => {
     });
 
     it('does nothing when the session turned out to be expired', async () => {
-      client.listAuthorizationRequests.and.resolveTo(undefined);
+      client.listAuthorizationRequests.and.rejectWith(sessionExpiredError());
       const controller = buildController();
 
       await controller.load();
@@ -95,7 +96,7 @@ describe('AuthorizationRequestsController', () => {
     });
 
     it('does nothing when the session turned out to be expired', async () => {
-      stub(client).and.resolveTo(undefined);
+      stub(client).and.rejectWith(sessionExpiredError());
       const controller = buildController();
 
       await act(controller, ...args);

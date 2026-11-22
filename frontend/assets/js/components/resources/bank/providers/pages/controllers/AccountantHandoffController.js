@@ -1,5 +1,6 @@
 import AccountantClient from '../../../../../../client/AccountantClient.js';
 import Download from '../../../common/download.js';
+import { isSessionExpired } from '../../../../../../client/isSessionExpired.js';
 import { classifyError } from '../../../common/bankErrors.js';
 import { lastFullMonth } from '../../../common/dates.js';
 import { runLoad } from '../../../common/runLoad.js';
@@ -125,19 +126,22 @@ export default class AccountantHandoffController {
   }
 
   /**
-   * Fetch the preview; a session-expired `undefined` ends the loading state.
+   * Fetch the preview; a session-expired rejection ends the loading state (and is rethrown,
+   * so `runLoad` reports nothing).
    *
    * @param {{from: string, to: string, unsentOnly: boolean}} query - The range and the toggle.
-   * @returns {Promise<object|undefined>} The `{ charges }` reply.
+   * @returns {Promise<object>} The `{ charges }` reply.
    */
   async request({ from, to, unsentOnly }) {
-    const reply = await this.client.listCharges(this.context, { from, to, includeSent: !unsentOnly });
+    try {
+      return await this.client.listCharges(this.context, { from, to, includeSent: !unsentOnly });
+    } catch (error) {
+      if (isSessionExpired(error)) {
+        this.update({ loading: false });
+      }
 
-    if (reply === undefined) {
-      this.update({ loading: false });
+      throw error;
     }
-
-    return reply;
   }
 
   /**
@@ -175,15 +179,16 @@ export default class AccountantHandoffController {
     this.update({ marking: true, error: null, success: null });
 
     try {
-      const reply = await this.client.markSent(this.context, ids);
+      await this.client.markSent(this.context, ids);
 
-      this.update({ marking: false, confirming: false });
-
-      if (reply !== undefined) {
-        this.update({ success: `${chargeCount(ids.length)} marked as sent` });
-        this.reload();
-      }
+      this.update({ marking: false, confirming: false, success: `${chargeCount(ids.length)} marked as sent` });
+      this.reload();
     } catch (error) {
+      if (isSessionExpired(error)) {
+        this.update({ marking: false, confirming: false });
+        return;
+      }
+
       this.update({
         marking: false, confirming: false, error: markError(classifyError(error), () => this.markSent({ charges })),
       });

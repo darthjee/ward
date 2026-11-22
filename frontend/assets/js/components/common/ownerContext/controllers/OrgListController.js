@@ -1,4 +1,5 @@
 import AuthEvents from '../../../../client/AuthEvents.js';
+import { isSessionExpired } from '../../../../client/isSessionExpired.js';
 import OrganizationsClient from '../../../../client/OrganizationsClient.js';
 
 /** Org-list state of a logged-out session. */
@@ -11,8 +12,8 @@ export const EMPTY_ORG_STATE = Object.freeze({
  *
  * @description Fetches `GET /orgs.json` once per session, on the first logged-in `AuthEvents`
  * event for a user (never on navigation); `refresh()` refetches. A logged-out event clears the
- * list, the user id and the error. A failed load sets `orgsError` and never throws; an
- * `undefined` result (session expired) leaves the list unloaded so the next login reloads it.
+ * list, the user id and the error. A failed load sets `orgsError` and never throws; a
+ * session-expired rejection leaves the list unloaded so the next login reloads it.
  * Late answers from a previous session are ignored.
  */
 export default class OrgListController {
@@ -125,10 +126,14 @@ export default class OrgListController {
     try {
       const orgs = await this.#client.list();
 
-      return Array.isArray(orgs) ? {
+      return {
         userId, orgs, orgsLoaded: true, orgsError: null,
-      } : null;
+      };
     } catch (error) {
+      if (isSessionExpired(error)) {
+        return null;
+      }
+
       return {
         userId, orgs: [], orgsLoaded: true, orgsError: error.message || 'Request failed',
       };
