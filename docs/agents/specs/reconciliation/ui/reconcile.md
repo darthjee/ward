@@ -9,18 +9,31 @@ types get it without per-type copies.
 
 A **Reconcile** button in the `B/detail/helpers/AccountHeaderHelper.jsx` actions row, next to
 Edit and Archive. It is a private `renderReconcileButton` that returns null when the account is
-archived or the user is not allowed. It reads **Continue reconciliation** when
-`open_reconciliation_id` is set.
+archived or the user is not allowed (`useCan(ACTIONS.WRITE)`). It reads **Continue
+reconciliation** when `open_reconciliation_id` (from the account detail) is set.
 
 ## Role gating
 
-A new `ACTIONS.RECONCILE` (and `ACTIONS.UNDO_RECONCILIATION`) in
-`frontend/assets/js/utils/permissions/orgPermissions.js`, with `MIN_ROLE` rows matching the
-backend's (provisional) minimum roles, read through `useCan`.
+Controls are gated through `useCan` and `ACTIONS` in
+`frontend/assets/js/utils/permissions/orgPermissions.js`, matching the backend `@MinOrgRole` of
+[api/reconciliations.md](../api/reconciliations.md#routes). Only one action is new:
+
+| Control | Action | Min role |
+|---|---|---|
+| Reconcile / Continue reconciliation, Edit statement, the checkboxes and bulk ticks, Finish | `ACTIONS.WRITE` (existing) | `user` |
+| Cancel | `ACTIONS.DELETE` (existing, since cancel is a DELETE route) | `admin` |
+| History Undo (see [ui/ledger.md](ledger.md#statements-history)) | `ACTIONS.UNDO_RECONCILIATION` (new `MIN_ROLE` row) | `admin` |
+
+A hidden control is UX only: the backend 403 stays the enforcement, as
+[Frontend architecture](https://github.com/darthjee/ward/blob/main/docs/agents/architecture/frontend.md)
+describes. **Hidden controls for `user`**: a `user` sees Reconcile, the checkboxes and Finish, but
+not Cancel or Undo. `admin` and `owner` (and the personal context) see everything.
 
 ## Start and edit statement form
 
-- **Statement date** defaults to today, with `max` today like the ledger form.
+- **Statement date** defaults to today, with `max` today like the ledger form. That `max` is a UX
+  default only: the server accepts up to UTC today + 1 day (see
+  [security.md](../security.md#input-bounds)).
 - **Statement balance** uses `B/form/AccountFormInput.jsx` with `inputMode: 'decimal'`, parsed
   with `B/amounts.js` `parseAmount`.
 - On a debt the balance is labelled "Amount owed" and negated with `negateAmount` on load and on
@@ -65,6 +78,8 @@ spread into it, like `TypedAccountsClient.js`): `listReconciliations`, `startRec
 Jasmine specs mirroring the source paths under `frontend/specs/assets/js/...`:
 
 - header button states (archived, role, open statement);
+- role gating: Cancel hidden for `user` and shown for `admin` and `owner`, while Reconcile and
+  Finish show for `user`;
 - the debt negation of the statement balance;
 - the optimistic tick and its revert on error;
 - Finish disabled unless the difference is 0.

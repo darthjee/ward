@@ -25,10 +25,11 @@ On an uncleared row dated on or before `last_reconciled_date`: "Not on reconcile
 ## Header line
 
 "Last reconciled: <date> · <balance>" under the `Balance:` line in `AccountHeaderHelper`, from
-`last_reconciliation`. On a debt the balance is shown negated.
+`last_reconciliation` of the account detail. On a debt the balance is shown negated.
 
-The account edit form shows the opening fields read-only when `last_reconciliation` is set, with
-a hint to undo the statements first.
+The account edit form shows the opening fields read-only when `last_reconciliation` or
+`open_reconciliation_id` is set (read from the account detail, which is the only payload that
+carries them), with a hint to cancel or undo the statements first.
 
 ## Statements history
 
@@ -36,7 +37,7 @@ A section rendered for every type from the shared `AccountDetailHelper` (not per
 It is modelled on Bill history (`B/bills/BillHistory.jsx`, `hooks/useBillHistory.js`,
 `controllers/BillHistoryController.js`, `helpers/BillHistoryHelper.jsx`, `B/BankPagination.jsx`):
 date, balance, `reconciled_at` and row count, newest first, paginated in component state.
-**Undo** appears only where `undoable` and allowed, behind a confirmation modal like
+**Undo** appears only where `undoable` and `useCan(ACTIONS.UNDO_RECONCILIATION)` (`admin`), behind a confirmation modal like
 `B/bills/UndoPaymentConfirm.jsx`. Drilling from a statement to a filtered ledger is out of scope
 (see [Future epics](../README.md#future-epics)).
 
@@ -65,7 +66,7 @@ Jasmine specs mirroring the source paths under `frontend/specs/assets/js/...`:
 - the cleared marker and the locked fields;
 - the warning badge;
 - the header line, including the debt negation;
-- history Undo visibility (`undoable` and role);
+- history Undo visibility (`undoable` and role): hidden for `user`, shown for `admin` and `owner`;
 - the error messages for each new code.
 
 Back to the [README](../README.md).

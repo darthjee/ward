@@ -14,7 +14,7 @@ TypeORM relations, and the real FKs are declared in the migration.
 | `id` | int PK | |
 | `accountId` | int, FK `bank_accounts.id` `ON DELETE CASCADE` | Inherits the owner through the account and never stores one. The cascade lets an account with no transactions but with a zero-row statement still be hard-deleted |
 | `statementDate` | `DATE` | At least `openingDate`, at most UTC today + 1 day, strictly after the latest finished statement's date |
-| `statementBalance` | `BIGINT` minor units | In the account currency; a decimal string in the API, with the same bound (10¹³) as amounts |
+| `statementBalance` | `BIGINT` minor units | In the account currency; a decimal string in the API, signed, zero allowed, `\|value\| ≤ 10¹³` minor units on the absolute value |
 | `reconciledAt` | nullable `DATETIME` | `NULL` means `open`, a value means `finished`; undo sets it back to `NULL` |
 | `createdAt` / `updatedAt` | | |
 
@@ -66,7 +66,7 @@ always takes and returns the signed value.
 
 | Step | Preconditions | Errors |
 |---|---|---|
-| Start | Account not archived; no open statement; `statementDate` ≥ `openingDate`, ≤ UTC today + 1 day, and strictly after the latest finished statement | 409 `ACCOUNT_ARCHIVED`, `RECONCILIATION_OPEN`, `RECONCILIATION_OUT_OF_ORDER`; 400 for a date before `openingDate` or in the future |
+| Start | Account not archived; no open statement; `statementDate` ≥ `openingDate`, ≤ UTC today + 1 day, and strictly after the latest finished statement | 409 `ACCOUNT_ARCHIVED`, `RECONCILIATION_OPEN`, `RECONCILIATION_OUT_OF_ORDER`; 400 for a date before `openingDate` or later than UTC today + 1 day |
 | Edit while open | Statement is `open`; same date rules as start | 409 `RECONCILIATION_FINISHED`, `RECONCILIATION_OUT_OF_ORDER`, `ACCOUNT_ARCHIVED` |
 | Tick / untick | Statement is `open`; ticked rows are eligible | 409 `RECONCILIATION_FINISHED`, `TRANSACTION_NOT_ELIGIBLE`, `ACCOUNT_ARCHIVED` |
 | Finish | Statement is `open`; difference is 0 | 409 `RECONCILIATION_UNBALANCED`, `RECONCILIATION_FINISHED`, `ACCOUNT_ARCHIVED` |
@@ -91,11 +91,12 @@ always takes and returns the signed value.
 
 - Sending an unchanged `amount` or `date` on a cleared row is accepted, so forms that send every
   field keep working.
-- An edit that moves a ticked row's date past `statementDate` unticks it (edge case).
+- An edit that moves a ticked row's date past `statementDate`, or before `openingDate`, unticks it (edge case).
 - No role bypasses the lock, `admin` included. The only way to change a locked field or delete the
   row is to undo the statement first.
-- **Opening anchor.** `openingDate` and `openingBalance` are locked once any finished statement
-  exists: 409 `ACCOUNT_RECONCILED`. See [api/existing-routes.md](api/existing-routes.md).
+- **Opening anchor.** `openingDate` and `openingBalance` are locked once any statement
+  exists, open or finished: 409 `ACCOUNT_RECONCILED`. The currency is locked the same way
+  (`CURRENCY_LOCKED`). See [api/existing-routes.md](api/existing-routes.md).
 
 ## Migration
 

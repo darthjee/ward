@@ -27,7 +27,7 @@ statement can be undone.
 | States | `open` → `finished`, and undo returns to `open` |
 | Lock | `amount` / `date` / delete of rows cleared into a finished statement |
 | Lock bypass | None, `admin` included |
-| Opening anchor | Locked once any statement is finished |
+| Opening anchor | Locked once any statement exists, open or finished |
 | Ordering | Statements are chronological; only the latest finished one can be undone |
 | Balances | Still computed; no per-statement opening balance stored |
 
@@ -67,7 +67,7 @@ Out of scope for this epic:
 - [api/existing-routes.md](api/existing-routes.md) — changes to transaction, ledger, account and bill-payment routes
 - [ui/reconcile.md](ui/reconcile.md) — entry point, start form, reconcile mode, client
 - [ui/ledger.md](ui/ledger.md) — cleared marker, locked fields, warning badge, header line, history, errors
-- [security.md](security.md) — ownership, sensitivity, bounds, cache, memory, open concerns
+- [security.md](security.md) — roles, ownership, response fields, sensitivity, bounds, concurrency, cache, memory, open concerns
 
 ## Delivery
 
@@ -75,8 +75,10 @@ The epic follows four phases:
 
 1. **Initial specs** — this folder ([#152](https://github.com/darthjee/ward/issues/152)).
 2. **Spec enhancement** — one or more issues refining the specs and settling the
-   [open concerns](security.md#open-concerns) (roles, migration, performance, caching, mismatch
-   surfacing, checkpoint anchors, testing).
+   [open concerns](security.md#open-concerns). Roles, security and data access were settled by
+   [#153](https://github.com/darthjee/ward/issues/153); migration, performance, memory and caching
+   remain for [#154](https://github.com/darthjee/ward/issues/154), and mismatch surfacing,
+   checkpoint anchors and testing for [#155](https://github.com/darthjee/ward/issues/155).
 3. **Create the implementation issues** — an issue that breaks the finished specs into
    implementation sub-issues.
 4. **Fold** — fold the specs into the permanent docs and remove this folder.
@@ -105,10 +107,11 @@ The likely split suggested for phase 3 to confirm:
 
 ## Open concerns
 
-Deferred to phase 2, each with a provisional default. See
-[security.md](security.md#open-concerns): roles, backward compatibility and migration,
-performance, mismatch surfacing, checkpoint anchors as an alternative, and whether the account
-list needs the reconciliation fields.
+Roles, security and data access are settled (see [security.md](security.md#decided)). What remains,
+each with a provisional default, is in [security.md](security.md#open-concerns): backward
+compatibility, migration and performance ([#154](https://github.com/darthjee/ward/issues/154)),
+and mismatch surfacing and checkpoint anchors as an alternative
+([#155](https://github.com/darthjee/ward/issues/155)).
 
 ## Testing overview
 
