@@ -69,7 +69,8 @@ export function validateUpdateValue(values, account, now = new Date()) {
  * posts nothing and shows "Value unchanged"; otherwise, after asking before discarding the
  * inline form's unsaved changes, posts a "Yield" transaction for the difference (positive or
  * negative), resets the form and reloads the account and its ledger. A network / 5xx failure
- * shows the alert with Retry; a `404` / `409` shows its message (if any) and reloads.
+ * shows the alert with Retry; a `404` / `409` shows its message (if any) and reloads. A session-expired failure shows
+ * nothing (the login modal is already open), does not reload and only resets `pending`.
  */
 export default class UpdateValueController {
   /**
@@ -139,12 +140,7 @@ export default class UpdateValueController {
     });
 
     try {
-      const created = await this.client.createTransaction(this.context, this.accountId, body);
-
-      if (created === undefined) {
-        this.update({ pending: false });
-        return;
-      }
+      await this.client.createTransaction(this.context, this.accountId, body);
 
       this.update(initialUpdateValue());
       this.reload();
@@ -162,6 +158,11 @@ export default class UpdateValueController {
    */
   handleError(error, retry) {
     const classified = classifyError(error);
+
+    if (classified.kind === 'sessionExpired') {
+      this.update({ pending: false });
+      return;
+    }
 
     if (classified.kind === 'transient') {
       this.update({ pending: false, error: { ...classified, retry } });

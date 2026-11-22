@@ -109,13 +109,10 @@ export default class BankAccountDetailController {
     this.setError(null);
 
     try {
-      const result = await request();
+      await request();
 
       this.finish();
-
-      if (result !== undefined) {
-        onDone();
-      }
+      onDone();
     } catch (error) {
       this.finish();
       this.handleError(error, () => this.run(key, request, onDone, options), options);
@@ -142,6 +139,10 @@ export default class BankAccountDetailController {
    */
   handleError(error, retry, { transaction = false }) {
     const classified = classifyError(error);
+
+    if (classified.kind === 'sessionExpired') {
+      return;
+    }
 
     if (classified.kind === 'notFound' && !transaction) {
       this.onNotFound();

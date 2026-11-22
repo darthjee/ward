@@ -5,6 +5,7 @@ import useRecurringBills, {
 import ProviderBillsClient from '../../../../../../../../../assets/js/client/ProviderBillsClient.js';
 import ApiError from '../../../../../../../../../assets/js/client/ApiError.js';
 import { renderedOutput } from '../../../../../../../../support/renderedOutput.js';
+import sessionExpiredError from '../../../../../../../../support/sessionExpiredError.js';
 
 const CONTEXT = { kind: 'organization', orgId: 5 };
 const PAGE = { provider_bills: [{ id: 1, kind: 'recurring', expected_amount: '200.00' }], pagination: { total_count: 1 } };
@@ -64,7 +65,7 @@ describe('useRecurringBills', () => {
     });
 
     it('keeps the suggestion empty when the session expired', async () => {
-      spyOn(ProviderBillsClient, 'listProviderBills').and.resolveTo(undefined);
+      spyOn(ProviderBillsClient, 'listProviderBills').and.rejectWith(sessionExpiredError());
 
       await loadRecurringBills({
         context: CONTEXT, providerId: 7, archived: false, setRecurring,

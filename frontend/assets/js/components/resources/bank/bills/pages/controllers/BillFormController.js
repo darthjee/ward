@@ -39,7 +39,8 @@ const ERROR_PLACEMENTS = new Map([
  * changed fields (nothing changed → straight back). Errors are classified: `404` → Not-found;
  * `409 BILL_PAID` → the form alert telling the user to undo the payment first; any other `409`,
  * a `400` or a `422` → the form alert with the server's message; network / 5xx → a transient
- * alert with Retry.
+ * alert with Retry; a session-expired failure shows nothing (the login modal is already
+ * open) and only resets the pending / confirmation state.
  */
 export default class BillFormController {
   /**
@@ -128,14 +129,11 @@ export default class BillFormController {
     this.setPending(true);
 
     try {
-      const reply = await this.client.deleteProviderBill(this.context, bill.id);
+      await this.client.deleteProviderBill(this.context, bill.id);
 
       this.setPending(false);
       this.setConfirming(false);
-
-      if (reply !== undefined) {
-        this.navigate(this.returnHash(bill.provider_account_id));
-      }
+      this.navigate(this.returnHash(bill.provider_account_id));
     } catch (error) {
       this.setConfirming(false);
       this.handleError(error, () => this.destroy(bill));
@@ -161,11 +159,6 @@ export default class BillFormController {
 
     try {
       const bill = await request(body);
-
-      if (!bill) {
-        this.setPending(false);
-        return;
-      }
 
       this.navigate(this.returnHash(bill.provider_account_id));
     } catch (error) {
@@ -206,6 +199,10 @@ export default class BillFormController {
     const classified = classifyError(error);
 
     this.setPending(false);
+
+    if (classified.kind === 'sessionExpired') {
+      return;
+    }
 
     if (classified.kind === 'notFound') {
       this.onNotFound();

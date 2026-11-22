@@ -5,7 +5,7 @@ import { buildLoadEffect, runLoad } from '../../runLoad.js';
  * Loads the accounts of one type for a list page (regular for Accounts, debt for Debts).
  *
  * @description A `404` (non-member organization) reports Not-found; any other failure reports
- * the classified error. An `undefined` result (session expired) reports nothing. Answers
+ * the classified error. A session-expired rejection reports nothing. Answers
  * arriving after `isActive()` turned false are ignored.
  */
 export default class BankAccountsLoader {

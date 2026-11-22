@@ -1,5 +1,6 @@
 import CalendarActionsController from '../../../../../../../../../assets/js/components/resources/bank/calendar/common/controllers/CalendarActionsController.js';
 import ApiError from '../../../../../../../../../assets/js/client/ApiError.js';
+import sessionExpiredError from '../../../../../../../../support/sessionExpiredError.js';
 
 const CONTEXT = { kind: 'organization', orgId: 5 };
 const DERIVED = {
@@ -142,10 +143,12 @@ describe('CalendarActionsController', () => {
     });
 
     it('does not reload when the session expired', async () => {
-      client.payOccurrence.and.resolveTo(undefined);
+      client.payOccurrence.and.rejectWith(sessionExpiredError());
       await controller.confirmPay(DERIVED, fields);
 
       expect(deps.onChanged).not.toHaveBeenCalled();
+      expect(deps.setError).not.toHaveBeenCalledWith(jasmine.objectContaining({ kind: jasmine.any(String) }));
+      expect(deps.setPending).toHaveBeenCalledWith(false);
     });
   });
 

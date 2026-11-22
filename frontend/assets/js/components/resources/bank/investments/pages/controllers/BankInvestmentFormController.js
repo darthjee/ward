@@ -61,7 +61,7 @@ export default class BankInvestmentFormController extends AccountFormController 
    * Create the investment (`type: "investment"` with its `investment` object).
    *
    * @param {object} body - The validated body.
-   * @returns {Promise<object|undefined>} The created investment.
+   * @returns {Promise<object>} The created investment.
    */
   sendCreate(body) {
     return this.client.createInvestment(this.context, body);
@@ -72,7 +72,7 @@ export default class BankInvestmentFormController extends AccountFormController 
    *
    * @param {number|string} accountId - The account id.
    * @param {object} body - The PATCH body.
-   * @returns {Promise<object|undefined>} The updated investment.
+   * @returns {Promise<object>} The updated investment.
    */
   sendUpdate(accountId, body) {
     return this.client.updateInvestment(this.context, accountId, body);

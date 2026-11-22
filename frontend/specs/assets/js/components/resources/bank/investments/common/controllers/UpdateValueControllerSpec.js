@@ -4,6 +4,7 @@ import UpdateValueController, {
   validateUpdateValue,
 } from '../../../../../../../../../assets/js/components/resources/bank/investments/common/controllers/UpdateValueController.js';
 import ApiError from '../../../../../../../../../assets/js/client/ApiError.js';
+import sessionExpiredError from '../../../../../../../../support/sessionExpiredError.js';
 
 const NOW = new Date(2026, 4, 10, 12);
 const ACCOUNT = { id: 3, balance: '1000.00', currency: 'BRL' };
@@ -132,10 +133,11 @@ describe('UpdateValueController', () => {
     });
 
     it('stops quietly when the session expired', async () => {
-      deps.client.createTransaction.and.resolveTo(undefined);
+      deps.client.createTransaction.and.rejectWith(sessionExpiredError());
       await submit('1200');
 
       expect(deps.update).toHaveBeenCalledWith({ pending: false });
+      expect(deps.update).not.toHaveBeenCalledWith(jasmine.objectContaining({ error: jasmine.anything() }));
       expect(deps.reload).not.toHaveBeenCalled();
     });
 

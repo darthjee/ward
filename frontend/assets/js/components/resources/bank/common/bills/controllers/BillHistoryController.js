@@ -77,7 +77,7 @@ export default class BillHistoryController {
    * Request one page of the history, of the bill or of the account.
    *
    * @param {number} page - The 1-based page.
-   * @returns {Promise<object|undefined>} The history page.
+   * @returns {Promise<object>} The history page.
    */
   listPage(page) {
     if (this.billId !== undefined) {
@@ -91,7 +91,7 @@ export default class BillHistoryController {
    * Send the undo request matching the row (per-bill, derived or one-off).
    *
    * @param {object} row - The history row.
-   * @returns {Promise<object|undefined>} The (empty) response body.
+   * @returns {Promise<object>} The (empty) response body.
    */
   sendUndo(row) {
     if (this.billId !== undefined) {
@@ -116,13 +116,10 @@ export default class BillHistoryController {
     this.setPending(true);
 
     try {
-      const reply = await this.sendUndo(row);
+      await this.sendUndo(row);
 
       this.finish();
-
-      if (reply !== undefined) {
-        this.refresh();
-      }
+      this.refresh();
     } catch (error) {
       this.handleError(error, () => this.undo(row));
     }
@@ -159,6 +156,10 @@ export default class BillHistoryController {
     const classified = classifyError(error);
 
     this.finish();
+
+    if (classified.kind === 'sessionExpired') {
+      return;
+    }
 
     if (classified.kind === 'transient') {
       this.setError({ ...classified, retry });

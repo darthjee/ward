@@ -9,19 +9,14 @@ import { buildLoadEffect, runLoad } from '../../../common/runLoad.js';
  * @param {object} context - The owner context.
  * @param {string} billId - The bill id.
  * @param {{bills: typeof ProviderBillsClient, bank: typeof BankClient}} clients - HTTP clients.
- * @returns {Promise<{bill: object, provider: object}|undefined>} The loaded data, or
- *   `undefined` when the session expired.
+ * @returns {Promise<{bill: object, provider: object}>} The loaded data.
  */
 async function fetchBillHistoryPage(context, billId, { bills, bank }) {
   const bill = await bills.getProviderBill(context, billId);
 
-  if (!bill) {
-    return undefined;
-  }
-
   const provider = await bank.getAccount(context, bill.provider_account_id);
 
-  return provider ? { bill, provider } : undefined;
+  return { bill, provider };
 }
 
 /**
@@ -29,7 +24,7 @@ async function fetchBillHistoryPage(context, billId, { bills, bank }) {
  * renderer.
  *
  * @description Outcomes follow `runLoad`: a `404` from either call (unknown or foreign bill)
- * reports Not-found, other failures the classified error, an expired session nothing; late
+ * reports Not-found, other failures the classified error, a session-expired rejection nothing; late
  * answers are dropped. A bill of an archived provider loads normally and renders read-only.
  * @param {object} context - The owner context.
  * @param {string} billId - The bill id.

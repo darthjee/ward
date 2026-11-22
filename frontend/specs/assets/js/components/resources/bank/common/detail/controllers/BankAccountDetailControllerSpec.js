@@ -1,5 +1,6 @@
 import BankAccountDetailController from '../../../../../../../../../assets/js/components/resources/bank/common/detail/controllers/BankAccountDetailController.js';
 import ApiError from '../../../../../../../../../assets/js/client/ApiError.js';
+import sessionExpiredError from '../../../../../../../../support/sessionExpiredError.js';
 
 describe('BankAccountDetailController', () => {
   let deps;
@@ -67,7 +68,7 @@ describe('BankAccountDetailController', () => {
   });
 
   it('does nothing more on an expired session', async () => {
-    deps.client.archiveAccount.and.resolveTo(undefined);
+    deps.client.archiveAccount.and.rejectWith(sessionExpiredError());
 
     await controller.archive();
 

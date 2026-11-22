@@ -61,7 +61,7 @@ export default class BankProviderFormController extends AccountFormController {
    * Create the provider (`type: "provider_expense"` with its `provider_expense` object).
    *
    * @param {object} body - The validated body.
-   * @returns {Promise<object|undefined>} The created provider.
+   * @returns {Promise<object>} The created provider.
    */
   sendCreate(body) {
     return this.client.createProviderExpense(this.context, body);
@@ -72,7 +72,7 @@ export default class BankProviderFormController extends AccountFormController {
    *
    * @param {number|string} accountId - The account id.
    * @param {object} body - The PATCH body.
-   * @returns {Promise<object|undefined>} The updated provider.
+   * @returns {Promise<object>} The updated provider.
    */
   sendUpdate(accountId, body) {
     return this.client.updateProviderExpense(this.context, accountId, body);
