@@ -71,14 +71,20 @@ describe('serializeTransaction', () => {
 
 describe('serializeLedger', () => {
   const account = buildAccount({ currency: 'BRL', openingDate: '2026-10-01' });
-  const rows = [{ id: 7, date: '2026-11-01', amount: -1250n, description: 'x', notes: null, sentToAccountantAt: null, balance: 98750n }];
+  const rows = [{ id: 7, date: '2026-11-01', amount: -1250n, description: 'x', notes: null, sentToAccountantAt: null, paymentGenerated: false, balance: 98750n }];
 
   it('builds the envelope with the opening row', () => {
     expect(serializeLedger(account, rows, 100000n, buildPagination(1, 50, 1))).toEqual({
-      transactions: [{ id: 7, date: '2026-11-01', amount: '-12.50', description: 'x', notes: null, balance: '987.50' }],
+      transactions: [{ id: 7, date: '2026-11-01', amount: '-12.50', description: 'x', notes: null, payment_generated: false, balance: '987.50' }],
       opening: { date: '2026-10-01', amount: '1000.00', balance: '1000.00' },
       pagination: { page: 1, per_page: 50, total_pages: 1, total_count: 1 },
     });
+  });
+
+  it('carries the payment-generated flag of every row', () => {
+    const generated = serializeLedger(account, [{ ...rows[0], paymentGenerated: true }], null, buildPagination(1, 50, 1));
+
+    expect(generated.transactions[0].payment_generated).toBe(true);
   });
 
   it('sets opening to null when not on the last page', () => {
@@ -87,9 +93,9 @@ describe('serializeLedger', () => {
 
   it('marks only the charges of a provider-expense account, never the opening row', () => {
     const providerRows = [
-      { id: 8, date: '2026-11-02', amount: 5000n, description: 'Payment', notes: null, sentToAccountantAt: null, balance: 1n },
-      { id: 7, date: '2026-11-01', amount: -1250n, description: 'Charge', notes: null, sentToAccountantAt: SENT_AT, balance: 2n },
-      { id: 6, date: '2026-10-30', amount: -100n, description: 'Charge', notes: null, sentToAccountantAt: null, balance: 3n },
+      { id: 8, date: '2026-11-02', amount: 5000n, description: 'Payment', notes: null, sentToAccountantAt: null, paymentGenerated: false, balance: 1n },
+      { id: 7, date: '2026-11-01', amount: -1250n, description: 'Charge', notes: null, sentToAccountantAt: SENT_AT, paymentGenerated: false, balance: 2n },
+      { id: 6, date: '2026-10-30', amount: -100n, description: 'Charge', notes: null, sentToAccountantAt: null, paymentGenerated: false, balance: 3n },
     ];
 
     const response = serializeLedger(provider, providerRows, 0n, buildPagination(1, 50, 3));

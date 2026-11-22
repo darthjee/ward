@@ -31,7 +31,7 @@ function buildTransaction(overrides: Partial<Transaction> = {}): Transaction {
 }
 
 function row(id: number, balance: bigint): LedgerRow {
-  return { id, date: '2026-01-10', amount: -100n, description: `t${id}`, notes: null, sentToAccountantAt: null, balance };
+  return { id, date: '2026-01-10', amount: -100n, description: `t${id}`, notes: null, sentToAccountantAt: null, paymentGenerated: false, balance };
 }
 
 function setup(account: Account | null = buildAccount(), stored: Transaction | null = buildTransaction()) {
@@ -366,7 +366,7 @@ describe('TransactionService', () => {
 
       const result = await service.ledger(PERSONAL, 1, 1);
 
-      expect(ledgerQuery.page).toHaveBeenCalledWith(expect.objectContaining({ id: 1 }), 1, 50);
+      expect(ledgerQuery.page).toHaveBeenCalledWith(PERSONAL, expect.objectContaining({ id: 1 }), 1, 50);
       expect(result).toEqual({
         transactions: [],
         opening: { date: '2026-01-01', amount: '1000.00', balance: '1000.00' },
@@ -381,11 +381,11 @@ describe('TransactionService', () => {
 
       const result = await service.ledger(PERSONAL, 1, 2);
 
-      expect(ledgerQuery.page).toHaveBeenCalledWith(expect.anything(), 2, 50);
+      expect(ledgerQuery.page).toHaveBeenCalledWith(PERSONAL, expect.anything(), 2, 50);
       expect(ledgerQuery.openingEffective).not.toHaveBeenCalled();
       expect(result.opening).toBeNull();
       expect(result.transactions).toEqual([
-        { id: 120, date: '2026-01-10', amount: '-1.00', description: 't120', notes: null, balance: '50.00' },
+        { id: 120, date: '2026-01-10', amount: '-1.00', description: 't120', notes: null, payment_generated: false, balance: '50.00' },
       ]);
       expect(result.pagination).toEqual({ page: 2, per_page: 50, total_pages: 3, total_count: 120 });
     });

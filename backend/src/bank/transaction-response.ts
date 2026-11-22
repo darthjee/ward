@@ -33,6 +33,8 @@ export interface LedgerRowResponse extends HandOffMark {
   amount: string;
   description: string;
   notes: string | null;
+  /** Whether a bill payment of the same owner generated the transaction. */
+  payment_generated: boolean;
   balance: string;
 }
 
@@ -109,6 +111,7 @@ export function serializeLedger(
       description: row.description,
       notes: row.notes,
       ...handOffMark(account, row.amount, row.sentToAccountantAt),
+      payment_generated: row.paymentGenerated,
       balance: format(row.balance),
     })),
     opening: opening === null ? null : { date: account.openingDate, amount: format(opening), balance: format(opening) },

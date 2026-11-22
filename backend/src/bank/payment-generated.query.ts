@@ -1,8 +1,35 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import type { Repository } from 'typeorm';
-import { ownerSqlWhere, type OwnerScope } from '../core/owner-context.js';
+import { ownerSqlWhere, type OwnerScope, type OwnerSqlWhere } from '../core/owner-context.js';
 import { BillPayment } from './entities/bill-payment.entity.js';
+
+/**
+ * The owner-scoped "is payment-generated" `EXISTS` fragment, shared by
+ * {@link PaymentGeneratedQuery} and the ledger SQL so the two never drift. A
+ * `bank_bill_payments` row references the transaction through one of its three
+ * FK-indexed columns, and counts only when its source account belongs to the owner.
+ * @param {OwnerScope} owner - The data owner scope.
+ * @param {string} transactionRef - The SQL expression of the transaction id: a column
+ *   (e.g. `t.id`) or a `?` placeholder.
+ * @param {number[]} refParams - The params bound by one occurrence of `transactionRef`
+ *   (empty for a column, `[id]` for a placeholder); repeated for each of the three references.
+ * @returns {OwnerSqlWhere} The `EXISTS (...)` SQL and its params, in placeholder order.
+ */
+export function paymentGeneratedExistsSql(owner: OwnerScope, transactionRef: string, refParams: number[] = []): OwnerSqlWhere {
+  const ownerFilter = ownerSqlWhere(owner, 'a');
+
+  return {
+    sql: `EXISTS (
+      SELECT 1
+        FROM bank_bill_payments p
+        JOIN bank_accounts a ON a.id = p.source_account_id
+       WHERE (p.payment_transaction_id = ${transactionRef} OR p.withdrawal_transaction_id = ${transactionRef} OR p.charge_transaction_id = ${transactionRef})
+         AND ${ownerFilter.sql}
+    )`,
+    params: [...refParams, ...refParams, ...refParams, ...ownerFilter.params],
+  };
+}
 
 interface RawExistsRow {
   found: number | string;
@@ -35,17 +62,8 @@ export class PaymentGeneratedQuery {
    * @returns {Promise<boolean>} `true` when one of the owner's bill payments references the transaction.
    */
   async isPaymentGenerated(owner: OwnerScope, transactionId: number): Promise<boolean> {
-    const ownerFilter = ownerSqlWhere(owner, 'a');
-    const rows: RawExistsRow[] = await this.billPaymentRepository.query(
-      `SELECT EXISTS (
-         SELECT 1
-           FROM bank_bill_payments p
-           JOIN bank_accounts a ON a.id = p.source_account_id
-          WHERE (p.payment_transaction_id = ? OR p.withdrawal_transaction_id = ? OR p.charge_transaction_id = ?)
-            AND ${ownerFilter.sql}
-       ) AS found`,
-      [transactionId, transactionId, transactionId, ...ownerFilter.params],
-    );
+    const exists = paymentGeneratedExistsSql(owner, '?', [transactionId]);
+    const rows: RawExistsRow[] = await this.billPaymentRepository.query(`SELECT ${exists.sql} AS found`, exists.params);
 
     return Number(rows[0]?.found) === 1;
   }

@@ -2,13 +2,20 @@ import type { DataSource, Repository } from 'typeorm';
 import { createTestDataSource, resetDatabase } from './test-data-source.js';
 import { AccountBalancesQuery } from '../../../bank/account-balances.query.js';
 import { Account } from '../../../bank/entities/account.entity.js';
+import { BillPayment } from '../../../bank/entities/bill-payment.entity.js';
 import { Transaction } from '../../../bank/entities/transaction.entity.js';
 import { LedgerQuery } from '../../../bank/ledger.query.js';
+import type { OwnerScope } from '../../../core/owner-context.js';
+
+const ALICE: OwnerScope = { kind: 'user', userId: 1 };
+const BOB: OwnerScope = { kind: 'user', userId: 2 };
 
 describe('bank ledger SQL (MySQL)', () => {
   let ds: DataSource;
   let accounts: Repository<Account>;
   let transactions: Repository<Transaction>;
+  let payments: Repository<BillPayment>;
+  let dueDay = 1;
   let ledger: LedgerQuery;
   let balances: AccountBalancesQuery;
 
@@ -29,10 +36,30 @@ describe('bank ledger SQL (MySQL)', () => {
     return transactions.save(transactions.create({ accountId, date, amount, description: `${date} ${amount}` }));
   }
 
+  type TransactionRefs = Partial<Pick<BillPayment, 'paymentTransactionId' | 'withdrawalTransactionId' | 'chargeTransactionId'>>;
+
+  async function insertPayment(sourceAccountId: number, refs: TransactionRefs): Promise<void> {
+    await payments.save(payments.create({
+      sourceAccountId,
+      billId: null,
+      providerBillId: null,
+      dueDate: `2026-11-${String(dueDay++).padStart(2, '0')}`,
+      status: 'paid',
+      paidOn: '2026-11-12',
+      amount: 1n,
+      payingAccountId: null,
+      paymentTransactionId: null,
+      withdrawalTransactionId: null,
+      chargeTransactionId: null,
+      ...refs,
+    }));
+  }
+
   beforeAll(async () => {
     ds = await createTestDataSource();
     accounts = ds.getRepository(Account);
     transactions = ds.getRepository(Transaction);
+    payments = ds.getRepository(BillPayment);
     ledger = new LedgerQuery(transactions);
     balances = new AccountBalancesQuery(transactions);
   });
@@ -40,6 +67,7 @@ describe('bank ledger SQL (MySQL)', () => {
   beforeEach(async () => {
     await resetDatabase(ds);
     await ds.runMigrations();
+    dueDay = 1;
   });
 
   afterAll(async () => {
@@ -60,7 +88,7 @@ describe('bank ledger SQL (MySQL)', () => {
     await insertTransaction(account.id, '2026-10-20', -1_000_000n);
 
     expect(await ledger.openingEffective(account)).toBe(500_000n);
-    expect((await ledger.page(account, 1, 50)).map((row) => row.balance)).toEqual([1_000_000n, 2_000_000n]);
+    expect((await ledger.page(ALICE, account, 1, 50)).map((row) => row.balance)).toEqual([1_000_000n, 2_000_000n]);
     expect(await balances.currentBalance(account)).toBe(1_000_000n);
   });
 
@@ -71,7 +99,7 @@ describe('bank ledger SQL (MySQL)', () => {
 
     expect(await ledger.openingEffective(account)).toBe(1100n);
     expect(await balances.currentBalance(account)).toBe(1250n);
-    expect((await ledger.page(account, 1, 50)).map((row) => [row.date, row.amount, row.balance])).toEqual([
+    expect((await ledger.page(ALICE, account, 1, 50)).map((row) => [row.date, row.amount, row.balance])).toEqual([
       ['2026-11-01', 250n, 1250n],
       ['2026-10-31', -100n, 1000n],
     ]);
@@ -83,10 +111,38 @@ describe('bank ledger SQL (MySQL)', () => {
     await insertTransaction(account.id, '2026-11-01', -2n);
     await ds.query('UPDATE bank_transactions SET sent_to_accountant_at = ? WHERE id = ?', ['2026-11-09 12:00:00', sent.id]);
 
-    const rows = await ledger.page(account, 1, 50);
+    const rows = await ledger.page(ALICE, account, 1, 50);
 
     expect(rows[0].sentToAccountantAt).toBeInstanceOf(Date);
     expect(rows[1].sentToAccountantAt).toBeNull();
+  });
+
+  it('flags the rows referenced by a payment, withdrawal or charge id of an owned bill payment', async () => {
+    const account = await insertAccount();
+    const paid = await insertTransaction(account.id, '2026-11-04', -1n);
+    const withdrawn = await insertTransaction(account.id, '2026-11-03', -2n);
+    const charged = await insertTransaction(account.id, '2026-11-02', -3n);
+    const plain = await insertTransaction(account.id, '2026-11-01', -4n);
+    await insertPayment(account.id, { paymentTransactionId: paid.id });
+    await insertPayment(account.id, { withdrawalTransactionId: withdrawn.id });
+    await insertPayment(account.id, { chargeTransactionId: charged.id });
+
+    expect((await ledger.page(ALICE, account, 1, 50)).map((row) => [row.id, row.paymentGenerated])).toEqual([
+      [paid.id, true],
+      [withdrawn.id, true],
+      [charged.id, true],
+      [plain.id, false],
+    ]);
+  });
+
+  it('ignores a bill payment whose source account belongs to another owner', async () => {
+    const account = await insertAccount();
+    const foreign = await insertAccount({ userId: 2 });
+    const transaction = await insertTransaction(account.id, '2026-11-02', -1n);
+    await insertPayment(foreign.id, { paymentTransactionId: transaction.id });
+
+    expect((await ledger.page(ALICE, account, 1, 50)).map((row) => row.paymentGenerated)).toEqual([false]);
+    expect((await ledger.page(BOB, account, 1, 50)).map((row) => row.paymentGenerated)).toEqual([true]);
   });
 
   it('orders newest first, by id within a day', async () => {
@@ -96,7 +152,7 @@ describe('bank ledger SQL (MySQL)', () => {
     const older = await insertTransaction(account.id, '2026-11-01', 3n);
     const newest = await insertTransaction(account.id, '2026-11-03', 4n);
 
-    expect((await ledger.page(account, 1, 50)).map((row) => row.id)).toEqual([newest.id, second.id, first.id, older.id]);
+    expect((await ledger.page(ALICE, account, 1, 50)).map((row) => row.id)).toEqual([newest.id, second.id, first.id, older.id]);
   });
 
   it('pages 50 rows with running balances correct across page boundaries', async () => {
@@ -108,7 +164,7 @@ describe('bank ledger SQL (MySQL)', () => {
 
     expect(await ledger.count(account.id)).toBe(120);
 
-    const pages = [await ledger.page(account, 1, 50), await ledger.page(account, 2, 50), await ledger.page(account, 3, 50)];
+    const pages = [await ledger.page(ALICE, account, 1, 50), await ledger.page(ALICE, account, 2, 50), await ledger.page(ALICE, account, 3, 50)];
     expect(pages.map((page) => page.length)).toEqual([50, 50, 20]);
 
     const all = pages.flat();
@@ -119,7 +175,7 @@ describe('bank ledger SQL (MySQL)', () => {
     });
     expect(all[0].amount).toBe(120n);
     expect(all[119].amount).toBe(1n);
-    expect(await ledger.page(account, 4, 50)).toEqual([]);
+    expect(await ledger.page(ALICE, account, 4, 50)).toEqual([]);
   });
 
   it('keeps each account ledger separate', async () => {
@@ -129,7 +185,7 @@ describe('bank ledger SQL (MySQL)', () => {
     await insertTransaction(other.id, '2026-11-02', 7n);
 
     expect(await ledger.count(mine.id)).toBe(1);
-    expect((await ledger.page(mine, 1, 50)).map((row) => row.balance)).toEqual([5n]);
+    expect((await ledger.page(ALICE, mine, 1, 50)).map((row) => row.balance)).toEqual([5n]);
   });
 
   it('computes every current balance with the grouped query', async () => {

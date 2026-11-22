@@ -13,6 +13,24 @@ import { BillPayment } from '../../entities/bill-payment.entity.js';
 
 const REFS = ['paymentTransactionId', 'withdrawalTransactionId', 'chargeTransactionId'] as const;
 
+// The ids of the transactions referenced by a bill payment whose source account belongs to the
+// owner — the same rule as `paymentGeneratedExistsSql`, shared with the in-memory ledger.
+export function paymentGeneratedIds(
+  owner: OwnerScope,
+  billPayments: InMemoryBankRepo<BillPayment>,
+  accounts: InMemoryBankRepo<Account>,
+): Set<number> {
+  const ownedBy = (account: Account): boolean => owner.kind === 'user'
+    ? account.userId === owner.userId && account.organizationId === null
+    : account.userId === null && account.organizationId === owner.organizationId;
+  const owned = new Set(accounts.rows.filter(ownedBy).map((account) => account.id));
+
+  return new Set(billPayments.rows
+    .filter((payment) => owned.has(payment.sourceAccountId))
+    .flatMap((payment) => REFS.map((ref) => payment[ref]))
+    .filter((id): id is number => id !== null && id !== undefined));
+}
+
 @Injectable()
 export class PaymentGeneratedQuery {
   static calls = 0;
@@ -29,12 +47,6 @@ export class PaymentGeneratedQuery {
 
   async isPaymentGenerated(owner: OwnerScope, transactionId: number): Promise<boolean> {
     PaymentGeneratedQuery.calls++;
-    const ownedBy = (account: Account): boolean => owner.kind === 'user'
-      ? account.userId === owner.userId && account.organizationId === null
-      : account.userId === null && account.organizationId === owner.organizationId;
-    const owned = new Set(this.accounts.rows.filter(ownedBy).map((account) => account.id));
-
-    return this.billPayments.rows.some((payment) =>
-      owned.has(payment.sourceAccountId) && REFS.some((ref) => payment[ref] === transactionId));
+    return paymentGeneratedIds(owner, this.billPayments, this.accounts).has(transactionId);
   }
 }
