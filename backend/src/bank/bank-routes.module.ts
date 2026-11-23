@@ -17,6 +17,7 @@ import { Reconciliation } from './entities/reconciliation.entity.js';
 import { Transaction } from './entities/transaction.entity.js';
 import { ProviderBillPaymentsController } from './provider-bill-payments.controller.js';
 import { ProviderBillsController } from './provider-bills.controller.js';
+import { ReconciliationsController } from './reconciliations.controller.js';
 import { SettingsController } from './settings.controller.js';
 import { TransactionsController } from './transactions.controller.js';
 import { LazyModuleLoaderService } from '../core/lazy-module-loader.service.js';
@@ -56,6 +57,7 @@ import { LazyModuleLoaderService } from '../core/lazy-module-loader.service.js';
     BillPaymentsController,
     ProviderBillsController,
     ProviderBillPaymentsController,
+    ReconciliationsController,
     CalendarController,
   ],
   providers: [LazyModuleLoaderService, BankModuleLoader],
