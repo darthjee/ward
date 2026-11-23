@@ -157,12 +157,56 @@ rule needs no change either.
 ## Required tests
 
 - `reconciliations.e2e-spec.ts`: every route, every error code and the check order, under both
-  base paths; a non-member 404.
+  base paths; a non-member 404. It owns the per-route, per-error-code and check-order coverage:
+  - the start boundaries (a date equal to `opening_date` is accepted; a date equal to the latest
+    finished date is 409 `RECONCILIATION_OUT_OF_ORDER`; a date that breaks both rules is 400; a
+    second start is 409 `RECONCILIATION_OPEN`);
+  - edit while open (409 `RECONCILIATION_FINISHED` on a finished statement, the chronology
+    compared against finished statements only, and a balance-only edit with no chronology check);
+  - ticks: each of the three `TRANSACTION_NOT_ELIGIBLE` causes, `RECONCILIATION_FINISHED` taking
+    priority over it in one batch, and a whole-batch rollback;
+  - finish (`RECONCILIATION_UNBALANCED` at a non-zero difference, `RECONCILIATION_FINISHED` on a
+    second finish), cancel of a finished statement, and the undo errors `RECONCILIATION_NOT_LATEST`,
+    `RECONCILIATION_OPEN` and `RECONCILIATION_NOT_FINISHED`;
+  - the history (`undoable` only on the latest finished statement with none open, the open
+    statement first, `transaction_count`, 50 per page, a malformed `page` is 400) and a statement
+    GET of a sibling account answering 404;
+  - the archive path: with an open statement, start, edit, ticks, finish, cancel and undo answer
+    `ACCOUNT_ARCHIVED` (before the state 409s), the GETs still work, and the writes work again
+    after unarchive;
+  - the personal context counts as `owner` (an `admin` route succeeds there).
+- `reconciliation-lifecycle.e2e-spec.ts` (new, in `backend/src/bank/tests/`, next to the other
+  bank e2e specs): one end-to-end scenario, run under **both** base paths with the usual
+  `describe.each(CONTEXTS)` pattern of `bill-payments.e2e-spec.ts` (`/bank` and
+  `/orgs/<id>/bank`):
+  1. start a statement;
+  2. tick and untick rows, checking the live difference;
+  3. finish at difference 0;
+  4. the locks on the cleared rows: PATCH `amount` / `date` is 409 `TRANSACTION_CLEARED`, DELETE is
+     409, a description edit is allowed, and the anchor and currency locks on the account are 409;
+  5. undo: the rows unlock, and the ticks are kept on the reopened statement (`ticked_sum`,
+     `cleared_balance` and `difference` are restored);
+  6. cancel: the ticks are dropped, the rows are uncleared, and the anchor and currency locks are
+     released when no statement remains (and still held after an undo, until the later cancel);
+  7. a zero-row statement (start, finish at difference 0, undo, cancel);
+  8. a second statement counting the rows of the first (chronology), and its undo;
+  9. the `x-cache-invalidate` header on every 2xx write and none on a 409.
+
+  The two specs do not overlap: `reconciliations.e2e-spec.ts` keeps the per-route, per-error-code
+  and check-order coverage, while the lifecycle spec covers the end-to-end flow. Neither changes
+  `accountant.e2e-spec.ts` or the bill-payment specs, which stay green and unchanged. Optionally,
+  the lifecycle spec asserts that the accountant `mark-sent` and `mark-unsent` work on a ticked and
+  on a cleared row and leave `reconciliation` untouched.
+- `org-roles.e2e-spec.ts`: the six reconciliation writes join its `ROUTES` matrix (start, edit,
+  ticks and finish need `user`; cancel and undo need `admin`), and its route count is updated
+  accordingly.
 - Role 403s, under the org base path only: a `user` gets 403 on cancel and undo, even with an
   invalid body (403 before 400), and `admin` and `owner` get through. A `user` is allowed on
   start, edit, ticks and finish. The personal context counts as `owner`.
-- The concurrent-start 409 `RECONCILIATION_OPEN`, and the 404 for a statement of a sibling
-  account. The bounds are in [security.md](../security.md#required-tests).
+- The concurrent-start 409 `RECONCILIATION_OPEN`, driven through `beforeNextTransaction` with an
+  in-memory repository that throws a MySQL-shaped `ER_DUP_ENTRY` (the pattern of
+  `bill-payments.e2e-spec.ts`), also for undo versus start, and the 404 for a statement of a
+  sibling account. The bounds are in [security.md](../security.md#required-tests).
 - Unit specs for `ReconciliationService` and the difference.
 - Cache headers: see [security.md](../security.md#required-tests).
 

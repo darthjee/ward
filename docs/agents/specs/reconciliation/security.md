@@ -1,8 +1,9 @@
-# Reconciliation — Security and open concerns
+# Reconciliation — Security and decisions
 
 Part of the [Reconciliation spec](README.md). This file records the decided roles, ownership,
 response fields, data sensitivity, input bounds, concurrency, migration, performance, cache and
-memory rules, and the concerns still deferred to later spec-enhancement issues.
+memory rules, and the mismatch-surfacing and checkpoint-anchor decisions. No open concern
+remains.
 
 ## Decided
 
@@ -11,13 +12,15 @@ memory rules, and the concerns still deferred to later spec-enhancement issues.
 | Roles | Start, edit statement, tick and finish need `user` (everyday writes). Cancel (a DELETE) and undo need `admin`, like every DELETE and payment undo in [Routes — Bank](https://github.com/darthjee/ward/blob/main/docs/agents/backend/routes/bank.md#minimum-role). GETs are open to every member, the personal context counts as `owner`, and nothing is owner-only. Each write route declares `@MinOrgRole`, enforced by `OwnerContextGuard` (the `min-org-role.coverage.spec.ts` guard fails on a missing one). Finish stays `user`: it only works at difference 0, and undo is the sanctioned `admin` way out of the lock it creates. The locks (`TRANSACTION_CLEARED`, `ACCOUNT_RECONCILED`) are 409s checked after the role 403, so no role bypasses them, `admin` and `owner` included |
 | Ownership | Statements inherit the owner through their account and never store an owner column. Every route resolves the account owner-scoped first: a uniform 404 for a foreign, wrong-context or non-member id, and global `is_admin` gets no bypass. Every statement lookup is by `{ id, accountId }` (the path account), so a statement of a sibling account of the same owner, or of another context, answers the same 404 as an unknown id, never a 409. A ticks body may only name transactions of the same account: the ids (`tick` and `untick` alike) are loaded in a single account-scoped query (`WHERE id IN (…) AND account_id = :account`), and any miss answers 404 and rejects the whole batch, applying nothing. A foreign and a nonexistent id are indistinguishable, and no 404 or 409 message names an id. The service also keeps the invariant that a tick always links a row to a statement of the row's own account |
 | Response fields | Every new field is derived from the caller's own, already owner-scoped account and carries no owner, user or member field. It never points to another account's statement. The statement response, the history rows (`undoable`, `transaction_count`) and the account `last_reconciliation` and `open_reconciliation_id` come from the path account. The ledger-row `reconciliation` (`{ id, status, statement_date }`) comes from a `LEFT JOIN` on `r.id = t.reconciliation_id AND r.account_id = t.account_id`, and the cleared-balance `SUM` is scoped the same way. The ledger envelope's `last_reconciled_date` is queried by the scoped account id. The transaction POST and PATCH responses gain `reconciliation` too, through an account-scoped lookup |
-| Account payload | `last_reconciliation` and `open_reconciliation_id` are on the account **detail only**, not on the list. No list UI reads them, and `statement_balance` is financial data that nothing on the list needs. If a later list badge needs them (see Open concerns), the list may add them with a query grouped over the owner-scoped account ids only |
+| Account payload | `last_reconciliation` and `open_reconciliation_id` are on the account **detail only**, not on the list. No list UI reads them, and `statement_balance` is financial data that nothing on the list needs. If a future epic adds a list badge that needs them, the list may add them with a query grouped over the owner-scoped account ids only |
 | Data sensitivity | Statement balances are financial data. Bodies are never logged, and TypeORM query or parameter logging must stay off on these routes. Statement responses never contain owner fields. All new 409 messages are fixed static text: they never carry `statement_balance`, `difference`, `ticked_sum`, `cleared_balance`, the latest finished date, a statement or transaction id, or a count. The client already has these values from the statement response. 400 messages never echo the offending value |
 | Input bounds | See [Input bounds](#input-bounds) below |
 | Concurrency | See [Concurrency](#concurrency) below |
 | Backward compatibility and migration | One additive migration with no backfill: it creates `bank_reconciliations`, adds `reconciliation_id` with its FK and index, and adds the generated `open_key` unique index. Existing transactions start uncleared. Existing clients keep working: the new response fields are additive and `null`, and the new 409s apply only once a statement exists. `down()` is reversible and reconcile data is lost on rollback. See [model.md](model.md#migration) |
 | Performance | Every computed value is one indexed `SUM` or `COUNT`, served by `(account_id, date, id)`, `(reconciliation_id)`, `(account_id, statement_date)` or the unique `open_key`. The worst case is a single indexed `SUM` over the account's whole ledger, the same as `currentBalance()` today. Every other query is bounded by the ticked rows, the statements of one account, or the 50-row page. No new full scan and no query per row. No numeric latency target is set. See [model.md](model.md#queries-and-indexes) and [api/existing-routes.md](api/existing-routes.md#transactions) |
 | Cache | No route is `public`. GETs are `user-scoped`, writes are `never` with `InvalidatesOwner()`, which clears the caller's own `/bank` subtree on a 2xx. Every changed existing route keeps its class and is refreshed by the reconciliation writes. 400 and 409 bodies are never cached. Navi warms nothing. See [api/reconciliations.md](api/reconciliations.md#caching) and [api/existing-routes.md](api/existing-routes.md#caching) |
+| Mismatch surfacing | None beyond the reconcile-mode difference bar and the ledger warning badge. No account-list indicator and no notifications in this epic. `last_reconciliation` and `open_reconciliation_id` stay off the list payload (see *Account payload*) |
+| Checkpoint anchors | Rejected: each finished statement does not become a new balance anchor. Balances stay computed as the opening anchor plus every cleared row ([model.md](model.md#formulas)). (1) There is no second source of truth: no stored per-statement balance can drift from the ledger. (2) Undo stays a plain revert of the latest statement, with no re-anchoring to unwind. (3) The cleared-row locks (`TRANSACTION_CLEARED`) already protect the history that a checkpoint would freeze |
 | Memory and module | Owned by the lazy `bank` module. It adds no dependency and no resident code beyond one controller, and a bounded, small per-request footprint, so it fits the 512 MB Render tier. See [Memory](#memory) |
 
 ### Input bounds
@@ -127,6 +130,14 @@ The `backend` specialist confirmed the migration shape, the queries, the indexes
 footprint against the code. The `cache` specialist confirmed the cache classes, the invalidation
 of every changed route and that Navi warms nothing.
 
+### Decisions and test review (#155)
+
+The `backend` and `frontend` specialists reviewed the Required tests of every file against the
+lifecycle table and the lock matrix. The gaps they found were added to the file that owns each
+rule, and the end-to-end lifecycle spec is named in
+[api/reconciliations.md](api/reconciliations.md#required-tests). Mismatch surfacing and checkpoint
+anchors are settled in [Decided](#decided).
+
 ### Security review (#153)
 
 The new routes and every new 409 path were reviewed. All are `@OwnerScopedController('bank')`,
@@ -142,15 +153,7 @@ members can join an organization (#82), stays in
 
 ## Open concerns
 
-Still deferred to a later spec-enhancement issue. Each has a recommended default, **provisional —
-to be settled in its issue**. Roles, security and data access were settled by #153, and migration,
-performance, memory and caching by #154 (see [Decided](#decided)).
-
-- **Mismatch surfacing beyond the difference bar and the badge** (#155). Recommend none in this
-  epic: no notifications and no account-list badge.
-- **Checkpoint anchors as an alternative** (#155; each finished statement becomes a new anchor
-  for balances). Recommend rejecting it, since it would change the computed balance model. Keep
-  it listed for the enhancement phase to confirm.
+None. Everything was settled by #153, #154 and #155 (see [Decided](#decided)).
 
 ## Reference
 
@@ -188,6 +191,9 @@ performance, memory and caching by #154 (see [Decided](#decided)).
   tick, and a finish and a payment undo, end in the outcomes listed under
   [Concurrency](#concurrency).
 - No 409 or 400 body contains a balance, difference, date, id or count.
+- A reconciliation request loads `BankModule` once through the lazy loader, and a request
+  rejected by the role 403 or the DTO 400 before the handler does not load it
+  (`bank-lazy-loading.e2e-spec.ts`).
 - Every GET sends `X-Cache-Allow` as user-scoped and every write sends `X-Skip-Cache`.
 - A 2xx tick, finish, undo or cancel carries the `/bank` (or `/orgs/<id>/bank`) invalidation
   header, and a 409 does not.

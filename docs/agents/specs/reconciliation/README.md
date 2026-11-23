@@ -29,7 +29,8 @@ statement can be undone.
 | Lock bypass | None, `admin` included |
 | Opening anchor | Locked once any statement exists, open or finished |
 | Ordering | Statements are chronological; only the latest finished one can be undone |
-| Balances | Still computed; no per-statement opening balance stored |
+| Balances | Still computed; no per-statement opening balance stored (checkpoint anchors rejected) |
+| Mismatch surfacing | The difference bar and the warning badge only: no list badge, no notifications |
 
 Balances stay computed from the ledger and the opening anchor, as in
 [Transactions — Balance](https://github.com/darthjee/ward/blob/main/docs/agents/modules/bank/transactions.md#balance).
@@ -59,6 +60,10 @@ Out of scope for this epic:
   description and notes.
 - **Soft lock** (edit allowed, the row is un-cleared and the statement flagged broken): rejected.
   It reintroduces the silent drift this epic exists to remove.
+- **Checkpoint anchors** (each finished statement becomes a new balance anchor): rejected. It
+  would add a second source of truth for balances that could drift from the ledger, undo would
+  have to re-anchor instead of reverting the latest statement, and the cleared-row locks already
+  protect the history. See [security.md](security.md#decided).
 
 ## Index
 
@@ -67,19 +72,18 @@ Out of scope for this epic:
 - [api/existing-routes.md](api/existing-routes.md) — changes to transaction, ledger, account and bill-payment routes, and their cache classes
 - [ui/reconcile.md](ui/reconcile.md) — entry point, start form, reconcile mode, client
 - [ui/ledger.md](ui/ledger.md) — cleared marker, locked fields, warning badge, header line, history, errors
-- [security.md](security.md) — roles, ownership, response fields, sensitivity, bounds, concurrency, migration, performance, cache, memory, open concerns
+- [security.md](security.md) — roles, ownership, response fields, sensitivity, bounds, concurrency, migration, performance, cache, memory, mismatch surfacing and checkpoint anchors
 
 ## Delivery
 
 The epic follows four phases:
 
 1. **Initial specs** — this folder ([#152](https://github.com/darthjee/ward/issues/152)).
-2. **Spec enhancement** — one or more issues refining the specs and settling the
-   [open concerns](security.md#open-concerns). Roles, security and data access were settled by
-   [#153](https://github.com/darthjee/ward/issues/153), and migration, performance, memory and
-   caching by [#154](https://github.com/darthjee/ward/issues/154). Only mismatch surfacing,
-   checkpoint anchors and testing remain for
-   [#155](https://github.com/darthjee/ward/issues/155).
+2. **Spec enhancement** — complete. Roles, security and data access were settled by
+   [#153](https://github.com/darthjee/ward/issues/153), migration, performance, memory and
+   caching by [#154](https://github.com/darthjee/ward/issues/154), and mismatch surfacing,
+   checkpoint anchors and testing by [#155](https://github.com/darthjee/ward/issues/155). The
+   specs are ready for phase 3.
 3. **Create the implementation issues** — an issue that breaks the finished specs into
    implementation sub-issues.
 4. **Fold** — fold the specs into the permanent docs and remove this folder.
@@ -91,7 +95,7 @@ The implementation sub-issues do not exist yet; phase 3 creates them. The rows a
 | Sub-issue | Reads |
 |---|---|
 | TBD — backend migration plus entity | TBD (likely `model.md`, `security.md`) |
-| TBD — backend reconciliation API | TBD (likely `model.md`, `api/reconciliations.md`, `security.md`) |
+| TBD — backend reconciliation API (and the lifecycle e2e spec) | TBD (likely `model.md`, `api/reconciliations.md`, `security.md`) |
 | TBD — backend locks on existing routes | TBD (likely `model.md`, `api/existing-routes.md`) |
 | TBD — frontend reconcile mode plus history | TBD (likely `api/*.md`, `ui/reconcile.md`, `ui/ledger.md`) |
 | TBD — frontend ledger markers | TBD (likely `api/existing-routes.md`, `ui/ledger.md`) |
@@ -108,20 +112,23 @@ The likely split suggested for phase 3 to confirm:
 
 ## Open concerns
 
-Roles, security, data access, migration, performance, memory and caching are settled (see
-[security.md](security.md#decided)). What remains, each with a provisional default, is in
-[security.md](security.md#open-concerns): mismatch surfacing and checkpoint anchors as an
-alternative ([#155](https://github.com/darthjee/ward/issues/155)).
+None remain. Everything is settled in [security.md](security.md#decided).
 
 ## Testing overview
 
 Each area's tests are the **Required tests** of the file named below. The existing
-`accountant.e2e-spec.ts` and the bill-payment specs must stay green and unchanged.
+`accountant.e2e-spec.ts` and the bill-payment specs must stay green and unchanged. The backend
+also gets a dedicated end-to-end lifecycle spec,
+`backend/src/bank/tests/reconciliation-lifecycle.e2e-spec.ts`, run under both the `/bank` and
+`/orgs/<id>/bank` base paths. The frontend uses Jasmine specs only
+([ui/reconcile.md](ui/reconcile.md#required-tests), [ui/ledger.md](ui/ledger.md#required-tests)),
+with no end-to-end tooling.
 
 | Implementation area | Required tests in |
 |---|---|
 | Migration and entity | [model.md](model.md#required-tests) |
 | Reconciliation API | [api/reconciliations.md](api/reconciliations.md#required-tests) |
+| End-to-end lifecycle (both base paths) | [api/reconciliations.md](api/reconciliations.md#required-tests) |
 | Locks on existing routes | [api/existing-routes.md](api/existing-routes.md#required-tests) |
 | Frontend reconcile mode | [ui/reconcile.md](ui/reconcile.md#required-tests) |
 | Frontend ledger and history | [ui/ledger.md](ui/ledger.md#required-tests) |

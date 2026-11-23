@@ -118,13 +118,44 @@ for the full list.
 
 ## Required tests
 
-- `transactions.e2e-spec.ts`: changed versus unchanged amount and date, a description edit, a
-  delete, and no bypass for `admin`; a ticked row moved before `opening_date` is unticked.
-- `accounts.e2e-spec.ts`: the anchor lock while a statement is open, after a finish and after an
-  undo; `CURRENCY_LOCKED` once a zero-row statement exists; the account list does **not** carry
-  `last_reconciliation` or `open_reconciliation_id`, and the detail does.
-- The bill-payment e2e specs: undo blocked when cleared, allowed when ticked.
-- Ledger query units: the `reconciliation` field and `last_reconciled_date`.
+- `transactions.e2e-spec.ts`, the full lock matrix of [model.md](../model.md#lock-matrix), one
+  `it.each` row per cell: three row states (uncleared, open-ticked, cleared) against PATCH
+  `amount` / `date`, PATCH `description` / `notes` and DELETE; plus
+  - an unchanged `amount` or `date` on a cleared row is accepted (including a formatting
+    difference such as `"10"` and `"10.00"`), and a changed `amount` together with a `description`
+    change is 409 with nothing applied;
+  - DELETE of a cleared row is 409 `TRANSACTION_CLEARED` as `admin` and as `owner` (no bypass);
+  - DELETE of an open-ticked row is 204, drops the tick, and changes the statement's
+    `ticked_sum`, `difference` and `transaction_count`;
+  - a ticked row moved past `statementDate` or before `opening_date` is unticked and the
+    `difference` recomputed; one moved to exactly `statementDate` stays ticked;
+  - the check order: `ACCOUNT_ARCHIVED`, then the payment-generated 403, then
+    `TRANSACTION_CLEARED`; a cleared payment-generated row answers 403 on PATCH and
+    `TRANSACTION_CLEARED` on a direct DELETE;
+  - a POST dated inside a finished period is allowed and uncleared, and the `reconciliation` of a
+    POST and PATCH response comes from the account-scoped lookup;
+  - `reconciliation_id` and `reconciliation` in a transaction body answer 400;
+  - a tick or finish interleaved before a PATCH or DELETE (through `beforeNextTransaction`) ends
+    in the outcome listed under [Concurrency](../security.md#concurrency).
+- `accounts.e2e-spec.ts`: the anchor lock (`ACCOUNT_RECONCILED`) on `opening_date` alone, on
+  `opening_balance` alone and on both, while a statement is open, after a finish and after an
+  undo, and allowed again after a cancel removes the last statement; an unchanged `opening_*`
+  value is accepted while a statement exists, and a `name` edit still works; `CURRENCY_LOCKED`
+  with an open statement and with a zero-row statement, released after cancel; the account list
+  does **not** carry `last_reconciliation` or `open_reconciliation_id`, and the detail does,
+  with the values after finish, undo and cancel; deleting an account with a zero-row statement and
+  no transactions still works (the cascade). The same locks are asserted for the typed accounts
+  (`debt-accounts`, `provider-expense-accounts` and `investment-accounts` e2e specs).
+- `bill-payments.e2e-spec.ts`, for each of the three payment undo routes (debt occurrence,
+  one-off `bills/:id/payment`, provider-bill occurrence): blocked with `TRANSACTION_CLEARED` when
+  a generated row is cleared, and allowed when ticked (the tick is dropped and the open
+  statement's `ticked_sum` and `difference` are recomputed); a payment with several linked rows
+  where only one is cleared is blocked and none of its rows is deleted; a skipped payment (no
+  linked rows) still undoes normally; and a finish between the pre-check and the write
+  (`beforeNextTransaction`) ends in the outcome listed under
+  [Concurrency](../security.md#concurrency).
+- Ledger query units and the integration spec of the real SQL: the `reconciliation` field and
+  `last_reconciled_date`, with the join scope (see [model.md](../model.md#required-tests)).
 - The ledger and account-detail GETs send `X-Cache-Allow` as user-scoped, and a 2xx transaction
   or account write carries the owner invalidation header (see
   [security.md](../security.md#required-tests)).
