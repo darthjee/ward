@@ -33,7 +33,7 @@ export class UpdateReconciliationDto {
 }
 
 /**
- * Request body of `POST <base>/accounts/:accountId/reconciliations/:id/ticks.json`, taken
+ * Request body of `PATCH <base>/accounts/:accountId/reconciliations/:id/ticks.json`, taken
  * through `@StrictBody()`: up to {@link RECONCILIATION_TICK_MAX_IDS} positive integer ids per
  * array (raw length), each array optional and defaulting to `[]`. Emptiness and overlap are
  * checked by `normalizeTicks`.

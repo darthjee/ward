@@ -30,6 +30,11 @@ export function buildReconciliationServices() {
     lockOrder.push('Transaction');
     return lockTransactions(...args);
   };
+  const lockTicked = query.lockTicked.bind(query);
+  query.lockTicked = async (...args) => {
+    lockOrder.push('Transaction');
+    return lockTicked(...args);
+  };
 
   const repositoryFor = (entity: unknown): Record<string, unknown> => {
     const repo = (entity === Account ? repos.accounts : entity === Transaction ? repos.transactions : repos.reconciliations) as

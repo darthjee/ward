@@ -41,6 +41,13 @@ export class ReconciliationQuery {
       .map(({ id, date, amount, reconciliationId }) => ({ id, date, amount, reconciliationId }));
   }
 
+  async lockTicked(_manager: Manager, accountId: number, statementId: number): Promise<number[]> {
+    return this.transactions.rows
+      .filter((row) => row.accountId === accountId && row.reconciliationId === statementId)
+      .map((row) => row.id)
+      .sort((a, b) => a - b);
+  }
+
   async tick(_manager: Manager, accountId: number, statementId: number, ids: number[]): Promise<void> {
     for (const row of this.transactions.rows) {
       if (row.accountId === accountId && ids.includes(row.id)) {

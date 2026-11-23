@@ -252,11 +252,42 @@ describe('ReconciliationService', () => {
 
       expect(finished).toMatchObject({ status: 'finished', difference: '0.00', ticked_sum: '25.00', cleared_balance: '1000.00', transaction_count: 1 });
       expect(finished.reconciled_at).toBeInstanceOf(Date);
-      expect(s.lockOrder).toEqual(['Account', 'Reconciliation']);
+      expect(s.lockOrder).toEqual(['Account', 'Reconciliation', 'Transaction']);
 
       const reopened = await s.service.undo(s.owner, accountId, open.id);
 
       expect(reopened).toMatchObject({ status: 'open', reconciled_at: null, ticked_sum: '25.00', cleared_balance: '1000.00', difference: '0.00' });
+    });
+
+    it('locks the ticked rows of the statement (account-scoped) before the balance check and the finish update', async () => {
+      const open = await s.seedStatement(accountId, '2026-02-28', 102_500n);
+      const other = await s.seedAccount({ name: 'Sibling' });
+      const otherOpen = await s.seedStatement(other.id, '2026-02-28', 0n);
+      await s.seedTransaction(accountId, '2026-01-10', 2_500n, open.id);
+      await s.seedTransaction(other.id, '2026-01-10', 1n, otherOpen.id);
+      const calls: string[] = [];
+      const lockTicked = jest.spyOn(s.query, 'lockTicked').mockImplementation(async () => {
+        calls.push('lockTicked');
+        return [];
+      });
+      jest.spyOn(s.query, 'markFinished').mockImplementation(async () => {
+        calls.push('markFinished');
+        return true;
+      });
+
+      await s.service.finish(s.owner, accountId, open.id);
+
+      expect(lockTicked).toHaveBeenCalledWith(expect.anything(), accountId, open.id);
+      expect(calls).toEqual(['lockTicked', 'markFinished']);
+    });
+
+    it('does not finish when the locked-rows read hits a deadlock or a lock wait timeout', async () => {
+      const open = await s.seedStatement(accountId, '2026-02-28', 0n);
+      const timeout = new QueryFailedError('q', [], Object.assign(new Error('timeout'), { code: 'ER_LOCK_WAIT_TIMEOUT' }));
+      jest.spyOn(s.query, 'lockTicked').mockRejectedValueOnce(timeout);
+
+      await expectConflict(s.service.finish(s.owner, accountId, open.id), ErrorCodes.CONCURRENT_UPDATE);
+      expect(s.repos.reconciliations.rows.find((row) => row.id === open.id)?.reconciledAt).toBeNull();
     });
 
     it('finishes a zero-row statement at the opening balance', async () => {

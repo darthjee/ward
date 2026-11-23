@@ -87,6 +87,17 @@ describe('reconciliation conflicts', () => {
       });
     });
 
+    it('maps a lock wait timeout to 409 CONCURRENT_UPDATE with the same fixed text', async () => {
+      const timeout = new QueryFailedError('q', [], Object.assign(new Error('timeout'), { code: 'ER_LOCK_WAIT_TIMEOUT' }));
+      const failure = await mapDeadlock(async () => { throw timeout; }).catch((error: unknown) => error);
+
+      expect(failure).toBeInstanceOf(ConflictException);
+      expect((failure as ConflictException).getResponse()).toEqual({
+        code: ErrorCodes.CONCURRENT_UPDATE,
+        message: 'The request conflicted with another change; please retry.',
+      });
+    });
+
     it('passes other MySQL errors through unchanged', async () => {
       await expect(mapDeadlock(async () => { throw duplicate; })).rejects.toBe(duplicate);
     });

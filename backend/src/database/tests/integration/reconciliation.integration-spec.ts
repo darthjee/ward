@@ -231,6 +231,23 @@ describe('reconciliation SQL (MySQL)', () => {
       });
     });
 
+    describe('lockTicked', () => {
+      it('returns the ids ticked to the statement of the account, ascending', async () => {
+        const account = await insertAccount();
+        const other = await insertAccount();
+        const statement = await insertReconciliation(account.id, '2026-02-28');
+        const otherStatement = await insertReconciliation(other.id, '2026-02-28');
+        const second = await insertTransaction(account.id, '2026-02-02', 2n, statement.id);
+        const first = await insertTransaction(account.id, '2026-02-03', 1n, statement.id);
+        await insertTransaction(account.id, '2026-02-04', 3n);
+        await insertTransaction(other.id, '2026-02-01', 4n, otherStatement.id);
+
+        const locked = await ds.transaction((manager) => query.lockTicked(manager, account.id, statement.id));
+
+        expect(locked).toEqual([second.id, first.id].sort((a, b) => a - b));
+      });
+    });
+
     describe('tick, untick and untickAfter', () => {
       it('ticks only the given rows of the account', async () => {
         const account = await insertAccount();

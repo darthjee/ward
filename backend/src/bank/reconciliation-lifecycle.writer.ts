@@ -164,6 +164,7 @@ export class ReconciliationLifecycleWriter {
       const statement = await lockStatement(manager, account.id, id);
       assertNotArchived(account);
       assertOpen(statement);
+      await this.query.lockTicked(manager, account.id, statement.id);
       await this.#assertBalanced(manager, account, statement);
 
       const at = new Date();

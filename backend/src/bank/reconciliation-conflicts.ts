@@ -1,5 +1,5 @@
 import { ConflictException } from '@nestjs/common';
-import { isMysqlError, MYSQL_DUPLICATE_ENTRY, MYSQL_LOCK_DEADLOCK } from './mysql-errors.js';
+import { isMysqlError, MYSQL_DUPLICATE_ENTRY, MYSQL_LOCK_DEADLOCK, MYSQL_LOCK_WAIT_TIMEOUT } from './mysql-errors.js';
 import { ErrorCodes } from '../core/error-codes.js';
 
 /*
@@ -98,7 +98,7 @@ export function accountReconciled(): ConflictException {
 }
 
 /**
- * @returns {ConflictException} 409: the request collided with another change (deadlock); retry.
+ * @returns {ConflictException} 409: the request collided with another change (deadlock or lock wait timeout); retry.
  */
 export function concurrentUpdate(): ConflictException {
   return new ConflictException({
@@ -108,17 +108,18 @@ export function concurrentUpdate(): ConflictException {
 }
 
 /**
- * Runs a write, mapping a deadlock (`ER_LOCK_DEADLOCK`) to {@link concurrentUpdate}.
+ * Runs a write, mapping a deadlock (`ER_LOCK_DEADLOCK`) or a lock wait timeout
+ * (`ER_LOCK_WAIT_TIMEOUT`) to {@link concurrentUpdate}.
  * Any other error passes through unchanged.
  * @param {() => Promise<T>} write - The write.
  * @returns {Promise<T>} The write's result.
- * @throws {ConflictException} 409 when the database picked the request as a deadlock victim.
+ * @throws {ConflictException} 409 when the database picked the request as a deadlock victim or its lock wait timed out.
  */
 export async function mapDeadlock<T>(write: () => Promise<T>): Promise<T> {
   try {
     return await write();
   } catch (error) {
-    if (isMysqlError(error, MYSQL_LOCK_DEADLOCK)) {
+    if (isMysqlError(error, MYSQL_LOCK_DEADLOCK) || isMysqlError(error, MYSQL_LOCK_WAIT_TIMEOUT)) {
       throw concurrentUpdate();
     }
 

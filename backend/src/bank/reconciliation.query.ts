@@ -59,6 +59,28 @@ export class ReconciliationQuery {
   }
 
   /**
+   * Locks (`FOR UPDATE`, ascending id) every transaction ticked to the statement, so a finish
+   * recomputes its difference while a concurrent PATCH or DELETE of a ticked row waits.
+   * @param {EntityManager} manager - The write transaction's manager.
+   * @param {number} accountId - The account id.
+   * @param {number} statementId - The statement id.
+   * @returns {Promise<number[]>} The ids of the locked rows, ascending.
+   */
+  async lockTicked(manager: EntityManager, accountId: number, statementId: number): Promise<number[]> {
+    const rows = await manager
+      .getRepository(Transaction)
+      .createQueryBuilder('t')
+      .select(['t.id'])
+      .where('t.account_id = :account', { account: accountId })
+      .andWhere('t.reconciliation_id = :statement', { statement: statementId })
+      .orderBy('t.id', 'ASC')
+      .setLock('pessimistic_write')
+      .getMany();
+
+    return rows.map((row) => row.id);
+  }
+
+  /**
    * Ticks the rows on the statement with one bulk `UPDATE`.
    * @param {EntityManager} manager - The write transaction's manager.
    * @param {number} accountId - The account id.
@@ -98,6 +120,10 @@ export class ReconciliationQuery {
       .execute();
   }
 
+  // Lock-order rule for this and the other bulk UPDATEs here: they never take the account lock
+  // themselves, so they are deadlock-free only because every caller (these writers, and the
+  // transaction PATCH / DELETE and payment undos in #166) takes the account row `FOR UPDATE`
+  // first, then the statement, then the transaction rows.
   /**
    * Unticks the rows of the statement dated after `statementDate` (an edit moving the date earlier).
    * @param {EntityManager} manager - The write transaction's manager.
