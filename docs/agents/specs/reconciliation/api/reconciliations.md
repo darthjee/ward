@@ -28,17 +28,22 @@ payment undo, so both need `admin`. The reasoning is in [security.md](../securit
 
 - **One bulk ticks route** serves both a single checkbox (one id) and "tick all on page / untick
   all" (up to the 50-row ledger page). The whole batch is applied in one DB transaction and fails
-  as a whole. Ticking an already ticked row, or unticking an unticked one, is a no-op.
+  as a whole. Ticking an already ticked row, or unticking an unticked one, is a no-op. The cost
+  is one locking `SELECT` plus one bulk `UPDATE` per array (see
+  [security.md](../security.md#memory)).
 - **Statement response**:
   `{ id, status, statement_date, statement_balance, reconciled_at, cleared_balance, ticked_sum,
   difference, transaction_count, created_at, updated_at }`. On a finished statement, `difference`
   is `"0…"` and `ticked_sum` is the amount it cleared. Every write returns it, so the summary bar
-  updates from the response.
+  updates from the response. `cleared_balance`, `ticked_sum` and `difference` are computed by the
+  queries in [model.md](../model.md#queries-and-indexes), never stored.
 - **History envelope**: `{ reconciliations: [...], pagination: {...} }`, newest first by
   `statement_date` then `id`, 50 per page, with the standard `pagination` block. It includes the
   open statement (at the top) so the UI can show "Continue". Each row carries `id`, `status`,
   `statement_date`, `statement_balance`, `reconciled_at`, `transaction_count` and `undoable`.
   `undoable` is true only on the latest finished statement when none is open.
+  `transaction_count` comes from one grouped `COUNT` over the page's at most 50 statement ids
+  (no N+1; see [model.md](../model.md#queries-and-indexes)).
 
 ## Check order
 
@@ -101,10 +106,45 @@ The new codes go in `backend/src/core/error-codes.ts`, with factories in a new
 
 ## Caching
 
-GETs are `user-scoped`, writes are `never`. The class-level `InvalidatesOwner()` from
-`OwnerScopedController` already clears the owner's `/bank` subtree, which covers the ledger
-(ticked and cleared flags), the account detail (last reconciled) and the history. Navi warms
-nothing, and the proxy's `*.json` rule needs no change.
+**Mechanism.** `ReconciliationsController` is declared with `@OwnerScopedController('bank')`, like
+every bank controller. That decorator sets class-level `CacheClass.UserScoped` and class-level
+`InvalidatesOwner()`.
+
+- On a successful write, `InvalidatesOwner()` emits `/bank` in the personal context, or
+  `/orgs/<orgId>/bank` in an org context, only for the caller's own context. Tent clears that
+  subtree recursively, and only on a 2xx response.
+- Each write route declares `@CachePolicy(CacheClass.Never)`. Writes must not use
+  `NoCacheInvalidation()` or `InvalidatesPaths()`.
+- `cache-policy.coverage.spec.ts` enforces that every route declares a class.
+
+**New routes.**
+
+| Route | Class | Invalidation |
+|---|---|---|
+| History GET, statement GET | `user-scoped` | none |
+| Start (POST), edit (PATCH), cancel (DELETE), ticks (PATCH), finish (POST), undo (POST) | `never` | `InvalidatesOwner()` |
+
+The routes table above carries the same classes. The cleared flags in the ledger, the account
+detail (last reconciled) and the history are all under `/bank`, so one invalidation refreshes them.
+The classes and invalidation of the **changed existing routes** (ledger, account detail,
+transaction writes, payment undos) are in
+[existing-routes.md](existing-routes.md#caching). The general model is in
+[Caching](https://github.com/darthjee/ward/blob/main/docs/agents/architecture/caching.md#invalidation).
+
+**Error bodies.** 400 and 409 bodies are never cached:
+
+- `CachePolicyInterceptor` sets `X-Skip-Cache` and `no-store` on every non-GET/HEAD before the
+  handler runs, so thrown errors carry them;
+- Tent caches only 2xx responses that carry `X-Cache-Allow`
+  ([response headers](https://github.com/darthjee/ward/blob/main/docs/agents/architecture/caching.md#response-headers)).
+- Guard 404 and 403 responses carry no cache headers and are not 2xx, so they are not cached
+  either.
+- A failed write (4xx or 5xx) emits no invalidation. That is correct, because nothing changed.
+
+**Navi.** Navi warms nothing. Every reconciliation GET is user-scoped and changes on every tick
+([Navi warm-up](https://github.com/darthjee/ward/blob/main/docs/agents/architecture/caching.md#navi-warm-up)).
+`navi/navi_config.yaml` warms nothing under `/bank` and needs no change, and the proxy's `*.json`
+rule needs no change either.
 
 ## Reference
 
@@ -124,5 +164,6 @@ nothing, and the proxy's `*.json` rule needs no change.
 - The concurrent-start 409 `RECONCILIATION_OPEN`, and the 404 for a statement of a sibling
   account. The bounds are in [security.md](../security.md#required-tests).
 - Unit specs for `ReconciliationService` and the difference.
+- Cache headers: see [security.md](../security.md#required-tests).
 
 Back to the [README](../README.md).

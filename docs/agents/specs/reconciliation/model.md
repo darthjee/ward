@@ -55,8 +55,30 @@ Computed, never stored:
 - **ticked sum** = SUM(amount of rows linked to the open statement);
 - **difference** = `statementBalance` − (cleared balance + ticked sum).
 
-The query goes in `AccountBalancesQuery` (`backend/src/bank/account-balances.query.ts`), next to
-`currentBalance()`, with a join on `bank_reconciliations`.
+The queries go in `AccountBalancesQuery` (`backend/src/bank/account-balances.query.ts`), next to
+`currentBalance()`, with a join on `bank_reconciliations`. See
+[Queries and indexes](#queries-and-indexes).
+
+### Queries and indexes
+
+Each computed value is one indexed `SUM` or `COUNT`, never in-memory work over rows. No numeric
+latency target is set: cost is stated qualitatively.
+
+| Value | Query | Index | Cost |
+|---|---|---|---|
+| Cleared balance | The `currentBalance()` shape (`SUM(t.amount)` with `WHERE t.account_id = :account AND t.date >= a.opening_date`), plus `INNER JOIN bank_reconciliations r ON r.id = t.reconciliation_id AND r.account_id = t.account_id AND r.reconciled_at IS NOT NULL` | `idx_bank_transactions_account_id_date_id` `(account_id, date, id)` serves the range; each join is a PK lookup on `bank_reconciliations` | The account's whole ledger in the worst case, the same as `currentBalance()` today |
+| Ticked sum | `SUM(t.amount) WHERE t.reconciliation_id = :open AND t.account_id = :account` | `(reconciliation_id)` | Proportional to the ticked rows, not to the ledger size |
+| Difference | Computed in the service as a `BigInt` from the two `SUM` strings, never a `Number` | none | Constant |
+| `transaction_count` (statement and history rows) | `COUNT(*)` grouped by `reconciliation_id`; the history page runs one grouped query for its at most 50 statement ids, never one query per row | `(reconciliation_id)` | Proportional to the rows of those statements |
+| Latest finished statement, chronology check, history order | `bank_reconciliations` by `account_id`, ordered by `statement_date` | `(account_id, statement_date)` | Bounded by the statements of one account |
+| One open statement and the start race | The unique `open_key` | `open_key` | Constant |
+
+- The spec allows both `SUM`s to come from one statement with conditional `SUM`s. That is an
+  implementation choice and is not mandated.
+- `open_key` holds an `INT`, not a string, so unlike `active_name_key` it needs no collation.
+- The ledger and account-detail queries are in
+  [api/existing-routes.md](api/existing-routes.md#transactions).
+- The memory footprint is in [security.md](security.md#memory).
 
 **Debt sign.** `statementBalance` is stored signed like the ledger. On a debt the statement shows
 the positive amount owed, so the UI negates it (as it does for the opening balance) and the API
@@ -100,11 +122,54 @@ always takes and returns the signed value.
 
 ## Migration
 
-One additive migration: create the table, add the column with its FK and index, no backfill.
-Name: `backend/src/database/migrations/<YYYYMMDD>120027-bank-create-reconciliations.ts` (the
-sequence counter continues after `20261120120026-bank-contract-provider-bills.ts`). It is
-backward compatible: every existing row starts uncleared and every current rule keeps working.
-The rollback drops the column and then the table.
+One additive migration: create the table, add the column with its FK and index, and add the
+generated `open_key` unique index. There is **no backfill**.
+
+File: `backend/src/database/migrations/<YYYYMMDD>120027-bank-create-reconciliations.ts`, class
+`BankCreateReconciliations<YYYYMMDD>120027`. The sequence counter continues after
+`20261120120026-bank-contract-provider-bills.ts`.
+
+**Raw SQL.** The generated column, its unique index and the FK addition are written as raw SQL,
+because TypeORM's `getTable` and generated-column helpers hit a `typeorm_metadata` table that the
+project never creates. The precedents are `20261108120016-bank-create-accounts.ts` for the
+generated column (`active_name_key ... VIRTUAL` and its unique index) and
+`20261117120025-bank-expand-provider-bills.ts` for a nullable FK and index on an existing table.
+
+**`up()`**, in this order:
+
+1. Create `bank_reconciliations`:
+   - columns `id`, `account_id`, `statement_date DATE`, `statement_balance BIGINT`,
+     `reconciled_at DATETIME NULL`, `created_at`, `updated_at`;
+   - FK `account_id` to `bank_accounts.id` `ON DELETE CASCADE`;
+   - index `(account_id, statement_date)`.
+2. Raw SQL: add the generated column
+   `open_key INT AS (IF(reconciled_at IS NULL, account_id, NULL)) VIRTUAL` and its unique index.
+3. Raw SQL on `bank_transactions`:
+   - `ADD COLUMN reconciliation_id INT NULL`;
+   - `ADD INDEX idx_bank_transactions_reconciliation_id (reconciliation_id)`;
+   - `ADD CONSTRAINT fk_... FOREIGN KEY (reconciliation_id) REFERENCES bank_reconciliations(id)
+     ON DELETE SET NULL`.
+
+**`down()`** is reversible, in reverse order:
+
+1. Drop the `bank_transactions` FK, then its index, then the `reconciliation_id` column, each step
+   guarded through `information_schema` (as in `20261117120025-bank-expand-provider-bills.ts`).
+2. Drop `bank_reconciliations` with `DROP TABLE IF EXISTS`. That also removes `open_key`, its
+   unique index, the `(account_id, statement_date)` index and the account FK.
+
+**Reconcile data is lost on rollback**: statements and ticks are not preserved by `down()`.
+
+### Backward compatibility
+
+- Every existing transaction starts uncleared (`reconciliation_id NULL`). No backfill runs.
+- Existing clients keep working, for two reasons:
+  - the new response fields are additive and `null` on every existing row: `reconciliation`,
+    `last_reconciled_date`, `last_reconciliation` and `open_reconciliation_id`;
+  - the new 409s apply only once a statement exists: `TRANSACTION_CLEARED`, `ACCOUNT_RECONCILED`
+    and the widened `CURRENCY_LOCKED`. Until a user starts their first statement, every current
+    rule and response behaves as today.
+- `reconciliation_id` and `reconciliation` join the 400 mass-assignment list. A client that never
+  sends them is unaffected.
 
 ## Reference
 
@@ -117,7 +182,11 @@ The rollback drops the column and then the table.
 ## Required tests
 
 - Unique-open index integration spec (`database/tests/integration/`).
-- Migration up and down spec.
+- Migration unit spec `database/tests/bank-create-reconciliations-migration.spec.ts`, using
+  `fake-query-runner.ts` and asserting the `up()` and `down()` call order.
+- The migration registered in `MIGRATIONS` of `test-data-source.ts`, so
+  `migrations-registry.integration-spec.ts` passes.
+- `migrations-round-trip.integration-spec.ts` (up, down, up) stays green with the new migration.
 - Formula units: anchor, rows before the anchor excluded, debt sign, zero-row statement.
 - Eligibility and auto-untick units.
 

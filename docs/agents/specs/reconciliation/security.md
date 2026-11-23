@@ -1,8 +1,8 @@
 # Reconciliation — Security and open concerns
 
 Part of the [Reconciliation spec](README.md). This file records the decided roles, ownership,
-response fields, data sensitivity, input bounds, concurrency, cache and memory rules, and the
-concerns still deferred to later spec-enhancement issues.
+response fields, data sensitivity, input bounds, concurrency, migration, performance, cache and
+memory rules, and the concerns still deferred to later spec-enhancement issues.
 
 ## Decided
 
@@ -15,8 +15,10 @@ concerns still deferred to later spec-enhancement issues.
 | Data sensitivity | Statement balances are financial data. Bodies are never logged, and TypeORM query or parameter logging must stay off on these routes. Statement responses never contain owner fields. All new 409 messages are fixed static text: they never carry `statement_balance`, `difference`, `ticked_sum`, `cleared_balance`, the latest finished date, a statement or transaction id, or a count. The client already has these values from the statement response. 400 messages never echo the offending value |
 | Input bounds | See [Input bounds](#input-bounds) below |
 | Concurrency | See [Concurrency](#concurrency) below |
-| Cache | No route is `public`. GETs are `user-scoped`, writes are `never` with `InvalidatesOwner()`. Navi warms nothing. 400 and 409 bodies are never cached |
-| Memory and module | Owned by the lazy `bank` module. It adds no dependency and no always-on code beyond one resident controller. The difference is a single `SUM` query, not in-memory work, so it fits the 512 MB Render tier |
+| Backward compatibility and migration | One additive migration with no backfill: it creates `bank_reconciliations`, adds `reconciliation_id` with its FK and index, and adds the generated `open_key` unique index. Existing transactions start uncleared. Existing clients keep working: the new response fields are additive and `null`, and the new 409s apply only once a statement exists. `down()` is reversible and reconcile data is lost on rollback. See [model.md](model.md#migration) |
+| Performance | Every computed value is one indexed `SUM` or `COUNT`, served by `(account_id, date, id)`, `(reconciliation_id)`, `(account_id, statement_date)` or the unique `open_key`. The worst case is a single indexed `SUM` over the account's whole ledger, the same as `currentBalance()` today. Every other query is bounded by the ticked rows, the statements of one account, or the 50-row page. No new full scan and no query per row. No numeric latency target is set. See [model.md](model.md#queries-and-indexes) and [api/existing-routes.md](api/existing-routes.md#transactions) |
+| Cache | No route is `public`. GETs are `user-scoped`, writes are `never` with `InvalidatesOwner()`, which clears the caller's own `/bank` subtree on a 2xx. Every changed existing route keeps its class and is refreshed by the reconciliation writes. 400 and 409 bodies are never cached. Navi warms nothing. See [api/reconciliations.md](api/reconciliations.md#caching) and [api/existing-routes.md](api/existing-routes.md#caching) |
+| Memory and module | Owned by the lazy `bank` module. It adds no dependency and no resident code beyond one controller, and a bounded, small per-request footprint, so it fits the 512 MB Render tier. See [Memory](#memory) |
 
 ### Input bounds
 
@@ -91,6 +93,40 @@ uniform 409 retry-style error with fixed text, never a 500 carrying detail.
 - **Account PATCH (`opening_*`, currency) and archive vs. start or tick.** They take the account
   lock and recheck "a statement exists" inside it.
 
+### Memory
+
+The epic adds no meaningful resident memory and a bounded, small per-request footprint. It fits
+the 512 MB Render tier.
+
+- **Lazy module.** `ReconciliationsController` is the only resident addition. It is registered in
+  `bank-routes.module.ts` and imports service types only. `ReconciliationService`, its queries and
+  `reconciliation-conflicts.ts` load with the rest of `BankModule` on the first bank request,
+  through the dynamic `import()` in `bank-module.loader.ts`. They are listed in `BankModule`, and
+  in the `BankServices` interface where the controller needs them. No new dependency is added.
+- **Bulk tick** (at most 50 raw ids, one DB transaction). The pattern is the one of
+  `accountant.service.ts` and `accountant-charges.query.ts`, with the spec's cap of 50 rather than
+  the `MARK_MAX_IDS` of `MarkChargesDto`:
+  1. de-duplicate the ids in memory;
+  2. one account-scoped `SELECT ... FOR UPDATE` of narrow columns only (`id`, `date`, `amount`,
+     `reconciliation_id`), at most 50 rows;
+  3. one bulk `UPDATE ... SET reconciliation_id = ... WHERE id IN (...)` for `tick` and one for
+     `untick`;
+  4. recompute the statement with the two `SUM` queries.
+
+  There is no entity hydration of full rows and no per-id query. The footprint is a few kilobytes
+  per request.
+- **Ledger page with reconcile data.** It holds the same 50 rows as today, each with one more
+  small object (`{ id, status, statement_date }`), plus one scalar in the envelope. The difference
+  and the balances are computed in SQL: Ward never loads a ledger into memory to sum it.
+- **Finish and undo.** Each updates one statement row and runs the two `SUM`s under lock. No row
+  list is loaded.
+
+### Review (#154)
+
+The `backend` specialist confirmed the migration shape, the queries, the indexes and the memory
+footprint against the code. The `cache` specialist confirmed the cache classes, the invalidation
+of every changed route and that Navi warms nothing.
+
 ### Security review (#153)
 
 The new routes and every new 409 path were reviewed. All are `@OwnerScopedController('bank')`,
@@ -106,16 +142,10 @@ members can join an organization (#82), stays in
 
 ## Open concerns
 
-Still deferred to later spec-enhancement issues. Each has a recommended default, **provisional —
-to be settled in its issue**. Roles, security and data access were settled by #153 (see
-[Decided](#decided)).
+Still deferred to a later spec-enhancement issue. Each has a recommended default, **provisional —
+to be settled in its issue**. Roles, security and data access were settled by #153, and migration,
+performance, memory and caching by #154 (see [Decided](#decided)).
 
-- **Backward compatibility and migration** (#154). The change is additive with no backfill (see
-  [model.md](model.md#migration)). The only behaviour change for existing users is the anchor
-  and currency lock, and it starts only after their first statement.
-- **Performance** (#154). Indexes on `(reconciliation_id)` and `(account_id, statement_date)`.
-  The ledger `LEFT JOIN` adds one indexed lookup per row. The worst case of the cleared-balance
-  `SUM` is the account's whole ledger, the same as `currentBalance()`.
 - **Mismatch surfacing beyond the difference bar and the badge** (#155). Recommend none in this
   epic: no notifications and no account-list badge.
 - **Checkpoint anchors as an alternative** (#155; each finished statement becomes a new anchor
@@ -127,6 +157,11 @@ to be settled in its issue**. Roles, security and data access were settled by #1
 - [Epic #85](https://github.com/darthjee/ward/issues/85)
 - [Organizations](https://github.com/darthjee/ward/blob/main/docs/agents/modules/auth/organizations.md)
 - [Caching](https://github.com/darthjee/ward/blob/main/docs/agents/architecture/caching.md)
+  — [cache classes](https://github.com/darthjee/ward/blob/main/docs/agents/architecture/caching.md#cache-classes),
+  [response headers](https://github.com/darthjee/ward/blob/main/docs/agents/architecture/caching.md#response-headers),
+  [invalidation](https://github.com/darthjee/ward/blob/main/docs/agents/architecture/caching.md#invalidation),
+  [Navi warm-up](https://github.com/darthjee/ward/blob/main/docs/agents/architecture/caching.md#navi-warm-up),
+  [per-user cache](https://github.com/darthjee/ward/blob/main/docs/agents/architecture/caching.md#per-user-cache)
 - [Routes — Bank](https://github.com/darthjee/ward/blob/main/docs/agents/backend/routes/bank.md)
 
 ## Required tests
@@ -154,5 +189,7 @@ to be settled in its issue**. Roles, security and data access were settled by #1
   [Concurrency](#concurrency).
 - No 409 or 400 body contains a balance, difference, date, id or count.
 - Every GET sends `X-Cache-Allow` as user-scoped and every write sends `X-Skip-Cache`.
+- A 2xx tick, finish, undo or cancel carries the `/bank` (or `/orgs/<id>/bank`) invalidation
+  header, and a 409 does not.
 
 Back to the [README](README.md).
