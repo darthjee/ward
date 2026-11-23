@@ -13,6 +13,7 @@ import { DebtDetails } from '../../../bank/entities/debt-details.entity.js';
 import { InvestmentDetails } from '../../../bank/entities/investment-details.entity.js';
 import { ProviderBill } from '../../../bank/entities/provider-bill.entity.js';
 import { ProviderExpenseDetails } from '../../../bank/entities/provider-expense-details.entity.js';
+import { Reconciliation } from '../../../bank/entities/reconciliation.entity.js';
 import { Transaction } from '../../../bank/entities/transaction.entity.js';
 import { dataSourceOptions } from '../../data-source.js';
 import { AuthCreateUsers20260824120001 } from '../../migrations/20260824120001-auth-create-users.js';
@@ -41,6 +42,7 @@ import { BankCreateBills20261108120023 } from '../../migrations/20261108120023-b
 import { AuthAddUsersLocale20261113120024 } from '../../migrations/20261113120024-auth-add-users-locale.js';
 import { BankExpandProviderBills20261117120025 } from '../../migrations/20261117120025-bank-expand-provider-bills.js';
 import { BankContractProviderBills20261120120026 } from '../../migrations/20261120120026-bank-contract-provider-bills.js';
+import { BankCreateReconciliations20261123120027 } from '../../migrations/20261123120027-bank-create-reconciliations.js';
 
 type MigrationClass = new () => MigrationInterface;
 type MysqlOptions = MysqlConnectionOptions;
@@ -78,6 +80,7 @@ export const MIGRATIONS: ReadonlyArray<{ file: string; migration: MigrationClass
   { file: '20261113120024-auth-add-users-locale', migration: AuthAddUsersLocale20261113120024 },
   { file: '20261117120025-bank-expand-provider-bills', migration: BankExpandProviderBills20261117120025 },
   { file: '20261120120026-bank-contract-provider-bills', migration: BankContractProviderBills20261120120026 },
+  { file: '20261123120027-bank-create-reconciliations', migration: BankCreateReconciliations20261123120027 },
 ];
 
 /** Every entity the app maps, so repositories resolve against the test database. */
@@ -93,6 +96,7 @@ export const ENTITIES = [
   OrganizationMembership,
   PasswordResetToken,
   ProviderExpenseDetails,
+  Reconciliation,
   RefreshToken,
   Transaction,
   User,

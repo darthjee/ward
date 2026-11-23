@@ -1,10 +1,12 @@
-import { QueryFailedError } from 'typeorm';
+import { checkOpenKey, wireReconciliationDeletes } from './in-memory-reconciliation-repos.js';
+import { matches, mysqlError, type Where } from './in-memory-where.js';
 import { Account } from '../../entities/account.entity.js';
 import { BillPayment } from '../../entities/bill-payment.entity.js';
 import { DebtDetails } from '../../entities/debt-details.entity.js';
 import { InvestmentDetails } from '../../entities/investment-details.entity.js';
 import { ProviderBill } from '../../entities/provider-bill.entity.js';
 import { ProviderExpenseDetails } from '../../entities/provider-expense-details.entity.js';
+import { Reconciliation } from '../../entities/reconciliation.entity.js';
 import { Transaction } from '../../entities/transaction.entity.js';
 import { sameDescription } from '../../provider-bill-conflicts.js';
 
@@ -17,33 +19,6 @@ import { sameDescription } from '../../provider-bill-conflicts.js';
 // covered by `bank-schema.integration-spec.ts`.
 
 type Row = { id?: number; createdAt?: Date; updatedAt?: Date };
-type Where = Record<string, unknown>;
-
-function mysqlError(code: string): QueryFailedError {
-  return new QueryFailedError('in-memory', [], Object.assign(new Error(code), { code }));
-}
-
-type Operator = { type: string; value: unknown };
-const isSet = (value: unknown): boolean => value !== null && value !== undefined;
-const OPERATORS: Record<string, (actual: never, value: never) => boolean> = {
-  isNull: (actual) => !isSet(actual),
-  in: (actual, value: unknown[]) => value.includes(actual),
-  between: (actual, [low, high]: [never, never]) => isSet(actual) && actual >= low && actual <= high,
-  lessThan: (actual, value) => isSet(actual) && actual < value,
-};
-
-function matches(row: object, where: Where): boolean {
-  return Object.entries(where).every(([key, expected]) => {
-    const actual = (row as Record<string, unknown>)[key];
-
-    if (expected && typeof expected === 'object' && 'type' in expected) {
-      const operator = expected as Operator;
-      return OPERATORS[operator.type]?.(actual as never, operator.value as never) ?? false;
-    }
-
-    return actual === expected;
-  });
-}
 
 function compare(a: unknown, b: unknown): number {
   if (typeof a === 'string' && typeof b === 'string') {
@@ -170,6 +145,7 @@ export interface InMemoryBankRepos {
   debtDetails: InMemoryDebtDetailsRepo;
   investmentDetails: InMemoryInvestmentDetailsRepo;
   providerExpenseDetails: InMemoryProviderExpenseDetailsRepo;
+  reconciliations: InMemoryBankRepo<Reconciliation>;
 }
 
 function checkActiveName(account: Account, others: Account[]): void {
@@ -226,7 +202,9 @@ export function createInMemoryBankRepos(): InMemoryBankRepos {
   const createTransaction = transactions.create;
   // Like the nullable column with no default: a new transaction starts unsent.
   transactions.create = (fields: Partial<Transaction>): Transaction =>
-    createTransaction({ sentToAccountantAt: null, ...fields });
+    createTransaction({ sentToAccountantAt: null, reconciliationId: null, ...fields });
+  const reconciliations = createInMemoryBankRepo(Reconciliation, checkOpenKey);
+  wireReconciliationDeletes(reconciliations, transactions);
   const debtDetails = createInMemoryDetailsRepo(DebtDetails);
   const investmentDetails = createInMemoryDetailsRepo(InvestmentDetails);
   const providerExpenseDetails = createInMemoryDetailsRepo(ProviderExpenseDetails);
@@ -289,6 +267,7 @@ export function createInMemoryBankRepos(): InMemoryBankRepos {
     // Bills and payments cascade from their provider / source account; paying accounts are SET NULL.
     keep(bills.rows, (row) => !doomed.has(row.providerAccountId));
     keep(billPayments.rows, (row) => !doomed.has(row.sourceAccountId));
+    keep(reconciliations.rows, (row) => !doomed.has(row.accountId));
     for (const row of [...bills.rows, ...billPayments.rows, ...debtDetails.rows]) {
       if (row.payingAccountId !== null && doomed.has(row.payingAccountId)) row.payingAccountId = null;
     }
@@ -296,5 +275,5 @@ export function createInMemoryBankRepos(): InMemoryBankRepos {
     return result;
   };
 
-  return { accounts, transactions, bills, billPayments, debtDetails, investmentDetails, providerExpenseDetails };
+  return { accounts, transactions, bills, billPayments, debtDetails, investmentDetails, providerExpenseDetails, reconciliations };
 }

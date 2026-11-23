@@ -36,6 +36,10 @@ export class Transaction {
   @Column({ name: 'sent_to_accountant_at', type: 'datetime', nullable: true })
     sentToAccountantAt!: Date | null;
 
+  /** The statement this transaction is ticked on; `null` when it is on none. A logical link (FK `ON DELETE SET NULL`). */
+  @Column({ name: 'reconciliation_id', type: 'int', nullable: true })
+    reconciliationId!: number | null;
+
   @CreateDateColumn({ name: 'created_at' })
     createdAt!: Date;
 

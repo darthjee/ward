@@ -9,6 +9,7 @@ const TRANSACTIONS = 'bank_transactions';
 const DEBT_DETAILS = 'bank_debt_details';
 const INVESTMENT_DETAILS = 'bank_investment_details';
 const PROVIDER_EXPENSE_DETAILS = 'bank_provider_expense_details';
+const RECONCILIATIONS = 'bank_reconciliations';
 
 interface Owner {
   userId?: number | null;
@@ -78,6 +79,15 @@ async function insertPayment(ds: DataSource, fields: Record<string, unknown>): P
   const result: { insertId: number } = await ds.query(
     `INSERT INTO ${BILL_PAYMENTS} (${columns.join(', ')}) VALUES (${columns.map(() => '?').join(', ')})`,
     Object.values(row),
+  );
+  return result.insertId;
+}
+
+async function insertReconciliation(ds: DataSource, accountId: number, reconciled = false): Promise<number> {
+  const result: { insertId: number } = await ds.query(
+    `INSERT INTO ${RECONCILIATIONS} (account_id, statement_date, statement_balance, reconciled_at)
+     VALUES (?, '2026-10-31', 1000, ?)`,
+    [accountId, reconciled ? new Date() : null],
   );
   return result.insertId;
 }
@@ -660,6 +670,7 @@ describe('bank schema (MySQL)', () => {
         await seedPayment(provider, '2026-01-05');
         await ds.runMigrations();
 
+        await ds.undoLastMigration(); // reconciliations
         await ds.undoLastMigration();
         await ds.undoLastMigration();
         await ds.undoLastMigration();
@@ -750,6 +761,7 @@ describe('bank schema (MySQL)', () => {
       await seedRecurring(several, 'Rent', { expected_amount: 100 });
       await seedRecurring(several, 'Fee', { expected_amount: 200 });
 
+      await ds.undoLastMigration(); // reconciliations
       await ds.undoLastMigration();
       await runDown();
 
@@ -765,6 +777,7 @@ describe('bank schema (MySQL)', () => {
       const provider = await seedProvider('Nullish');
       await seedRecurring(provider, 'Rent', { charge_frequency: null, show_in_calendar: null });
 
+      await ds.undoLastMigration(); // reconciliations
       await ds.undoLastMigration();
 
       expect(await schedules()).toEqual([
@@ -790,9 +803,95 @@ describe('bank schema (MySQL)', () => {
     });
   });
 
+  describe('bank_reconciliations', () => {
+    it('creates the columns', async () => {
+      expect(await columnInfo(ds, RECONCILIATIONS, 'account_id')).toMatchObject({ type: 'int', nullable: false });
+      expect(await columnInfo(ds, RECONCILIATIONS, 'statement_date')).toMatchObject({ type: 'date', nullable: false });
+      expect(await columnInfo(ds, RECONCILIATIONS, 'statement_balance')).toMatchObject({ type: 'bigint', nullable: false });
+      expect(await columnInfo(ds, RECONCILIATIONS, 'reconciled_at')).toMatchObject({ type: 'datetime', nullable: true });
+      expect(await columnInfo(ds, RECONCILIATIONS, 'open_key')).toMatchObject({ type: 'int', nullable: true });
+      expect(await columnInfo(ds, TRANSACTIONS, 'reconciliation_id')).toMatchObject({ type: 'int', nullable: true });
+    });
+
+    it('creates the indexes', async () => {
+      expect(await indexNames(ds, RECONCILIATIONS)).toEqual([
+        'idx_bank_reconciliations_account_id_statement_date',
+        'idx_bank_reconciliations_open_key',
+        'PRIMARY',
+      ]);
+      expect(await indexColumns(ds, RECONCILIATIONS, 'idx_bank_reconciliations_account_id_statement_date')).toEqual([
+        'account_id',
+        'statement_date',
+      ]);
+      expect(await indexColumns(ds, TRANSACTIONS, 'idx_bank_transactions_reconciliation_id')).toEqual(['reconciliation_id']);
+    });
+
+    it('rejects a second open statement on the same account', async () => {
+      const accountId = await insertAccount(ds, { userId: 1 }, 'Nubank');
+      await insertReconciliation(ds, accountId);
+
+      await expect(insertReconciliation(ds, accountId)).rejects.toThrow(/Duplicate entry/);
+    });
+
+    it('allows a new open statement once the first is reconciled, and one on another account', async () => {
+      const accountId = await insertAccount(ds, { userId: 1 }, 'Nubank');
+      const otherId = await insertAccount(ds, { userId: 1 }, 'Itau');
+      const first = await insertReconciliation(ds, accountId);
+
+      await expect(insertReconciliation(ds, otherId)).resolves.toBeGreaterThan(0);
+      await ds.query(`UPDATE ${RECONCILIATIONS} SET reconciled_at = NOW() WHERE id = ?`, [first]);
+
+      await expect(insertReconciliation(ds, accountId)).resolves.toBeGreaterThan(first);
+      await expect(insertReconciliation(ds, accountId, true)).resolves.toBeGreaterThan(first);
+    });
+
+    it('rejects undoing a statement while another one is open', async () => {
+      const accountId = await insertAccount(ds, { userId: 1 }, 'Nubank');
+      const finished = await insertReconciliation(ds, accountId, true);
+      await insertReconciliation(ds, accountId);
+
+      await expect(ds.query(`UPDATE ${RECONCILIATIONS} SET reconciled_at = NULL WHERE id = ?`, [finished])).rejects.toThrow(
+        /Duplicate entry/,
+      );
+    });
+
+    it('sets reconciliation_id to NULL on the transactions when the statement is deleted (cancel)', async () => {
+      const accountId = await insertAccount(ds, { userId: 1 }, 'Nubank');
+      const statementId = await insertReconciliation(ds, accountId);
+      await insertTransaction(ds, accountId);
+      await ds.query(`UPDATE ${TRANSACTIONS} SET reconciliation_id = ?`, [statementId]);
+
+      await ds.query(`DELETE FROM ${RECONCILIATIONS} WHERE id = ?`, [statementId]);
+
+      expect(await ds.query(`SELECT reconciliation_id AS id FROM ${TRANSACTIONS}`)).toEqual([{ id: null }]);
+    });
+
+    it('cascades the account deletion to its zero-row statements', async () => {
+      const accountId = await insertAccount(ds, { userId: 1 }, 'Nubank');
+      await insertReconciliation(ds, accountId);
+
+      await ds.query(`DELETE FROM ${ACCOUNTS} WHERE id = ?`, [accountId]);
+
+      expect(await ds.query(`SELECT id FROM ${RECONCILIATIONS}`)).toEqual([]);
+    });
+
+    it('rejects a transaction linked to an unknown statement', async () => {
+      const accountId = await insertAccount(ds, { userId: 1 }, 'Nubank');
+      await insertTransaction(ds, accountId);
+
+      await expect(ds.query(`UPDATE ${TRANSACTIONS} SET reconciliation_id = 999999`)).rejects.toThrow(
+        /foreign key constraint fails/,
+      );
+    });
+  });
+
   describe('down', () => {
     it('restores the provider schedule, drops the bill tables, then the schedule fields, then sent_to_accountant_at, then bank_provider_expense_details, bank_investment_details, bank_debt_details, then bank_transactions, then bank_accounts', async () => {
-      // First undo the provider-bills contract (re-adds the provider schedule columns), then the
+      // First undo the reconciliations (drops the table and the transactions link).
+      await ds.undoLastMigration();
+      expect(await tableNames(ds)).not.toContain(RECONCILIATIONS);
+      expect(await columnInfo(ds, TRANSACTIONS, 'reconciliation_id')).toBeUndefined();
+      // Then undo the provider-bills contract (re-adds the provider schedule columns), then the
       // provider-bills expand (back to bank_bills), then the later, non-bank auth locale migration.
       await ds.undoLastMigration();
       for (const column of PROVIDER_SCHEDULE_COLUMNS) {
