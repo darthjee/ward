@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import type { InMemoryBankRepo } from './in-memory-bank-repos.js';
+import { checkOpenKey } from './in-memory-reconciliation-repos.js';
 import { Reconciliation } from '../../entities/reconciliation.entity.js';
 import { Transaction } from '../../entities/transaction.entity.js';
 import { LEDGER_PER_PAGE } from '../../pagination.js';
@@ -62,6 +63,27 @@ export class ReconciliationQuery {
         row.reconciliationId = null;
       }
     }
+  }
+
+  async markFinished(_manager: Manager, statementId: number, at: Date): Promise<boolean> {
+    const row = this.reconciliations.rows.find((candidate) => candidate.id === statementId && candidate.reconciledAt === null);
+
+    if (row) {
+      row.reconciledAt = at;
+    }
+
+    return row !== undefined;
+  }
+
+  async reopen(_manager: Manager, statementId: number): Promise<boolean> {
+    const row = this.reconciliations.rows.find((candidate) => candidate.id === statementId && candidate.reconciledAt !== null);
+
+    if (row) {
+      checkOpenKey({ ...row, reconciledAt: null } as Reconciliation, this.reconciliations.rows.filter((other) => other !== row));
+      row.reconciledAt = null;
+    }
+
+    return row !== undefined;
   }
 
   async transactionCounts(statementIds: number[]): Promise<Map<number, number>> {

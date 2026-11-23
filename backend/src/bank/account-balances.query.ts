@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { EntityManager, Repository } from 'typeorm';
 import { Account } from './entities/account.entity.js';
 import { Reconciliation } from './entities/reconciliation.entity.js';
 import { Transaction } from './entities/transaction.entity.js';
@@ -68,10 +68,11 @@ export class AccountBalancesQuery {
    * counting only rows dated on or after the opening date and linked to a statement of the same
    * account (a row of another account never counts).
    * @param {Account} account - The (owner-scoped) account.
+   * @param {EntityManager} [manager] - The write transaction's manager, to read under its locks.
    * @returns {Promise<bigint>} Its cleared balance in minor units.
    */
-  async clearedBalance(account: Account): Promise<bigint> {
-    const row: { total: string | null } | undefined = await this.transactionRepository
+  async clearedBalance(account: Account, manager?: EntityManager): Promise<bigint> {
+    const row: { total: string | null } | undefined = await this.#transactions(manager)
       .createQueryBuilder('t')
       .innerJoin(Account, 'a', 'a.id = t.account_id')
       .innerJoin(
@@ -89,11 +90,12 @@ export class AccountBalancesQuery {
 
   /**
    * @param {number} accountId - The (owner-scoped) account id.
-   * @param {number} reconciliationId - The open statement id.
-   * @returns {Promise<bigint>} The sum of the account's transactions ticked on that statement.
+   * @param {number} reconciliationId - The statement id.
+   * @param {EntityManager} [manager] - The write transaction's manager, to read under its locks.
+   * @returns {Promise<bigint>} The sum of the account's transactions linked to that statement.
    */
-  async tickedSum(accountId: number, reconciliationId: number): Promise<bigint> {
-    const row: { total: string | null } | undefined = await this.transactionRepository
+  async tickedSum(accountId: number, reconciliationId: number, manager?: EntityManager): Promise<bigint> {
+    const row: { total: string | null } | undefined = await this.#transactions(manager)
       .createQueryBuilder('t')
       .select('SUM(t.amount)', 'total')
       .where('t.reconciliation_id = :open', { open: reconciliationId })
@@ -109,5 +111,9 @@ export class AccountBalancesQuery {
    */
   async hasTransactions(accountId: number): Promise<boolean> {
     return this.transactionRepository.existsBy({ accountId });
+  }
+
+  #transactions(manager?: EntityManager): Repository<Transaction> {
+    return manager ? manager.getRepository(Transaction) : this.transactionRepository;
   }
 }

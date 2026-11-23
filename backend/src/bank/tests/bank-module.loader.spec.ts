@@ -6,6 +6,7 @@ import { BillHistoryService } from '../bill-history.service.js';
 import { BillPaymentService } from '../bill-payment.service.js';
 import { BillService } from '../bill.service.js';
 import { CalendarService } from '../calendar.service.js';
+import { ReconciliationService } from '../reconciliation.service.js';
 import { TransactionService } from '../transaction.service.js';
 
 describe('BankModuleLoader', () => {
@@ -16,6 +17,7 @@ describe('BankModuleLoader', () => {
     const billPayments = { name: 'billPayments' };
     const bills = { name: 'bills' };
     const calendar = { name: 'calendar' };
+    const reconciliations = { name: 'reconciliations' };
     const transactions = { name: 'transactions' };
     const byToken = new Map<unknown, object>([
       [AccountService, accounts],
@@ -24,6 +26,7 @@ describe('BankModuleLoader', () => {
       [BillPaymentService, billPayments],
       [BillService, bills],
       [CalendarService, calendar],
+      [ReconciliationService, reconciliations],
       [TransactionService, transactions],
     ]);
     const moduleRef = { get: jest.fn((token: unknown) => byToken.get(token)) };
@@ -37,11 +40,12 @@ describe('BankModuleLoader', () => {
     expect(lazy.loadOnFirstRequest).toHaveBeenCalledTimes(1);
     expect(moduleRef.get).toHaveBeenCalledWith(AccountService);
     expect(moduleRef.get).toHaveBeenCalledWith(AccountantService);
+    expect(moduleRef.get).toHaveBeenCalledWith(ReconciliationService);
     expect(moduleRef.get).toHaveBeenCalledWith(TransactionService);
     expect(moduleRef.get).toHaveBeenCalledWith(CalendarService);
     expect(moduleRef.get).toHaveBeenCalledWith(BillService);
     expect(moduleRef.get).toHaveBeenCalledWith(BillPaymentService);
     expect(moduleRef.get).toHaveBeenCalledWith(BillHistoryService);
-    expect(services).toEqual({ accounts, accountant, billHistory, billPayments, bills, calendar, transactions });
+    expect(services).toEqual({ accounts, accountant, billHistory, billPayments, bills, calendar, reconciliations, transactions });
   });
 });

@@ -5,8 +5,9 @@ import { Account } from '../../../bank/entities/account.entity.js';
 import { Reconciliation } from '../../../bank/entities/reconciliation.entity.js';
 import { Transaction } from '../../../bank/entities/transaction.entity.js';
 import { LedgerQuery } from '../../../bank/ledger.query.js';
-import { ReconciliationQuery } from '../../../bank/reconciliation.query.js';
+import { isMysqlError } from '../../../bank/mysql-errors.js';
 import { reconciliationDifference } from '../../../bank/reconciliation-balance.js';
+import { ReconciliationQuery } from '../../../bank/reconciliation.query.js';
 import type { OwnerScope } from '../../../core/owner-context.js';
 
 const ALICE: OwnerScope = { kind: 'user', userId: 1 };
@@ -273,6 +274,32 @@ describe('reconciliation SQL (MySQL)', () => {
         expect(await linkOf(before.id)).toBe(open.id);
         expect(await linkOf(boundary.id)).toBe(open.id);
         expect(await linkOf(after.id)).toBeNull();
+      });
+    });
+
+    describe('markFinished and reopen', () => {
+      it('finishes only an open statement and reopens only a finished one, keeping the ticks', async () => {
+        const account = await insertAccount();
+        const statement = await insertReconciliation(account.id, '2026-02-28');
+        const row = await insertTransaction(account.id, '2026-02-01', 5n, statement.id);
+
+        expect(await ds.transaction((manager) => query.markFinished(manager, statement.id, new Date()))).toBe(true);
+        expect(await ds.transaction((manager) => query.markFinished(manager, statement.id, new Date()))).toBe(false);
+        expect((await reconciliations.findOneByOrFail({ id: statement.id })).reconciledAt).not.toBeNull();
+        expect(await ds.transaction((manager) => query.reopen(manager, statement.id))).toBe(true);
+        expect(await ds.transaction((manager) => query.reopen(manager, statement.id))).toBe(false);
+        expect((await reconciliations.findOneByOrFail({ id: statement.id })).reconciledAt).toBeNull();
+        expect(await linkOf(row.id)).toBe(statement.id);
+      });
+
+      it('fails a reopen with ER_DUP_ENTRY while another statement of the account is open', async () => {
+        const account = await insertAccount();
+        const finished = await insertReconciliation(account.id, '2026-01-31', new Date());
+        await insertReconciliation(account.id, '2026-02-28');
+
+        const failure = await ds.transaction((manager) => query.reopen(manager, finished.id)).catch((error: unknown) => error);
+
+        expect(isMysqlError(failure, 'ER_DUP_ENTRY')).toBe(true);
       });
     });
 

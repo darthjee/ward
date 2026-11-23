@@ -122,6 +122,36 @@ export class ReconciliationQuery {
   }
 
   /**
+   * Finishes the statement, guarded by `reconciled_at IS NULL`.
+   * @param {EntityManager} manager - The write transaction's manager.
+   * @param {number} statementId - The statement id.
+   * @param {Date} at - The finish time.
+   * @returns {Promise<boolean>} `true` when the statement was open and is now finished.
+   */
+  async markFinished(manager: EntityManager, statementId: number, at: Date): Promise<boolean> {
+    const result = await manager
+      .getRepository(Reconciliation)
+      .update({ id: statementId, reconciledAt: IsNull() }, { reconciledAt: at });
+
+    return result.affected === 1;
+  }
+
+  /**
+   * Reopens the statement (undo), guarded by `reconciled_at IS NOT NULL`. The ticks are kept. The
+   * unique `open_key` makes this fail with `ER_DUP_ENTRY` when the account has another open statement.
+   * @param {EntityManager} manager - The write transaction's manager.
+   * @param {number} statementId - The statement id.
+   * @returns {Promise<boolean>} `true` when the statement was finished and is now open.
+   */
+  async reopen(manager: EntityManager, statementId: number): Promise<boolean> {
+    const result = await manager
+      .getRepository(Reconciliation)
+      .update({ id: statementId, reconciledAt: Not(IsNull()) }, { reconciledAt: null });
+
+    return result.affected === 1;
+  }
+
+  /**
    * Counts the transactions of each statement with **one** grouped query.
    * @param {number[]} statementIds - At most 50 statement ids.
    * @returns {Promise<Map<number, number>>} The count by statement id (`0` for a statement with no rows).
