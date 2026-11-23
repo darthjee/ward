@@ -22,6 +22,11 @@ For a cleared row, the inline form in `B/detail/helpers/LedgerFormHelper.jsx` an
 On an uncleared row dated on or before `last_reconciled_date`: "Not on reconciled statement of
 <date>".
 
+The badge is derived in the frontend, by comparing each row against the ledger envelope's
+`last_reconciled_date`: `reconciliation === null && date <= last_reconciled_date`. It costs one
+envelope query per page and no per-row query (see
+[api/existing-routes.md](../api/existing-routes.md#transactions)).
+
 ## Header line
 
 "Last reconciled: <date> · <balance>" under the `Balance:` line in `AccountHeaderHelper`, from

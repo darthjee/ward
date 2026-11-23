@@ -62,12 +62,12 @@ Out of scope for this epic:
 
 ## Index
 
-- [model.md](model.md) — entity, `Transaction` change, states, formulas, lifecycle, lock matrix, migration
-- [api/reconciliations.md](api/reconciliations.md) — the new reconciliation routes, payloads, error codes, cache
-- [api/existing-routes.md](api/existing-routes.md) — changes to transaction, ledger, account and bill-payment routes
+- [model.md](model.md) — entity, `Transaction` change, states, formulas, queries and indexes, lifecycle, lock matrix, migration and backward compatibility
+- [api/reconciliations.md](api/reconciliations.md) — the new reconciliation routes, payloads, error codes, cache classes and invalidation
+- [api/existing-routes.md](api/existing-routes.md) — changes to transaction, ledger, account and bill-payment routes, and their cache classes
 - [ui/reconcile.md](ui/reconcile.md) — entry point, start form, reconcile mode, client
 - [ui/ledger.md](ui/ledger.md) — cleared marker, locked fields, warning badge, header line, history, errors
-- [security.md](security.md) — roles, ownership, response fields, sensitivity, bounds, concurrency, cache, memory, open concerns
+- [security.md](security.md) — roles, ownership, response fields, sensitivity, bounds, concurrency, migration, performance, cache, memory, open concerns
 
 ## Delivery
 
@@ -76,9 +76,10 @@ The epic follows four phases:
 1. **Initial specs** — this folder ([#152](https://github.com/darthjee/ward/issues/152)).
 2. **Spec enhancement** — one or more issues refining the specs and settling the
    [open concerns](security.md#open-concerns). Roles, security and data access were settled by
-   [#153](https://github.com/darthjee/ward/issues/153); migration, performance, memory and caching
-   remain for [#154](https://github.com/darthjee/ward/issues/154), and mismatch surfacing,
-   checkpoint anchors and testing for [#155](https://github.com/darthjee/ward/issues/155).
+   [#153](https://github.com/darthjee/ward/issues/153), and migration, performance, memory and
+   caching by [#154](https://github.com/darthjee/ward/issues/154). Only mismatch surfacing,
+   checkpoint anchors and testing remain for
+   [#155](https://github.com/darthjee/ward/issues/155).
 3. **Create the implementation issues** — an issue that breaks the finished specs into
    implementation sub-issues.
 4. **Fold** — fold the specs into the permanent docs and remove this folder.
@@ -107,11 +108,10 @@ The likely split suggested for phase 3 to confirm:
 
 ## Open concerns
 
-Roles, security and data access are settled (see [security.md](security.md#decided)). What remains,
-each with a provisional default, is in [security.md](security.md#open-concerns): backward
-compatibility, migration and performance ([#154](https://github.com/darthjee/ward/issues/154)),
-and mismatch surfacing and checkpoint anchors as an alternative
-([#155](https://github.com/darthjee/ward/issues/155)).
+Roles, security, data access, migration, performance, memory and caching are settled (see
+[security.md](security.md#decided)). What remains, each with a provisional default, is in
+[security.md](security.md#open-concerns): mismatch surfacing and checkpoint anchors as an
+alternative ([#155](https://github.com/darthjee/ward/issues/155)).
 
 ## Testing overview
 
@@ -125,7 +125,7 @@ Each area's tests are the **Required tests** of the file named below. The existi
 | Locks on existing routes | [api/existing-routes.md](api/existing-routes.md#required-tests) |
 | Frontend reconcile mode | [ui/reconcile.md](ui/reconcile.md#required-tests) |
 | Frontend ledger and history | [ui/ledger.md](ui/ledger.md#required-tests) |
-| Ownership, bounds, cache | [security.md](security.md#required-tests) |
+| Ownership, bounds, cache and invalidation | [security.md](security.md#required-tests) |
 
 ## Future epics
 
