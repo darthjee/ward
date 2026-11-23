@@ -34,6 +34,7 @@ import { ProviderBillPaymentService } from './provider-bill-payment.service.js';
 import { ProviderBillResolver } from './provider-bill.resolver.js';
 import { ProviderBillService } from './provider-bill.service.js';
 import { ProviderBillsSummaryQuery } from './provider-bills-summary.query.js';
+import { ReconciliationQuery } from './reconciliation.query.js';
 import { TransactionService } from './transaction.service.js';
 
 // Re-exported so the resident `BankModuleLoader` reaches the service classes
@@ -84,6 +85,7 @@ export { TransactionService } from './transaction.service.js';
     AccountTypeRegistry,
     AccountBalancesQuery,
     ProviderBillsSummaryQuery,
+    ReconciliationQuery,
     PayingAccountResolver,
     ProviderBillResolver,
     AccountScheduleValidator,
