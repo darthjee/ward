@@ -19,6 +19,7 @@ import { DebtDetails } from '../../entities/debt-details.entity.js';
 import { InvestmentDetails } from '../../entities/investment-details.entity.js';
 import { ProviderBill } from '../../entities/provider-bill.entity.js';
 import { ProviderExpenseDetails } from '../../entities/provider-expense-details.entity.js';
+import { Reconciliation } from '../../entities/reconciliation.entity.js';
 import { Transaction } from '../../entities/transaction.entity.js';
 
 // The bank e2e harness. A real Nest application (`NestFactory.create`, not
@@ -78,6 +79,7 @@ function fakeDataSource(repos: InMemoryBankRepos) {
     if (entity === Transaction) return { ...repos.transactions, manager };
     if (entity === ProviderBill) return { ...repos.bills, manager };
     if (entity === BillPayment) return { ...repos.billPayments, manager };
+    if (entity === Reconciliation) return { ...repos.reconciliations, manager };
     if (entity === DebtDetails) return repos.debtDetails;
     if (entity === InvestmentDetails) return repos.investmentDetails;
     if (entity === ProviderExpenseDetails) return repos.providerExpenseDetails;

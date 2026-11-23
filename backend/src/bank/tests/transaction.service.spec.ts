@@ -31,7 +31,7 @@ function buildTransaction(overrides: Partial<Transaction> = {}): Transaction {
 }
 
 function row(id: number, balance: bigint): LedgerRow {
-  return { id, date: '2026-01-10', amount: -100n, description: `t${id}`, notes: null, sentToAccountantAt: null, paymentGenerated: false, balance };
+  return { id, date: '2026-01-10', amount: -100n, description: `t${id}`, notes: null, sentToAccountantAt: null, paymentGenerated: false, reconciliation: null, balance };
 }
 
 function setup(account: Account | null = buildAccount(), stored: Transaction | null = buildTransaction()) {
