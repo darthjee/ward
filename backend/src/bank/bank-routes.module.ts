@@ -13,6 +13,7 @@ import { DebtDetails } from './entities/debt-details.entity.js';
 import { InvestmentDetails } from './entities/investment-details.entity.js';
 import { ProviderBill } from './entities/provider-bill.entity.js';
 import { ProviderExpenseDetails } from './entities/provider-expense-details.entity.js';
+import { Reconciliation } from './entities/reconciliation.entity.js';
 import { Transaction } from './entities/transaction.entity.js';
 import { ProviderBillPaymentsController } from './provider-bill-payments.controller.js';
 import { ProviderBillsController } from './provider-bills.controller.js';
@@ -43,6 +44,7 @@ import { LazyModuleLoaderService } from '../core/lazy-module-loader.service.js';
     DebtDetails,
     InvestmentDetails,
     ProviderExpenseDetails,
+    Reconciliation,
     Transaction,
   ]), BankConfigModule],
   controllers: [

@@ -13,6 +13,7 @@ import { DebtDetails } from '../../../bank/entities/debt-details.entity.js';
 import { InvestmentDetails } from '../../../bank/entities/investment-details.entity.js';
 import { ProviderBill } from '../../../bank/entities/provider-bill.entity.js';
 import { ProviderExpenseDetails } from '../../../bank/entities/provider-expense-details.entity.js';
+import { Reconciliation } from '../../../bank/entities/reconciliation.entity.js';
 import { Transaction } from '../../../bank/entities/transaction.entity.js';
 import { dataSourceOptions } from '../../data-source.js';
 import { AuthCreateUsers20260824120001 } from '../../migrations/20260824120001-auth-create-users.js';
@@ -95,6 +96,7 @@ export const ENTITIES = [
   OrganizationMembership,
   PasswordResetToken,
   ProviderExpenseDetails,
+  Reconciliation,
   RefreshToken,
   Transaction,
   User,

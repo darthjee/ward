@@ -25,6 +25,7 @@ import { DebtDetails } from './entities/debt-details.entity.js';
 import { InvestmentDetails } from './entities/investment-details.entity.js';
 import { ProviderBill } from './entities/provider-bill.entity.js';
 import { ProviderExpenseDetails } from './entities/provider-expense-details.entity.js';
+import { Reconciliation } from './entities/reconciliation.entity.js';
 import { Transaction } from './entities/transaction.entity.js';
 import { LedgerQuery } from './ledger.query.js';
 import { PayingAccountResolver } from './paying-account.resolver.js';
@@ -67,6 +68,7 @@ export { TransactionService } from './transaction.service.js';
     DebtDetails,
     InvestmentDetails,
     ProviderExpenseDetails,
+    Reconciliation,
     Transaction,
   ]), BankConfigModule],
   providers: [
