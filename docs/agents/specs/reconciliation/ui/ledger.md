@@ -66,12 +66,33 @@ code map today, so this one lives next to the reconciliation controller. The cod
 
 ## Required tests
 
-Jasmine specs mirroring the source paths under `frontend/specs/assets/js/...`:
+Jasmine specs mirroring the source paths under `frontend/specs/assets/js/...`. The frontend
+uses Jasmine only: no end-to-end tooling is added for this epic.
 
-- the cleared marker and the locked fields;
-- the warning badge;
-- the header line, including the debt negation;
-- history Undo visibility (`undoable` and role): hidden for `user`, shown for `admin` and `owner`;
-- the error messages for each new code.
+- **Cleared marker**: shown for `status === 'finished'` with the statement date in the tooltip,
+  and not shown for rows of an open statement.
+- **Locked fields**: `amount` and `date` read-only on a cleared row, the other fields still
+  editable, and `renderDelete` returns null.
+- **Warning badge**: shown on an uncleared row dated on or before `last_reconciled_date`; a row
+  dated exactly on it shows the badge and a later row does not; no badge when
+  `last_reconciled_date` is null; cleared rows never show it.
+- **Header line**: shown from `last_reconciliation` and absent when it is null; the debt negation;
+  it refreshes after a finish and after an undo.
+- **Account edit form**: the opening fields are read-only, with the hint, when
+  `last_reconciliation` or `open_reconciliation_id` is set, and editable when neither is.
+- **History section**: rows (date, balance, `reconciled_at`, count) newest first, the open
+  statement on top, pagination, and rendered for all four account types from `AccountDetailHelper`
+  (mirroring `BillHistorySpec`, `useBillHistorySpec`, `BillHistoryControllerSpec` and
+  `BillHistoryHelperSpec`).
+- **History Undo**: hidden for `user` and when `undoable` is false even for `admin`, shown for
+  `admin` and `owner` (the personal context counts as `owner`); the confirmation comes first and
+  dismissing it sends no request; after a successful undo the history, the ledger (rows
+  unlocked) and the header line refresh.
+- **Error messages**: one test per new code in the `classifyError` map (`RECONCILIATION_UNBALANCED`,
+  `RECONCILIATION_OPEN`, `RECONCILIATION_OUT_OF_ORDER`, `RECONCILIATION_NOT_LATEST`,
+  `RECONCILIATION_FINISHED`, `TRANSACTION_NOT_ELIGIBLE`, `TRANSACTION_CLEARED`,
+  `ACCOUNT_RECONCILED`), the rendering through `BankErrorAlert`, and an unmapped code (such as
+  `RECONCILIATION_NOT_FINISHED`, which Undo's visibility rule makes unreachable from the UI)
+  falling back to the server message.
 
 Back to the [README](../README.md).

@@ -75,13 +75,43 @@ spread into it, like `TypedAccountsClient.js`): `listReconciliations`, `startRec
 
 ## Required tests
 
-Jasmine specs mirroring the source paths under `frontend/specs/assets/js/...`:
+Jasmine specs mirroring the source paths under `frontend/specs/assets/js/...`. The frontend
+uses Jasmine only: no end-to-end tooling is added for this epic, and the end-to-end lifecycle is
+covered by the backend spec named in [api/reconciliations.md](../api/reconciliations.md#required-tests).
+Reuse the helpers in `frontend/specs/support/` (for example `roleGatedPageExamples.js` and
+`fetchSequence.js`).
 
-- header button states (archived, role, open statement);
-- role gating: Cancel hidden for `user` and shown for `admin` and `owner`, while Reconcile and
-  Finish show for `user`;
-- the debt negation of the statement balance;
-- the optimistic tick and its revert on error;
-- Finish disabled unless the difference is 0.
+- **Header button**: states (archived, role, open statement), and the label reads **Continue
+  reconciliation** when `open_reconciliation_id` is set.
+- **Role gating**: Cancel hidden for `user` and shown for `admin` and `owner` (the personal context
+  counts as `owner`), while Reconcile, Edit statement, the checkboxes, the bulk ticks and Finish
+  show for `user`. `orgPermissionsSpec.js` gains a case for the new `UNDO_RECONCILIATION`
+  `MIN_ROLE` row (`admin`).
+- **Start form**: the date defaults to today (the `max` is asserted as a UX default, not as a
+  validation rule); the balance goes through `parseAmount` and an invalid value is rejected
+  client-side; the submitted body is exactly `{ statement_date, statement_balance }`.
+- **Edit statement form**: prefilled from the open statement and sent as the same whitelisted
+  body; a 409 `RECONCILIATION_OUT_OF_ORDER` or `RECONCILIATION_FINISHED` shows its message.
+- **Debt negation** of the statement balance, on load and on submit, in both forms, with the
+  "Amount owed" label.
+- **Tick and untick toggle**: the optimistic flip, the difference taken from the response, the
+  `{ tick: [id] }` and `{ untick: [id] }` bodies, and the revert of both the checkbox and the
+  difference on error, including 409 `TRANSACTION_NOT_ELIGIBLE` and `RECONCILIATION_FINISHED`
+  with their messages.
+- **Eligibility** in the checkbox column: enabled only inside the eligible window, ineligible
+  rows dimmed, and no checkbox on the opening row.
+- **Bulk ticks**: Tick all on page sends one call with the eligible ids of the page, Untick all
+  sends one call, neither sends per-row calls, and an empty eligible set sends nothing.
+- **Show only uncleared** filters the loaded page locally and makes no request.
+- **Summary bar**: shows date, statement balance, cleared balance and Difference, highlighted
+  unless 0, and updates from every write response.
+- **Finish**: disabled unless the difference is 0 and enabled at 0; on success it leaves reconcile
+  mode (summary bar and checkbox column gone), refreshes the ledger and the header line, and the
+  header button goes back to **Reconcile**; a 409 `RECONCILIATION_UNBALANCED` shows its message.
+- **Cancel**: opens the confirmation, dismissing it sends no request, confirming sends the DELETE
+  and leaves reconcile mode; a 403 from a stale role shows the permission message.
+- The inline transaction form stays usable in reconcile mode (a new row can be added, then ticked).
+- **Client**: each method of `BankClient.js` (or `ReconciliationsClient.js`) for URL, method and
+  whitelisted body (unknown keys stripped), under both the personal and the org base paths.
 
 Back to the [README](../README.md).

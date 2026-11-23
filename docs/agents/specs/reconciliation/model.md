@@ -48,7 +48,8 @@ transaction.
 
 ## Formulas
 
-Computed, never stored:
+Computed, never stored (checkpoint anchors were rejected, see
+[security.md](security.md#decided)):
 
 - **cleared balance** = `openingBalance` + SUM(amount of rows dated on or after `openingDate`
   linked to any finished statement of the account);
@@ -105,7 +106,7 @@ always takes and returns the signed value.
 
 ## Lock matrix
 
-| Row state | PATCH `amount` / `date` | PATCH `description` / `notes` | DELETE | Undo or delete of the generating bill payment |
+| Row state | PATCH `amount` / `date` | PATCH `description` / `notes` | DELETE | Undo of the generating bill payment (the three payment DELETEs) |
 |---|---|---|---|---|
 | Uncleared | Allowed | Allowed | Allowed | Allowed |
 | Open-ticked | Allowed | Allowed | Allowed (the tick is dropped) | Allowed (the tick is dropped) |
@@ -187,7 +188,26 @@ generated column (`active_name_key ... VIRTUAL` and its unique index) and
 - The migration registered in `MIGRATIONS` of `test-data-source.ts`, so
   `migrations-registry.integration-spec.ts` passes.
 - `migrations-round-trip.integration-spec.ts` (up, down, up) stays green with the new migration.
-- Formula units: anchor, rows before the anchor excluded, debt sign, zero-row statement.
-- Eligibility and auto-untick units.
+- Formula units: anchor, rows before the anchor excluded, debt sign, zero-row statement, and the
+  cleared balance after a finish, after an undo and with a second statement (chronology: the
+  second statement counts the rows of the first, and its undo removes them again). The queries
+  are SQL and the e2e specs mock them with in-memory versions, so the formulas are also asserted
+  against the real SQL in the integration specs (`database/tests/integration/`): the balances
+  query (rows before the anchor excluded, finished-only join, a row of another account never
+  counted) and the ledger query (the scoped `reconciliation` join and `last_reconciled_date`).
+- Eligibility units for each of its three causes (dated after `statementDate`, dated before
+  `openingDate`, cleared by another statement), and auto-untick units: a ticked row moved past
+  `statementDate` or before `openingDate` is unticked, one moved to exactly `statementDate` stays
+  ticked.
+- Foreign-key behaviour in `bank-schema.integration-spec.ts`: `ON DELETE SET NULL` on
+  `reconciliation_id` when a statement is cancelled, and `ON DELETE CASCADE` on `account_id` when
+  an account is deleted. The in-memory repositories cannot show either.
+- `reconciliation-conflicts.spec.ts` (or an addition to `bank-small-helpers.spec.ts`): each
+  factory is a 409 with its `ErrorCodes` code and fixed text.
+- The test support is extended with the new entity: a `Reconciliation` repository in the fake
+  data source, the unique-open rule, `pessimistic_write`, SET NULL on cancel and cascade in the
+  in-memory repositories, and `'ReconciliationsController'` in `KNOWN_CONTROLLERS`
+  (`backend/src/core/tests/support/route-discovery.ts`), so `cache-policy.coverage.spec.ts` and
+  `min-org-role.coverage.spec.ts` cover it.
 
 Back to the [README](README.md).
