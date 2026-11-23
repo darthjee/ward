@@ -1,7 +1,7 @@
 import { AccountBalancesQuery } from '../account-balances.query.js';
+import { buildAccount } from './account.test-support.js';
 import { Account } from '../entities/account.entity.js';
 import { Reconciliation } from '../entities/reconciliation.entity.js';
-import { buildAccount } from './account.test-support.js';
 
 function fakeRepository(rows: unknown[], row?: unknown) {
   const builder = {

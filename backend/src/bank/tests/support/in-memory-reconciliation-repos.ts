@@ -1,6 +1,6 @@
+import { matches, mysqlError, type Where } from './in-memory-where.js';
 import type { Reconciliation } from '../../entities/reconciliation.entity.js';
 import type { Transaction } from '../../entities/transaction.entity.js';
-import { matches, mysqlError, type Where } from './in-memory-where.js';
 
 // The `bank_reconciliations` rules of the in-memory bank repositories (see
 // `docs/agents/specs/reconciliation/model.md`): the unique-open key, `ON DELETE SET NULL` of

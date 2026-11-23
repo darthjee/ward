@@ -1,3 +1,5 @@
+import { checkOpenKey, wireReconciliationDeletes } from './in-memory-reconciliation-repos.js';
+import { matches, mysqlError, type Where } from './in-memory-where.js';
 import { Account } from '../../entities/account.entity.js';
 import { BillPayment } from '../../entities/bill-payment.entity.js';
 import { DebtDetails } from '../../entities/debt-details.entity.js';
@@ -7,8 +9,6 @@ import { ProviderExpenseDetails } from '../../entities/provider-expense-details.
 import { Reconciliation } from '../../entities/reconciliation.entity.js';
 import { Transaction } from '../../entities/transaction.entity.js';
 import { sameDescription } from '../../provider-bill-conflicts.js';
-import { checkOpenKey, wireReconciliationDeletes } from './in-memory-reconciliation-repos.js';
-import { matches, mysqlError, type Where } from './in-memory-where.js';
 
 // In-memory stand-ins for the `bank_accounts` / `bank_transactions` / `bank_debt_details` /
 // `bank_investment_details` / `bank_provider_expense_details` repositories, used by the bank e2e harness (no DB in `backend_tests`). They mimic the DB rules
