@@ -84,31 +84,34 @@ The epic follows four phases:
    caching by [#154](https://github.com/darthjee/ward/issues/154), and mismatch surfacing,
    checkpoint anchors and testing by [#155](https://github.com/darthjee/ward/issues/155). The
    specs are ready for phase 3.
-3. **Create the implementation issues** — an issue that breaks the finished specs into
-   implementation sub-issues.
+3. **Create the implementation issues** — complete
+   ([#156](https://github.com/darthjee/ward/issues/156)). It created the five implementation sub-issues
+   [#164](https://github.com/darthjee/ward/issues/164), [#165](https://github.com/darthjee/ward/issues/165), [#166](https://github.com/darthjee/ward/issues/166), [#167](https://github.com/darthjee/ward/issues/167) and
+   [#168](https://github.com/darthjee/ward/issues/168). The fold is [#157](https://github.com/darthjee/ward/issues/157).
 4. **Fold** — fold the specs into the permanent docs and remove this folder.
 
 ### Sub-issue → file map
 
-The implementation sub-issues do not exist yet; phase 3 creates them. The rows are TBD.
+Phase 3 ([#156](https://github.com/darthjee/ward/issues/156)) created the implementation sub-issues. Each one reads only the files
+listed, and each stands alone.
 
-| Sub-issue | Reads |
-|---|---|
-| TBD — backend migration plus entity | TBD (likely `model.md`, `security.md`) |
-| TBD — backend reconciliation API (and the lifecycle e2e spec) | TBD (likely `model.md`, `api/reconciliations.md`, `security.md`) |
-| TBD — backend locks on existing routes | TBD (likely `model.md`, `api/existing-routes.md`) |
-| TBD — frontend reconcile mode plus history | TBD (likely `api/*.md`, `ui/reconcile.md`, `ui/ledger.md`) |
-| TBD — frontend ledger markers | TBD (likely `api/existing-routes.md`, `ui/ledger.md`) |
-| TBD — fold into the permanent docs | all files, § Future epics |
+| Sub-issue | Reads | Depends on |
+|---|---|---|
+| [#164](https://github.com/darthjee/ward/issues/164) — backend migration and entity | `model.md`, `security.md` | — |
+| [#165](https://github.com/darthjee/ward/issues/165) — backend reconciliation API (and the lifecycle e2e spec) | `model.md`, `api/reconciliations.md`, `security.md` | #164 |
+| [#166](https://github.com/darthjee/ward/issues/166) — backend locks on existing routes | `model.md`, `api/existing-routes.md` | #164 |
+| [#167](https://github.com/darthjee/ward/issues/167) — frontend reconcile mode and Statements history | `api/reconciliations.md`, `api/existing-routes.md`, `ui/reconcile.md`, `ui/ledger.md` (§ Statements history and § Errors) | #165 |
+| [#168](https://github.com/darthjee/ward/issues/168) — frontend ledger markers | `api/existing-routes.md`, `ui/ledger.md` (§ Cleared marker, § Locked fields, § Warning badge and § Header line) | #166 |
+| [#157](https://github.com/darthjee/ward/issues/157) — fold into the permanent docs | all files, § Future epics | #164 to #168 |
 
-The likely split suggested for phase 3 to confirm:
+The order is: #164, then #165 and #166 in parallel, then #167 (after #165) and #168 (after
+#166), then #157. All backend issues come before the frontend ones. `ui/ledger.md` is split
+between #167 (history, undo and errors) and #168 (markers, locks, badge, header line and account
+edit form), so the two never claim the same test.
 
-1. backend migration plus entity;
-2. backend reconciliation API;
-3. backend locks on existing routes;
-4. frontend reconcile mode plus history;
-5. frontend ledger markers;
-6. fold.
+No cache/Navi issue was created: Navi warms nothing for this feature, because every new GET is
+user-scoped, and `navi/navi_config.yaml` needs no change. The `security` and `cache` reviews
+belong to #165 and #166, which add or change endpoints.
 
 ## Open concerns
 
