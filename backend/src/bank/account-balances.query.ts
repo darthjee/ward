@@ -2,7 +2,9 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Account } from './entities/account.entity.js';
+import { Reconciliation } from './entities/reconciliation.entity.js';
 import { Transaction } from './entities/transaction.entity.js';
+import { clearedBalance, sumToBigInt } from './reconciliation-balance.js';
 
 /**
  * Balance reads over `bank_transactions`. Balances are computed, never stored:
@@ -59,6 +61,46 @@ export class AccountBalancesQuery {
     const balances = await this.currentBalances([account]);
 
     return balances.get(account.id) as bigint;
+  }
+
+  /**
+   * The cleared balance: the opening balance plus the transactions on **finished** statements,
+   * counting only rows dated on or after the opening date and linked to a statement of the same
+   * account (a row of another account never counts).
+   * @param {Account} account - The (owner-scoped) account.
+   * @returns {Promise<bigint>} Its cleared balance in minor units.
+   */
+  async clearedBalance(account: Account): Promise<bigint> {
+    const row: { total: string | null } | undefined = await this.transactionRepository
+      .createQueryBuilder('t')
+      .innerJoin(Account, 'a', 'a.id = t.account_id')
+      .innerJoin(
+        Reconciliation,
+        'r',
+        'r.id = t.reconciliation_id AND r.account_id = t.account_id AND r.reconciled_at IS NOT NULL',
+      )
+      .select('SUM(t.amount)', 'total')
+      .where('t.account_id = :account', { account: account.id })
+      .andWhere('t.date >= a.opening_date')
+      .getRawOne();
+
+    return clearedBalance(account.openingBalance, sumToBigInt(row?.total));
+  }
+
+  /**
+   * @param {number} accountId - The (owner-scoped) account id.
+   * @param {number} reconciliationId - The open statement id.
+   * @returns {Promise<bigint>} The sum of the account's transactions ticked on that statement.
+   */
+  async tickedSum(accountId: number, reconciliationId: number): Promise<bigint> {
+    const row: { total: string | null } | undefined = await this.transactionRepository
+      .createQueryBuilder('t')
+      .select('SUM(t.amount)', 'total')
+      .where('t.reconciliation_id = :open', { open: reconciliationId })
+      .andWhere('t.account_id = :account', { account: accountId })
+      .getRawOne();
+
+    return sumToBigInt(row?.total);
   }
 
   /**
