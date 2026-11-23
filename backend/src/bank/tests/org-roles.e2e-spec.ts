@@ -16,6 +16,7 @@ import { hasMinRole, OrgRole } from '../../core/org-role.js';
 jest.mock('../ledger.query.js', () => jest.requireActual('./support/in-memory-ledger.query.js'));
 jest.mock('../payment-generated.query.js', () => jest.requireActual('./support/in-memory-payment-generated.query.js'));
 jest.mock('../account-balances.query.js', () => jest.requireActual('./support/in-memory-ledger.query.js'));
+jest.mock('../reconciliation.query.js', () => jest.requireActual('./support/in-memory-reconciliation.query.js'));
 jest.mock('../provider-bills-summary.query.js', () => jest.requireActual('./support/in-memory-provider-bills-summary.query.js'));
 jest.mock('../accountant-charges.query.js', () => jest.requireActual('./support/in-memory-accountant-charges.query.js'));
 
@@ -91,6 +92,14 @@ describe('organization roles on bank writes (e2e)', () => {
     });
 
     return created.id as number;
+  };
+  const statementBody = { statement_date: '2026-02-28', statement_balance: '0' };
+  // An account with an open statement (the regular account opens at 0, so a 0 statement balances).
+  const statement = async (orgId: number | null): Promise<{ accountId: number; path: string }> => {
+    const accountId = await regular(orgId);
+    const created = await expectOk('post', `${base(orgId)}/accounts/${accountId}/reconciliations.json`, statementBody);
+
+    return { accountId, path: `${base(orgId)}/accounts/${accountId}/reconciliations/${created.id as number}` };
   };
   const skip = { status: 'skipped' };
   const occurrencePath = (orgId: number | null, accountId: number) =>
@@ -196,6 +205,29 @@ describe('organization roles on bank writes (e2e)', () => {
 
       return { path: `${base(orgId)}/accountant/mark-unsent.json`, body: { transaction_ids: ids } };
     } },
+    { label: 'POST accounts/:accountId/reconciliations.json', method: 'post', minRole: OrgRole.USER, setup: async (orgId) => ({
+      path: `${base(orgId)}/accounts/${await regular(orgId)}/reconciliations.json`, body: statementBody,
+    }) },
+    { label: 'PATCH accounts/:accountId/reconciliations/:id.json', method: 'patch', minRole: OrgRole.USER, setup: async (orgId) => ({
+      path: `${(await statement(orgId)).path}.json`, body: { statement_balance: '0' },
+    }) },
+    { label: 'DELETE accounts/:accountId/reconciliations/:id.json', method: 'delete', minRole: OrgRole.ADMIN, setup: async (orgId) => ({
+      path: `${(await statement(orgId)).path}.json`,
+    }) },
+    { label: 'PATCH accounts/:accountId/reconciliations/:id/ticks.json', method: 'patch', minRole: OrgRole.USER, setup: async (orgId) => {
+      const { accountId, path } = await statement(orgId);
+
+      return { path: `${path}/ticks.json`, body: { tick: [await transaction(orgId, accountId)] } };
+    } },
+    { label: 'POST accounts/:accountId/reconciliations/:id/finish.json', method: 'post', minRole: OrgRole.USER, setup: async (orgId) => ({
+      path: `${(await statement(orgId)).path}/finish.json`, body: {},
+    }) },
+    { label: 'POST accounts/:accountId/reconciliations/:id/undo.json', method: 'post', minRole: OrgRole.ADMIN, setup: async (orgId) => {
+      const { path } = await statement(orgId);
+      await expectOk('post', `${path}/finish.json`, {});
+
+      return { path: `${path}/undo.json`, body: {} };
+    } },
   ];
 
   beforeAll(async () => {
@@ -209,7 +241,7 @@ describe('organization roles on bank writes (e2e)', () => {
   });
 
   it('covers every owner-scoped bank write route', () => {
-    expect(ROUTES).toHaveLength(22);
+    expect(ROUTES).toHaveLength(28);
   });
 
   describe.each(ROUTES)('$label (min $minRole)', ({ method, minRole, setup }) => {

@@ -34,6 +34,11 @@ import { ProviderBillPaymentService } from './provider-bill-payment.service.js';
 import { ProviderBillResolver } from './provider-bill.resolver.js';
 import { ProviderBillService } from './provider-bill.service.js';
 import { ProviderBillsSummaryQuery } from './provider-bills-summary.query.js';
+import { ReconciliationLifecycleWriter } from './reconciliation-lifecycle.writer.js';
+import { ReconciliationTicksWriter } from './reconciliation-ticks.writer.js';
+import { ReconciliationViewer } from './reconciliation-viewer.js';
+import { ReconciliationQuery } from './reconciliation.query.js';
+import { ReconciliationService } from './reconciliation.service.js';
 import { TransactionService } from './transaction.service.js';
 
 // Re-exported so the resident `BankModuleLoader` reaches the service classes
@@ -46,6 +51,7 @@ export { BillService } from './bill.service.js';
 export { CalendarService } from './calendar.service.js';
 export { ProviderBillPaymentService } from './provider-bill-payment.service.js';
 export { ProviderBillService } from './provider-bill.service.js';
+export { ReconciliationService } from './reconciliation.service.js';
 export { TransactionService } from './transaction.service.js';
 
 /**
@@ -84,6 +90,7 @@ export { TransactionService } from './transaction.service.js';
     AccountTypeRegistry,
     AccountBalancesQuery,
     ProviderBillsSummaryQuery,
+    ReconciliationQuery,
     PayingAccountResolver,
     ProviderBillResolver,
     AccountScheduleValidator,
@@ -101,6 +108,10 @@ export { TransactionService } from './transaction.service.js';
     PaymentGeneratedQuery,
     ProviderBillPaymentService,
     ProviderBillService,
+    ReconciliationLifecycleWriter,
+    ReconciliationService,
+    ReconciliationTicksWriter,
+    ReconciliationViewer,
     TransactionService,
   ],
   exports: [
@@ -113,6 +124,7 @@ export { TransactionService } from './transaction.service.js';
     ProviderBillPaymentService,
     ProviderBillResolver,
     ProviderBillService,
+    ReconciliationService,
     TransactionService,
   ],
 })

@@ -28,6 +28,7 @@ export const KNOWN_CONTROLLERS = [
   'OrganizationController',
   'ProviderBillPaymentsController',
   'ProviderBillsController',
+  'ReconciliationsController',
   'SettingsController',
   'TransactionsController',
 ];
