@@ -43,6 +43,7 @@ export const ErrorCodes = {
   TRANSACTION_NOT_ELIGIBLE: 'TRANSACTION_NOT_ELIGIBLE',
   TRANSACTION_CLEARED: 'TRANSACTION_CLEARED',
   ACCOUNT_RECONCILED: 'ACCOUNT_RECONCILED',
+  CONCURRENT_UPDATE: 'CONCURRENT_UPDATE',
 } as const;
 
 // Message used for every unexpected (non-HTTP) error — the real message and

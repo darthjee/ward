@@ -4,6 +4,8 @@ import { QueryFailedError } from 'typeorm';
 export const MYSQL_DUPLICATE_ENTRY = 'ER_DUP_ENTRY';
 /** MySQL error code of a delete refused by a referencing FK (errno 1451). */
 export const MYSQL_ROW_IS_REFERENCED = 'ER_ROW_IS_REFERENCED_2';
+/** MySQL error code of a deadlock picked as the victim (errno 1213). */
+export const MYSQL_LOCK_DEADLOCK = 'ER_LOCK_DEADLOCK';
 
 /**
  * @param {unknown} error - A thrown value.

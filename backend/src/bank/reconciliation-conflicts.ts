@@ -1,5 +1,5 @@
 import { ConflictException } from '@nestjs/common';
-import { isMysqlError, MYSQL_DUPLICATE_ENTRY } from './mysql-errors.js';
+import { isMysqlError, MYSQL_DUPLICATE_ENTRY, MYSQL_LOCK_DEADLOCK } from './mysql-errors.js';
 import { ErrorCodes } from '../core/error-codes.js';
 
 /*
@@ -95,6 +95,35 @@ export function accountReconciled(): ConflictException {
     code: ErrorCodes.ACCOUNT_RECONCILED,
     message: 'The opening date and balance cannot change once the account has a reconciliation.',
   });
+}
+
+/**
+ * @returns {ConflictException} 409: the request collided with another change (deadlock); retry.
+ */
+export function concurrentUpdate(): ConflictException {
+  return new ConflictException({
+    code: ErrorCodes.CONCURRENT_UPDATE,
+    message: 'The request conflicted with another change; please retry.',
+  });
+}
+
+/**
+ * Runs a write, mapping a deadlock (`ER_LOCK_DEADLOCK`) to {@link concurrentUpdate}.
+ * Any other error passes through unchanged.
+ * @param {() => Promise<T>} write - The write.
+ * @returns {Promise<T>} The write's result.
+ * @throws {ConflictException} 409 when the database picked the request as a deadlock victim.
+ */
+export async function mapDeadlock<T>(write: () => Promise<T>): Promise<T> {
+  try {
+    return await write();
+  } catch (error) {
+    if (isMysqlError(error, MYSQL_LOCK_DEADLOCK)) {
+      throw concurrentUpdate();
+    }
+
+    throw error;
+  }
 }
 
 /**
