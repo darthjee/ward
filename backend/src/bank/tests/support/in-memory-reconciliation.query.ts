@@ -4,7 +4,7 @@ import type { InMemoryBankRepo } from './in-memory-bank-repos.js';
 import { checkOpenKey } from './in-memory-reconciliation-repos.js';
 import { Reconciliation } from '../../entities/reconciliation.entity.js';
 import { Transaction } from '../../entities/transaction.entity.js';
-import { LEDGER_PER_PAGE } from '../../pagination.js';
+import { HISTORY_PER_PAGE } from '../../pagination.js';
 import type { HistoryPage, LockedTransaction } from '../../reconciliation.query.js';
 
 // TypeScript stand-in for the bulk / grouped SQL of `ReconciliationQuery`, which the in-memory
@@ -108,7 +108,7 @@ export class ReconciliationQuery {
     const all = this.#newestFirst(accountId);
 
     return {
-      rows: all.slice((page - 1) * LEDGER_PER_PAGE, page * LEDGER_PER_PAGE).map((row) => this.reconciliations.create(row)),
+      rows: all.slice((page - 1) * HISTORY_PER_PAGE, page * HISTORY_PER_PAGE).map((row) => this.reconciliations.create(row)),
       total: all.length,
     };
   }

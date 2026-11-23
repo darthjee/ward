@@ -3,10 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { IsNull, Not, type EntityManager, type Repository } from 'typeorm';
 import { Reconciliation } from './entities/reconciliation.entity.js';
 import { Transaction } from './entities/transaction.entity.js';
-import { LEDGER_PER_PAGE } from './pagination.js';
-
-/** Statements per history page. */
-export const HISTORY_PER_PAGE = LEDGER_PER_PAGE;
+import { HISTORY_PER_PAGE } from './pagination.js';
 
 /** The narrow columns of a transaction row locked by a ticks request (never the whole entity). */
 export type LockedTransaction = Pick<Transaction, 'id' | 'date' | 'amount' | 'reconciliationId'>;

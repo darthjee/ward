@@ -3,6 +3,9 @@ import { BadRequestException } from '@nestjs/common';
 /** Rows per ledger page. */
 export const LEDGER_PER_PAGE = 50;
 
+/** Statements per reconciliation history page. */
+export const HISTORY_PER_PAGE = 50;
+
 const PAGE_PATTERN = /^[1-9][0-9]*$/;
 
 /**

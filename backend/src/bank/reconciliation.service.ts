@@ -8,12 +8,12 @@ import type {
   UpdateReconciliationDto,
 } from './dto/reconciliation.dto.js';
 import { Reconciliation } from './entities/reconciliation.entity.js';
-import { buildPagination } from './pagination.js';
+import { buildPagination, HISTORY_PER_PAGE } from './pagination.js';
 import { ReconciliationLifecycleWriter } from './reconciliation-lifecycle.writer.js';
 import { presentHistoryRow, type HistoryResponse, type StatementResponse } from './reconciliation-response.js';
 import { ReconciliationTicksWriter } from './reconciliation-ticks.writer.js';
 import { ReconciliationViewer } from './reconciliation-viewer.js';
-import { HISTORY_PER_PAGE, ReconciliationQuery } from './reconciliation.query.js';
+import { ReconciliationQuery } from './reconciliation.query.js';
 import type { OwnerContext } from '../core/owner-context.js';
 import { ownerNotFound } from '../core/parse-id.js';
 
