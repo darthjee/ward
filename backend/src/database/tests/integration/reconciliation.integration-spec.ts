@@ -358,6 +358,22 @@ describe('reconciliation SQL (MySQL)', () => {
       });
     });
 
+    describe('hasAny', () => {
+      it('is true for an open or a finished statement of the account only, inside or outside a transaction', async () => {
+        const open = await insertAccount();
+        const finished = await insertAccount();
+        const none = await insertAccount();
+        await insertReconciliation(open.id, '2026-03-31');
+        await insertReconciliation(finished.id, '2026-01-31', new Date());
+
+        expect(await query.hasAny(open.id)).toBe(true);
+        expect(await query.hasAny(finished.id)).toBe(true);
+        expect(await query.hasAny(none.id)).toBe(false);
+        expect(await ds.transaction((manager) => query.hasAny(none.id, manager))).toBe(false);
+        expect(await ds.transaction((manager) => query.hasAny(open.id, manager))).toBe(true);
+      });
+    });
+
     describe('historyPage', () => {
       it('orders newest first by date then id, open statement first, and counts the total', async () => {
         const account = await insertAccount();

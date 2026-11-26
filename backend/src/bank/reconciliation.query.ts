@@ -204,6 +204,16 @@ export class ReconciliationQuery {
   /**
    * @param {number} accountId - The account id.
    * @param {EntityManager} [manager] - The write transaction's manager, when inside one.
+   * @returns {Promise<boolean>} Whether the account has any statement, open or finished (one
+   *   `EXISTS` served by the `(account_id, statement_date)` index).
+   */
+  async hasAny(accountId: number, manager?: EntityManager): Promise<boolean> {
+    return this.#repository(manager).existsBy({ accountId });
+  }
+
+  /**
+   * @param {number} accountId - The account id.
+   * @param {EntityManager} [manager] - The write transaction's manager, when inside one.
    * @returns {Promise<Reconciliation | null>} The account's latest finished statement, or `null`.
    */
   async latestFinished(accountId: number, manager?: EntityManager): Promise<Reconciliation | null> {

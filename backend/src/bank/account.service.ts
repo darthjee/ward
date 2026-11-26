@@ -1,23 +1,27 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { IsNull, Repository } from 'typeorm';
+import { IsNull, Repository, type EntityManager } from 'typeorm';
 import { AccountBalancesQuery } from './account-balances.query.js';
-import { accountArchived, accountHasTransactions, currencyLocked, mapNameClash } from './account-conflicts.js';
+import { accountArchived, accountHasTransactions, mapNameClash } from './account-conflicts.js';
 import { accountOwnerWhere, copyEditableFields, nestedObject, ownerColumns, presentFields } from './account-fields.js';
+import { applyCurrencyChange, assertAnchorUnlocked, hasLockingStatement } from './account-reconciliation-guard.js';
 import type { AccountResponse } from './account-response.js';
 import { AccountScheduleValidator, type ScheduleCheck } from './account-schedule.validator.js';
 import { AccountPresenter } from './account.presenter.js';
+import { parseAmountInput } from './amount-input.js';
 import type { OwnerContext } from '../core/owner-context.js';
 import { ownerNotFound } from '../core/parse-id.js';
 import type { AccountTypeHandler } from './account-types/account-type-handler.js';
 import { AccountTypeRegistry } from './account-types/account-type.registry.js';
-import { convertAmountInput, parseAmountInput } from './amount-input.js';
 import { BANK_CONFIG, type BankConfig } from './bank.config.js';
 import type { CreateAccountDto } from './dto/create-account.dto.js';
 import type { UpdateAccountDto } from './dto/update-account.dto.js';
 import { Account } from './entities/account.entity.js';
 import { todayUtc } from './ledger-date.js';
 import { isMysqlError, MYSQL_ROW_IS_REFERENCED } from './mysql-errors.js';
+import { mapDeadlock } from './reconciliation-conflicts.js';
+import { lockAccount } from './reconciliation-guards.js';
+import { ReconciliationQuery } from './reconciliation.query.js';
 
 // The account type used when a request names none.
 const DEFAULT_ACCOUNT_TYPE = 'regular';
@@ -47,6 +51,7 @@ export class AccountService {
   private readonly balances: AccountBalancesQuery;
   private readonly config: BankConfig;
   private readonly schedule: AccountScheduleValidator;
+  private readonly reconciliation: ReconciliationQuery;
   private readonly presenter: AccountPresenter;
 
   /**
@@ -55,6 +60,7 @@ export class AccountService {
    * @param {AccountBalancesQuery} balances - Balance reads.
    * @param {BankConfig} config - The boot-validated bank config.
    * @param {AccountScheduleValidator} schedule - The owner-aware schedule-field check.
+   * @param {ReconciliationQuery} reconciliation - The statement lookups (anchor and currency locks, detail fields).
    */
   constructor(
     @InjectRepository(Account) accountRepository: Repository<Account>,
@@ -62,13 +68,15 @@ export class AccountService {
       balances: AccountBalancesQuery,
     @Inject(BANK_CONFIG) config: BankConfig,
       schedule: AccountScheduleValidator,
+      reconciliation: ReconciliationQuery,
   ) {
     this.accountRepository = accountRepository;
     this.registry = registry;
     this.balances = balances;
     this.config = config;
     this.schedule = schedule;
-    this.presenter = new AccountPresenter(accountRepository, registry, balances);
+    this.reconciliation = reconciliation;
+    this.presenter = new AccountPresenter(accountRepository, registry, balances, reconciliation);
   }
 
   /**
@@ -93,11 +101,12 @@ export class AccountService {
   /**
    * @param {OwnerContext} owner - The resolved owner.
    * @param {number} id - The account id.
-   * @returns {Promise<AccountResponse>} The account with its full number and current balance.
+   * @returns {Promise<AccountResponse>} The account with its full number, current balance and the
+   *   reconciliation fields (`last_reconciliation`, `open_reconciliation_id`; the detail only).
    * @throws {NotFoundException} The uniform 404 when not owned by `owner`.
    */
   async find(owner: OwnerContext, id: number): Promise<AccountResponse> {
-    return this.presenter.presentOne(await this.findOwned(owner, id), false);
+    return this.presenter.presentOne(await this.findOwned(owner, id), { mask: false, detail: true });
   }
 
   /**
@@ -148,46 +157,28 @@ export class AccountService {
       notes: dto.notes ?? null,
     });
 
-    return this.presenter.presentOne(await this.#saveWithDetails(account, handler, prepared), true);
+    return this.presenter.presentOne(await this.#saveWithDetails(account, handler, prepared), { mask: true });
   }
 
   /**
-   * Edits an account. On an archived account only `name` is accepted (checked
-   * before any nested validation); the currency is locked once the account
-   * has transactions. A type's nested object (e.g. `debt`) is merged onto the
+   * Edits an account in one DB transaction that starts with the account row lock. On an archived
+   * account only `name` is accepted (checked before any nested validation). The currency is locked
+   * once the account has transactions or a statement, and `opening_date` / `opening_balance` once
+   * it has a statement (open or finished). A type's nested object (e.g. `debt`) is merged onto the
    * stored details (stored amounts rescaled when the currency changes).
    * @param {OwnerContext} owner - The resolved owner.
    * @param {number} id - The account id.
    * @param {UpdateAccountDto} dto - The validated body.
    * @returns {Promise<AccountResponse>} The updated account (`account_number` masked).
    * @throws {NotFoundException} The uniform 404 when not owned by `owner`.
-   * @throws {ConflictException} 409 on an archived edit, a locked currency or a name clash.
+   * @throws {ConflictException} 409 on an archived edit, a locked currency, a locked opening anchor,
+   *   a name clash or a deadlock.
    */
   async update(owner: OwnerContext, id: number, dto: UpdateAccountDto): Promise<AccountResponse> {
-    const account = await this.findOwned(owner, id);
-    const handler = this.registry.get(account.type);
-    this.registry.assertNoForeignNested(dto, handler.type);
+    const saved = await mapNameClash(() => mapDeadlock(() =>
+      this.accountRepository.manager.transaction(async (manager) => this.#updateLocked(manager, owner, id, dto))));
 
-    if (account.archivedAt && presentFields(dto).some((field) => field !== ARCHIVED_EDITABLE_FIELD)) {
-      throw accountArchived();
-    }
-
-    const previousCurrency = account.currency;
-    await this.#applyCurrency(account, dto);
-
-    const stored = (await this.registry.loadDetails([account], this.accountRepository.manager)).get(account.id);
-    const nested = nestedObject(dto, handler.type);
-    const { currency } = account;
-    const prepared = handler.validateUpdate(nested, stored, { currency, previousCurrency });
-    await this.#validateSchedule(owner, handler, { nested, prepared, currency, currencyChanged: currency !== previousCurrency });
-
-    copyEditableFields(account, dto);
-
-    if (dto.opening_balance !== undefined) {
-      account.openingBalance = parseAmountInput('opening_balance', dto.opening_balance, account.currency);
-    }
-
-    return this.presenter.presentOne(await this.#saveWithDetails(account, handler, prepared), true);
+    return this.presenter.presentOne(saved, { mask: true });
   }
 
   /**
@@ -205,7 +196,7 @@ export class AccountService {
       await this.accountRepository.save(account);
     }
 
-    return this.presenter.presentOne(account, true);
+    return this.presenter.presentOne(account, { mask: true });
   }
 
   /**
@@ -224,7 +215,7 @@ export class AccountService {
       await mapNameClash(() => this.accountRepository.save(account));
     }
 
-    return this.presenter.presentOne(account, true);
+    return this.presenter.presentOne(account, { mask: true });
   }
 
   /**
@@ -255,20 +246,38 @@ export class AccountService {
     }
   }
 
-  async #applyCurrency(account: Account, dto: UpdateAccountDto): Promise<void> {
-    if (dto.currency === undefined || dto.currency === account.currency) {
-      return;
+  async #updateLocked(manager: EntityManager, owner: OwnerContext, id: number, dto: UpdateAccountDto): Promise<Account> {
+    const account = await lockAccount(manager, owner, id);
+    const handler = this.registry.get(account.type);
+    this.registry.assertNoForeignNested(dto, handler.type);
+
+    if (account.archivedAt && presentFields(dto).some((field) => field !== ARCHIVED_EDITABLE_FIELD)) {
+      throw accountArchived();
     }
 
-    if (await this.balances.hasTransactions(account.id)) {
-      throw currencyLocked();
+    const previousCurrency = account.currency;
+    const hasStatement = await hasLockingStatement(this.reconciliation, manager, account, dto);
+    await applyCurrencyChange(account, dto, hasStatement, this.balances);
+    assertAnchorUnlocked(account, dto, hasStatement);
+
+    const stored = (await this.registry.loadDetails([account], manager)).get(account.id);
+    const nested = nestedObject(dto, handler.type);
+    const { currency } = account;
+    const prepared = handler.validateUpdate(nested, stored, { currency, previousCurrency });
+    await this.#validateSchedule(owner, handler, { nested, prepared, currency, currencyChanged: currency !== previousCurrency });
+
+    copyEditableFields(account, dto);
+
+    if (dto.opening_balance !== undefined) {
+      account.openingBalance = parseAmountInput('opening_balance', dto.opening_balance, account.currency);
     }
 
-    if (dto.opening_balance === undefined) {
-      account.openingBalance = convertAmountInput('opening_balance', account.openingBalance, account.currency, dto.currency);
-    }
+    handler.validateAccount(account);
 
-    account.currency = dto.currency;
+    const saved = await manager.getRepository(Account).save(account);
+    await handler.saveDetails(saved, prepared, manager);
+
+    return saved;
   }
 
   async #validateSchedule(owner: OwnerContext, handler: AccountTypeHandler, check: ScheduleCheck): Promise<void> {

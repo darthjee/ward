@@ -4,6 +4,14 @@ import { ProviderExpenseAccountHandler } from '../account-types/provider-expense
 import { RegularAccountHandler } from '../account-types/regular-account.handler.js';
 import { AccountPresenter } from '../account.presenter.js';
 import type { Account } from '../entities/account.entity.js';
+import { Reconciliation } from '../entities/reconciliation.entity.js';
+
+function reconciliationQuery() {
+  return {
+    latestFinished: jest.fn(async () => null),
+    openStatement: jest.fn(async () => Object.assign(new Reconciliation(), { id: 8 })),
+  };
+}
 
 function setup() {
   const summaries = jest.fn(async (ids: number[]) => new Map(ids.map((id) => [id, { count: 2, monthly: 1000n, yearly: 0n }])));
@@ -13,9 +21,10 @@ function setup() {
     currentBalances: jest.fn(async (accounts: Account[]) => new Map(accounts.map((account) => [account.id, 500n]))),
   };
   const manager = {};
-  const presenter = new AccountPresenter({ manager } as never, registry, balances as never);
+  const reconciliation = reconciliationQuery();
+  const presenter = new AccountPresenter({ manager } as never, registry, balances as never, reconciliation as never);
 
-  return { presenter, summaries, loadDetails, balances, manager };
+  return { presenter, summaries, loadDetails, balances, manager, reconciliation };
 }
 
 describe('AccountPresenter', () => {
@@ -37,7 +46,7 @@ describe('AccountPresenter', () => {
     const { presenter, balances } = setup();
     balances.currentBalances.mockResolvedValue(new Map());
 
-    const response = await presenter.presentOne(regular, false);
+    const response = await presenter.presentOne(regular, { mask: false });
 
     expect(response.balance).toBe('1000.00');
     expect(response.account_number).toBe('12345-6');
@@ -47,10 +56,33 @@ describe('AccountPresenter', () => {
     const { presenter, summaries } = setup();
 
     const [, listed] = await presenter.present([regular, provider], { mask: true, listExtras: true });
-    const single = await presenter.presentOne(provider, true);
+    const single = await presenter.presentOne(provider, { mask: true });
 
     expect(listed.bills_summary).toEqual({ count: 2, monthly: '10.00', yearly: '0.00' });
     expect(single).not.toHaveProperty('bills_summary');
     expect(summaries).toHaveBeenCalledTimes(1);
+  });
+
+  it('runs no reconciliation query on the list or on a write response', async () => {
+    const { presenter, reconciliation } = setup();
+
+    const [listed] = await presenter.present([regular, provider], { mask: true, listExtras: true });
+    const written = await presenter.presentOne(regular, { mask: true });
+
+    expect(reconciliation.latestFinished).not.toHaveBeenCalled();
+    expect(reconciliation.openStatement).not.toHaveBeenCalled();
+    expect(listed).not.toHaveProperty('last_reconciliation');
+    expect(written).not.toHaveProperty('open_reconciliation_id');
+  });
+
+  it('adds the reconciliation fields to the detail with one lookup of each', async () => {
+    const { presenter, reconciliation } = setup();
+
+    const detail = await presenter.presentOne(regular, { mask: false, detail: true });
+
+    expect(reconciliation.latestFinished).toHaveBeenCalledTimes(1);
+    expect(reconciliation.latestFinished).toHaveBeenCalledWith(1);
+    expect(reconciliation.openStatement).toHaveBeenCalledTimes(1);
+    expect(detail).toMatchObject({ last_reconciliation: null, open_reconciliation_id: 8 });
   });
 });
