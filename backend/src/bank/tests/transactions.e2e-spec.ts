@@ -320,6 +320,28 @@ describe('bank transaction routes (e2e)', () => {
       expect(response.body.opening).toMatchObject({ amount: '7.00' });
     });
 
+    it('refreshes the owner prefix on a 2xx PATCH and DELETE, and on no 409 (TRANSACTION_CLEARED)', async () => {
+      const client = reconciliationClient(app, ALICE_ORG);
+      const { id } = await client.account();
+      const kept = await client.transaction(id, '2026-01-10', '10.00');
+      const doomed = await client.transaction(id, '2026-01-11', '5.00');
+      const statement = await client.open(id, '2026-01-31', '1010.00');
+      await client.ticks(id, statement, { tick: [kept] }).expect(200);
+      await client.finish(id, statement).expect(200);
+      const path = (transactionId: number) => transactionPath(`/orgs/${ALICE_ORG}/bank`, id, transactionId);
+
+      const edited = await send(app, 'patch', path(doomed), ALICE, { description: 'x' }).expect(200);
+      const deleted = await send(app, 'delete', path(doomed), ALICE).expect(204);
+      const cleared = await send(app, 'patch', path(kept), ALICE, { amount: '11.00' }).expect(409);
+      const clearedDelete = await send(app, 'delete', path(kept), ALICE).expect(409);
+
+      expect(cleared.body.error.code).toBe('TRANSACTION_CLEARED');
+      expect(edited.headers['x-cache-invalidate']).toBe(`/orgs/${ALICE_ORG}/bank`);
+      expect(deleted.headers['x-cache-invalidate']).toBe(`/orgs/${ALICE_ORG}/bank`);
+      expect(cleared.headers['x-cache-invalidate']).toBeUndefined();
+      expect(clearedDelete.headers['x-cache-invalidate']).toBeUndefined();
+    });
+
     it('is user-scoped (GET) and never (writes) for caching', async () => {
       const get = await ledger().expect(200);
       const post = await send(app, 'post', transactionPath(`/orgs/${ALICE_ORG}/bank`, accountId), ALICE, {

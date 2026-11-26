@@ -146,6 +146,18 @@ describe('bill payment undo locks (e2e)', () => {
         expect(repos.billPayments.rows.some((row) => row.sourceAccountId === source.id)).toBe(true);
       });
 
+      it('refreshes the owner prefix on the 204 and on no 409', async () => {
+        const blocked = await paid(route);
+        await tickRow(blocked.checking.id, rowsOf(blocked.checking.id)[0].id, '-490.00', true);
+        const free = await paid(route);
+
+        const refused = await blocked.undo().expect(409);
+        const done = await free.undo().expect(204);
+
+        expect(refused.headers['x-cache-invalidate']).toBeUndefined();
+        expect(done.headers['x-cache-invalidate']).toBe(base(orgId));
+      });
+
       it('locks the source and the paying account rows', async () => {
         const { undo } = await paid(route);
         const before = repos.accounts.locks.length;
