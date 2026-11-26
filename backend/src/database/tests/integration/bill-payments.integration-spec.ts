@@ -5,10 +5,12 @@ import { BillService } from '../../../bank/bill.service.js';
 import { Account } from '../../../bank/entities/account.entity.js';
 import { BillPayment } from '../../../bank/entities/bill-payment.entity.js';
 import { ProviderBill } from '../../../bank/entities/provider-bill.entity.js';
+import { Reconciliation } from '../../../bank/entities/reconciliation.entity.js';
 import { Transaction } from '../../../bank/entities/transaction.entity.js';
 import { PayingAccountResolver } from '../../../bank/paying-account.resolver.js';
 import { ProviderBillResolver } from '../../../bank/provider-bill.resolver.js';
 import { ProviderBillService } from '../../../bank/provider-bill.service.js';
+import { ReconciliationQuery } from '../../../bank/reconciliation.query.js';
 
 const PAID = { status: 'paid', paidOn: '2026-01-12', amount: 1000n, payingAccountId: 0, recordCharge: true } as const;
 const ALICE = { kind: 'user', userId: 1 } as const;
@@ -21,6 +23,7 @@ describe('bill payment writes (MySQL)', () => {
   let transactions: Repository<Transaction>;
   let bills: Repository<ProviderBill>;
   let writer: BillPaymentWriter;
+  let reconciliation: ReconciliationQuery;
 
   async function insertAccount(type: string): Promise<Account> {
     return accounts.save(accounts.create({
@@ -41,7 +44,8 @@ describe('bill payment writes (MySQL)', () => {
     payments = ds.getRepository(BillPayment);
     transactions = ds.getRepository(Transaction);
     bills = ds.getRepository(ProviderBill);
-    writer = new BillPaymentWriter(payments, new PayingAccountResolver(accounts));
+    reconciliation = new ReconciliationQuery(ds.getRepository(Reconciliation), transactions);
+    writer = new BillPaymentWriter(payments, new PayingAccountResolver(accounts), reconciliation);
   });
 
   beforeEach(async () => {
@@ -67,6 +71,48 @@ describe('bill payment writes (MySQL)', () => {
     expect(await payments.count()).toBe(0);
   });
 
+  describe('undo under the reconciliation locks', () => {
+    const insertStatement = (accountId: number, reconciledAt: Date | null) =>
+      ds.getRepository(Reconciliation).save(ds.getRepository(Reconciliation).create({
+        accountId,
+        statementDate: '2026-01-31',
+        statementBalance: 0n,
+        reconciledAt,
+      }));
+
+    async function pay() {
+      const provider = await insertAccount('provider_expense');
+      const paying = await insertAccount('regular');
+      const target = { sourceAccountId: provider.id, billId: null, providerBillId: null, nominal: '2026-01-05', label: 'Fee', currency: 'BRL' };
+      const row = await writer.record(ALICE, target, { ...PAID, payingAccountId: paying.id });
+
+      return { provider, paying, row };
+    }
+
+    it('refuses the undo and deletes nothing when one linked row is cleared', async () => {
+      const { paying, row } = await pay();
+      const finished = await insertStatement(paying.id, new Date());
+      await transactions.update({ id: row.withdrawalTransactionId as number }, { reconciliationId: finished.id });
+
+      await expect(writer.remove(row)).rejects.toMatchObject({ status: 409 });
+
+      expect(await transactions.count()).toBe(3);
+      expect(await payments.count()).toBe(1);
+    });
+
+    it('deletes a ticked row with the rest, and the tick goes with it', async () => {
+      const { paying, row } = await pay();
+      const open = await insertStatement(paying.id, null);
+      await transactions.update({ id: row.withdrawalTransactionId as number }, { reconciliationId: open.id });
+
+      await writer.remove(row);
+
+      expect(await transactions.count()).toBe(0);
+      expect(await transactions.countBy({ reconciliationId: open.id })).toBe(0);
+      expect(await payments.count()).toBe(0);
+    });
+  });
+
   it('rolls the transactions back when the payment row hits the unique key (race past the pre-check)', async () => {
     const provider = await insertAccount('provider_expense');
     const paying = await insertAccount('regular');
@@ -84,7 +130,7 @@ describe('bill payment writes (MySQL)', () => {
     }));
     // A repository whose pre-check misses the existing row, as in a concurrent request.
     const racing = Object.assign(Object.create(payments) as Repository<BillPayment>, { findOneBy: async () => null });
-    const racingWriter = new BillPaymentWriter(racing, new PayingAccountResolver(accounts));
+    const racingWriter = new BillPaymentWriter(racing, new PayingAccountResolver(accounts), reconciliation);
 
     await expect(racingWriter.record(
       ALICE,
