@@ -33,12 +33,12 @@ export function accountArchived(): ConflictException {
 }
 
 /**
- * @returns {ConflictException} 409: the currency cannot change once the account has transactions.
+ * @returns {ConflictException} 409: the currency cannot change once the account has transactions or a reconciliation.
  */
 export function currencyLocked(): ConflictException {
   return new ConflictException({
     code: ErrorCodes.CURRENCY_LOCKED,
-    message: 'The currency cannot change once the account has transactions',
+    message: 'The currency cannot change once the account has transactions or a reconciliation',
   });
 }
 

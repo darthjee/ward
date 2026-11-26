@@ -2,8 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { accountArchived } from './account-conflicts.js';
-import { hasMinRole, OrgRole, orgRoleForbidden } from '../core/org-role.js';
-import { ownerRole, type OwnerContext } from '../core/owner-context.js';
+import type { OwnerContext } from '../core/owner-context.js';
 import { ownerNotFound } from '../core/parse-id.js';
 import { AccountTypeRegistry } from './account-types/account-type.registry.js';
 import { AccountService } from './account.service.js';
@@ -14,14 +13,13 @@ import type { Account } from './entities/account.entity.js';
 import { Transaction } from './entities/transaction.entity.js';
 import { LedgerQuery } from './ledger.query.js';
 import { buildPagination, LEDGER_PER_PAGE } from './pagination.js';
-import { PaymentGeneratedQuery } from './payment-generated.query.js';
 import {
-  PROVIDER_EXPENSE_TYPE,
   serializeLedger,
   serializeTransaction,
   type LedgerResponse,
   type TransactionResponse,
 } from './transaction-response.js';
+import { TransactionWriter } from './transaction.writer.js';
 
 const AMOUNT_RULES = { nonZero: true };
 
@@ -31,38 +29,36 @@ const AMOUNT_RULES = { nonZero: true };
  * `AccountService.findOwned`, then the transaction by `{ id, accountId }`, so
  * an account of another owner or context, a transaction of another account
  * and an unknown id all answer the same uniform 404. Transactions of an
- * archived account are read-only (409). A payment-generated transaction (one
- * referenced by a `bank_bill_payments` row of the same owner) may be edited only by an
- * organization `admin` or `owner` (or in the personal context); any lower role gets the
- * uniform 403.
+ * archived account are read-only (409). The locked PATCH and DELETE (reconciliation locks,
+ * payment-generated 403) live in {@link TransactionWriter}.
  */
 @Injectable()
 export class TransactionService {
   private readonly transactionRepository: Repository<Transaction>;
-  private readonly paymentGenerated: PaymentGeneratedQuery;
   private readonly accounts: AccountService;
   private readonly registry: AccountTypeRegistry;
   private readonly ledgerQuery: LedgerQuery;
+  private readonly writer: TransactionWriter;
 
   /**
    * @param {Repository<Transaction>} transactionRepository - The transaction repository.
-   * @param {PaymentGeneratedQuery} paymentGenerated - The owner-scoped payment-generated lookup.
    * @param {AccountService} accounts - Owner-scoped account lookups.
    * @param {AccountTypeRegistry} registry - The account type handlers.
    * @param {LedgerQuery} ledgerQuery - The ledger SQL.
+   * @param {TransactionWriter} writer - The locked PATCH and DELETE.
    */
   constructor(
     @InjectRepository(Transaction) transactionRepository: Repository<Transaction>,
-      paymentGenerated: PaymentGeneratedQuery,
       accounts: AccountService,
       registry: AccountTypeRegistry,
       ledgerQuery: LedgerQuery,
+      writer: TransactionWriter,
   ) {
     this.transactionRepository = transactionRepository;
-    this.paymentGenerated = paymentGenerated;
     this.accounts = accounts;
     this.registry = registry;
     this.ledgerQuery = ledgerQuery;
+    this.writer = writer;
   }
 
   /**
@@ -77,10 +73,11 @@ export class TransactionService {
   async ledger(owner: OwnerContext, accountId: number, page: number): Promise<LedgerResponse> {
     const account = await this.#ledgerAccount(owner, accountId);
     const pagination = buildPagination(page, LEDGER_PER_PAGE, await this.ledgerQuery.count(account.id));
+    const lastReconciledDate = await this.ledgerQuery.lastReconciledDate(account.id);
     const rows = page > pagination.total_pages ? [] : await this.ledgerQuery.page(owner, account, page, LEDGER_PER_PAGE);
     const opening = page === pagination.total_pages ? await this.ledgerQuery.openingEffective(account) : null;
 
-    return serializeLedger(account, rows, opening, pagination);
+    return serializeLedger(account, rows, opening, pagination, lastReconciledDate);
   }
 
   /**
@@ -103,8 +100,9 @@ export class TransactionService {
       sentToAccountantAt: null,
     });
 
-    // A just-created transaction cannot be referenced by a bill payment yet.
-    return serializeTransaction(await this.transactionRepository.save(transaction), account, false);
+    // A just-created transaction is on no statement (even dated inside a finished period) and
+    // cannot be referenced by a bill payment yet.
+    return serializeTransaction(await this.transactionRepository.save(transaction), account, false, null);
   }
 
   /**
@@ -125,21 +123,18 @@ export class TransactionService {
     transactionId: number,
     dto: UpdateTransactionDto,
   ): Promise<TransactionResponse> {
-    const account = await this.#writableAccount(owner, accountId);
-    const transaction = await this.#findTransaction(account, transactionId);
+    const account = await this.#ledgerAccount(owner, accountId);
 
-    const paymentGenerated = await this.paymentGenerated.isPaymentGenerated(owner, transaction.id);
+    await this.#findTransaction(account, transactionId);
 
-    this.#assertMayEdit(owner, paymentGenerated);
+    const amount = dto.amount === undefined ? undefined : parseAmountInput('amount', dto.amount, account.currency, AMOUNT_RULES);
 
-    if (dto.amount !== undefined) {
-      transaction.amount = parseAmountInput('amount', dto.amount, account.currency, AMOUNT_RULES);
-      clearMarkOnPayment(account, transaction);
-    }
-
-    Object.assign(transaction, definedFields({ date: dto.date, description: dto.description, notes: dto.notes }));
-
-    return serializeTransaction(await this.transactionRepository.save(transaction), account, paymentGenerated);
+    return this.writer.update(owner, accountId, transactionId, {
+      amount,
+      date: dto.date,
+      description: dto.description,
+      notes: dto.notes,
+    });
   }
 
   /**
@@ -152,10 +147,8 @@ export class TransactionService {
    * @throws {ConflictException} 409 when the account is archived.
    */
   async delete(owner: OwnerContext, accountId: number, transactionId: number): Promise<void> {
-    const account = await this.#writableAccount(owner, accountId);
-    const transaction = await this.#findTransaction(account, transactionId);
-
-    await this.transactionRepository.delete({ id: transaction.id, accountId: account.id });
+    await this.#ledgerAccount(owner, accountId);
+    await this.writer.delete(owner, accountId, transactionId);
   }
 
   async #ledgerAccount(owner: OwnerContext, accountId: number): Promise<Account> {
@@ -178,16 +171,6 @@ export class TransactionService {
     return account;
   }
 
-  // Fail-closed: every role below `admin` (known or not) may not edit a payment-generated
-  // transaction; `owner`, `admin` and the personal context may. The flag is the single
-  // owner-scoped EXISTS `update()` runs for every role (and returns in the response), so a bill
-  // payment of another owner or context never makes the transaction payment-generated.
-  #assertMayEdit(owner: OwnerContext, paymentGenerated: boolean): void {
-    if (paymentGenerated && !hasMinRole(ownerRole(owner), OrgRole.ADMIN)) {
-      throw orgRoleForbidden();
-    }
-  }
-
   async #findTransaction(account: Account, transactionId: number): Promise<Transaction> {
     const transaction = await this.transactionRepository.findOneBy({ id: transactionId, accountId: account.id });
 
@@ -196,26 +179,5 @@ export class TransactionService {
     }
 
     return transaction;
-  }
-}
-
-/**
- * @param {Record<string, unknown>} fields - Candidate fields.
- * @returns {Record<string, unknown>} Only the fields that were sent (not `undefined`).
- */
-function definedFields(fields: Record<string, unknown>): Record<string, unknown> {
-  return Object.fromEntries(Object.entries(fields).filter(([, value]) => value !== undefined));
-}
-
-/**
- * A sent charge edited into a payment (positive amount) loses its hand-off mark, so a payment
- * is never marked; flipping it back yields an unsent charge. Other edits keep the mark.
- * @param {Account} account - The transaction's account.
- * @param {Transaction} transaction - The transaction, with its new amount.
- * @returns {void}
- */
-function clearMarkOnPayment(account: Account, transaction: Transaction): void {
-  if (account.type === PROVIDER_EXPENSE_TYPE && transaction.amount > 0n) {
-    transaction.sentToAccountantAt = null;
   }
 }

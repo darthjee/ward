@@ -10,7 +10,7 @@ import { ProviderExpenseAccountHandler } from '../account-types/provider-expense
 import { defaultProviderExpenseState } from '../account-types/provider-expense-details.js';
 import { RegularAccountHandler } from '../account-types/regular-account.handler.js';
 import { AccountService } from '../account.service.js';
-import { buildAccount, NO_BILLS_SUMMARY, ORGANIZATION, PERSONAL } from './account.test-support.js';
+import { buildAccount, NO_BILLS_SUMMARY, NO_RECONCILIATION, ORGANIZATION, PERSONAL } from './account.test-support.js';
 import type { CreateAccountDto } from '../dto/create-account.dto.js';
 import type { UpdateAccountDto } from '../dto/update-account.dto.js';
 import { Account } from '../entities/account.entity.js';
@@ -27,9 +27,19 @@ function mysqlError(code: string): QueryFailedError {
 
 function setup(stored: Account | null = buildAccount()) {
   const transactionalSave = jest.fn(async (account: Account) => ({ ...account, id: 99 }));
+  // `findOne` is the account row re-read under the write lock (`lockAccount`).
+  const accountLocks: unknown[] = [];
+  const lockedManager = {
+    getRepository: () => ({
+      save: transactionalSave,
+      findOne: jest.fn(async (options: unknown) => {
+        accountLocks.push(options);
+        return stored;
+      }),
+    }),
+  };
   const manager = {
-    transaction: jest.fn(async (work: (m: unknown) => Promise<unknown>) =>
-      work({ getRepository: () => ({ save: transactionalSave }) })),
+    transaction: jest.fn(async (work: (m: unknown) => Promise<unknown>) => work(lockedManager)),
   };
   const accountRepository = {
     find: jest.fn(async (): Promise<Account[]> => []),
@@ -44,12 +54,13 @@ function setup(stored: Account | null = buildAccount()) {
       new Map(accounts.map((account) => [account.id, account.openingBalance + 1n]))),
     hasTransactions: jest.fn(async () => false),
   };
+  const reconciliation = { hasAny: jest.fn(async () => false), latestFinished: jest.fn(async () => null), openStatement: jest.fn(async () => null) };
   const registry = new AccountTypeRegistry([new RegularAccountHandler()]);
   const service = new AccountService(accountRepository as never, registry, balances as never, {
     defaultCurrency: 'BRL',
-  }, NO_SCHEDULE_CHECK);
+  }, NO_SCHEDULE_CHECK, reconciliation as never);
 
-  return { service, accountRepository, balances, transactionalSave, manager };
+  return { service, accountRepository, balances, transactionalSave, manager, reconciliation, accountLocks, lockedManager };
 }
 
 const createDto = (fields: Partial<CreateAccountDto> = {}): CreateAccountDto =>
@@ -99,6 +110,28 @@ describe('AccountService', () => {
       const { service } = setup();
 
       await expect(service.list(PERSONAL, { type: 'debt' })).rejects.toThrow(BadRequestException);
+    });
+  });
+
+  describe('find (the detail)', () => {
+    it('adds the reconciliation fields, from one lookup of each', async () => {
+      const { service, reconciliation } = setup();
+      reconciliation.openStatement.mockResolvedValue({ id: 6 } as never);
+
+      const result = await service.find(PERSONAL, 1);
+
+      expect(result).toMatchObject({ last_reconciliation: null, open_reconciliation_id: 6 });
+      expect(reconciliation.latestFinished).toHaveBeenCalledTimes(1);
+    });
+
+    it('keeps them off the list', async () => {
+      const { service, accountRepository, reconciliation } = setup();
+      accountRepository.find.mockResolvedValue([buildAccount()]);
+
+      const [listed] = await service.list(PERSONAL);
+
+      expect(listed).not.toHaveProperty('last_reconciliation');
+      expect(reconciliation.latestFinished).not.toHaveBeenCalled();
     });
   });
 
@@ -263,6 +296,73 @@ describe('AccountService', () => {
       await expect(service.update(PERSONAL, 1, updateDto({ currency: 'JPY' }))).rejects.toThrow(BadRequestException);
     });
 
+    it('takes the account row lock first, inside the write transaction, scoped to the owner', async () => {
+      const { service, manager, accountLocks } = setup();
+
+      await service.update(PERSONAL, 1, updateDto({ name: 'Locked' }));
+
+      expect(manager.transaction).toHaveBeenCalledTimes(1);
+      expect(accountLocks).toEqual([{ where: { userId: 7, organizationId: IsNull(), id: 1 }, lock: { mode: 'pessimistic_write' } }]);
+    });
+
+    it('answers 404 when the locked re-read finds no account', async () => {
+      const { service } = setup(null);
+
+      await expect(service.update(PERSONAL, 1, updateDto({ name: 'x' }))).rejects.toThrow(NotFoundException);
+    });
+
+    it('maps a deadlock to CONCURRENT_UPDATE', async () => {
+      const { service, manager } = setup();
+      manager.transaction.mockRejectedValue(mysqlError('ER_LOCK_DEADLOCK'));
+
+      expect(await codeOf(service.update(PERSONAL, 1, updateDto({ name: 'x' })))).toBe(ErrorCodes.CONCURRENT_UPDATE);
+    });
+
+    it('looks for a statement inside the transaction only when the body touches the anchor or the currency', async () => {
+      const { service, reconciliation, lockedManager } = setup();
+
+      await service.update(PERSONAL, 1, updateDto({ name: 'x' }));
+      expect(reconciliation.hasAny).not.toHaveBeenCalled();
+
+      await service.update(PERSONAL, 1, updateDto({ opening_date: '2026-01-02' }));
+      expect(reconciliation.hasAny).toHaveBeenCalledWith(1, lockedManager);
+    });
+
+    it.each([
+      ['opening_date', { opening_date: '2026-01-02' }],
+      ['opening_balance', { opening_balance: '1000.01' }],
+    ])('answers ACCOUNT_RECONCILED when a statement exists and %s changes, saving nothing', async (_label, fields) => {
+      const { service, reconciliation, transactionalSave } = setup();
+      reconciliation.hasAny.mockResolvedValue(true);
+
+      expect(await codeOf(service.update(PERSONAL, 1, updateDto(fields)))).toBe(ErrorCodes.ACCOUNT_RECONCILED);
+      expect(transactionalSave).not.toHaveBeenCalled();
+    });
+
+    it('accepts unchanged anchor values and a rename when a statement exists', async () => {
+      const { service, reconciliation, transactionalSave } = setup();
+      reconciliation.hasAny.mockResolvedValue(true);
+
+      await service.update(PERSONAL, 1, updateDto({ opening_date: '2026-01-01', opening_balance: '1000', name: 'Renamed' }));
+
+      expect(transactionalSave).toHaveBeenCalledWith(expect.objectContaining({ name: 'Renamed', openingBalance: 100000n }));
+    });
+
+    it('answers CURRENCY_LOCKED, before ACCOUNT_RECONCILED, when a statement exists', async () => {
+      const { service, reconciliation } = setup();
+      reconciliation.hasAny.mockResolvedValue(true);
+
+      expect(await codeOf(service.update(PERSONAL, 1, updateDto({ currency: 'USD', opening_date: '2026-01-02' }))))
+        .toBe(ErrorCodes.CURRENCY_LOCKED);
+    });
+
+    it('answers ACCOUNT_ARCHIVED before any statement lookup', async () => {
+      const { service, reconciliation } = setup(buildAccount({ archivedAt: new Date() }));
+
+      expect(await codeOf(service.update(PERSONAL, 1, updateDto({ opening_date: '2026-01-02' })))).toBe(ErrorCodes.ACCOUNT_ARCHIVED);
+      expect(reconciliation.hasAny).not.toHaveBeenCalled();
+    });
+
     it('maps a rename clash to 409', async () => {
       const { service, manager } = setup();
       manager.transaction.mockRejectedValue(mysqlError('ER_DUP_ENTRY'));
@@ -415,7 +515,7 @@ function setupDebt(account: Account = buildAccount({ type: 'debt' }), details: o
   const detailsSave = jest.fn(async (row: object) => row);
   const detailsFind = jest.fn(async () => details.map((row) => Object.assign(new DebtDetails(), row)));
   const repositoryFor = (entity: unknown) =>
-    entity === Account ? { save: accountSave } : { save: detailsSave, find: detailsFind };
+    entity === Account ? { save: accountSave, findOne: jest.fn(async () => account) } : { save: detailsSave, find: detailsFind };
   const manager: { getRepository: jest.Mock; transaction: jest.Mock } = {
     getRepository: jest.fn(repositoryFor),
     transaction: jest.fn(async (work: (m: unknown) => Promise<unknown>) => work(manager)),
@@ -432,7 +532,7 @@ function setupDebt(account: Account = buildAccount({ type: 'debt' }), details: o
     hasTransactions: jest.fn(async () => false),
   };
   const registry = new AccountTypeRegistry([new RegularAccountHandler(), new DebtAccountHandler()]);
-  const service = new AccountService(accountRepository as never, registry, balances as never, { defaultCurrency: 'BRL' }, schedule as never);
+  const service = new AccountService(accountRepository as never, registry, balances as never, { defaultCurrency: 'BRL' }, schedule as never, NO_RECONCILIATION);
 
   return { service, accountRepository, balances, accountSave, detailsSave, detailsFind };
 }
@@ -617,7 +717,7 @@ function setupInvestment(
   const detailsSave = jest.fn(async (row: object) => row);
   const detailsFind = jest.fn(async () => details.map((row) => Object.assign(new InvestmentDetails(), row)));
   const repositoryFor = (entity: unknown) =>
-    entity === Account ? { save: accountSave } : { save: detailsSave, find: detailsFind };
+    entity === Account ? { save: accountSave, findOne: jest.fn(async () => account) } : { save: detailsSave, find: detailsFind };
   const manager: { getRepository: jest.Mock; transaction: jest.Mock } = {
     getRepository: jest.fn(repositoryFor),
     transaction: jest.fn(async (work: (m: unknown) => Promise<unknown>) => work(manager)),
@@ -635,7 +735,7 @@ function setupInvestment(
   };
   const investmentHandler = new InvestmentAccountHandler();
   const registry = new AccountTypeRegistry([new RegularAccountHandler(), new DebtAccountHandler(), investmentHandler]);
-  const service = new AccountService(accountRepository as never, registry, balances as never, { defaultCurrency: 'BRL' }, NO_SCHEDULE_CHECK);
+  const service = new AccountService(accountRepository as never, registry, balances as never, { defaultCurrency: 'BRL' }, NO_SCHEDULE_CHECK, NO_RECONCILIATION);
 
   return { service, accountRepository, balances, accountSave, detailsSave, detailsFind, investmentHandler, manager };
 }
@@ -718,10 +818,10 @@ describe('AccountService with investment accounts', () => {
     });
 
     it('rejects a non-zero opening balance with a 400, before saving', async () => {
-      const { service, manager } = setupInvestment();
+      const { service, accountSave } = setupInvestment();
 
       await expect(service.update(PERSONAL, 1, updateDto({ opening_balance: '1.00' }))).rejects.toThrow(BadRequestException);
-      expect(manager.transaction).not.toHaveBeenCalled();
+      expect(accountSave).not.toHaveBeenCalled();
     });
 
     it('calls validateAccount on PATCH too', async () => {
@@ -799,7 +899,7 @@ function setupProviderExpense(
   const detailsFind = jest.fn(async () => details.map((row) => Object.assign(new ProviderExpenseDetails(), row)));
   const billsRepo = { find: jest.fn(async () => []), save: jest.fn(async (row: object) => row) };
   const repositoryFor = (entity: unknown) =>
-    entity === Account ? { save: accountSave, findOne: jest.fn(async () => null), findOneBy: jest.fn(async () => null) } : entity === ProviderBill ? billsRepo : { save: detailsSave, find: detailsFind };
+    entity === Account ? { save: accountSave, findOne: jest.fn(async (options?: { lock?: unknown }) => (options?.lock ? account : null)), findOneBy: jest.fn(async () => null) } : entity === ProviderBill ? billsRepo : { save: detailsSave, find: detailsFind };
   const manager: { getRepository: jest.Mock; transaction: jest.Mock } = {
     getRepository: jest.fn(repositoryFor),
     transaction: jest.fn(async (work: (m: unknown) => Promise<unknown>) => work(manager)),
@@ -821,7 +921,7 @@ function setupProviderExpense(
     new InvestmentAccountHandler(),
     new ProviderExpenseAccountHandler(NO_BILLS_SUMMARY),
   ]);
-  const service = new AccountService(accountRepository as never, registry, balances as never, { defaultCurrency: 'BRL' }, schedule as never);
+  const service = new AccountService(accountRepository as never, registry, balances as never, { defaultCurrency: 'BRL' }, schedule as never, NO_RECONCILIATION);
 
   return { service, registry, accountRepository, balances, accountSave, detailsSave, detailsFind, manager, billsRepo };
 }

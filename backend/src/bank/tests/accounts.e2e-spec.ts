@@ -17,6 +17,7 @@ import { createOwnerFixtures, NOT_FOUND_CASES, ownerKeysIn, type OwnerFixtures }
 
 jest.mock('../ledger.query.js', () => jest.requireActual('./support/in-memory-ledger.query.js'));
 jest.mock('../account-balances.query.js', () => jest.requireActual('./support/in-memory-ledger.query.js'));
+jest.mock('../reconciliation.query.js', () => jest.requireActual('./support/in-memory-reconciliation.query.js'));
 jest.mock('../provider-bills-summary.query.js', () => jest.requireActual('./support/in-memory-provider-bills-summary.query.js'));
 
 const TODAY = new Date().toISOString().slice(0, 10);
@@ -409,6 +410,34 @@ describe('bank account routes (e2e)', () => {
       expect(response.headers['x-cache-allow']).toBe('true');
       expect(response.headers['x-skip-cache']).toBeUndefined();
       expect(response.headers['cache-control']).toBe('private, no-store');
+    });
+
+    it('sends the user-scoped class on the detail, with its reconciliation fields', async () => {
+      const account = await createAccount(app, ALICE, null);
+
+      const response = await send(app, 'get', `/bank/accounts/${account.id}.json`, ALICE).expect(200);
+
+      expect(response.headers['x-cache-allow']).toBe('true');
+      expect(response.headers['x-skip-cache']).toBeUndefined();
+      expect(response.headers['cache-control']).toBe('private, no-store');
+      expect(response.body).toMatchObject({ last_reconciliation: null, open_reconciliation_id: null });
+    });
+
+    it('refreshes the owner prefix on a 2xx PATCH and on no 409 (ACCOUNT_RECONCILED, CURRENCY_LOCKED)', async () => {
+      const account = await createAccount(app, ALICE, null, { opening_date: '2026-01-01', opening_balance: '0' });
+      const path = `/bank/accounts/${account.id}.json`;
+      const edited = await send(app, 'patch', path, ALICE, { opening_date: '2025-12-31' }).expect(200);
+      await send(app, 'post', `/bank/accounts/${account.id}/reconciliations.json`, ALICE, {
+        statement_date: '2026-01-31', statement_balance: '0.00',
+      }).expect(201);
+
+      const anchor = await send(app, 'patch', path, ALICE, { opening_date: '2025-12-30' }).expect(409);
+      const currency = await send(app, 'patch', path, ALICE, { currency: 'USD' }).expect(409);
+
+      expect(edited.headers['x-cache-invalidate']).toBe('/bank');
+      expect([anchor.body.error.code, currency.body.error.code]).toEqual(['ACCOUNT_RECONCILED', 'CURRENCY_LOCKED']);
+      expect(anchor.headers['x-cache-invalidate']).toBeUndefined();
+      expect(currency.headers['x-cache-invalidate']).toBeUndefined();
     });
 
     it('marks writes as never', async () => {

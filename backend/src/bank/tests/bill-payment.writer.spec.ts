@@ -1,14 +1,17 @@
 import { BadRequestException, ConflictException, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import { QueryFailedError } from 'typeorm';
+import { ErrorCodes } from '../../core/error-codes.js';
 import { BillPaymentWriter, type PaymentTarget } from '../bill-payment.writer.js';
 import type { PayOccurrenceDto } from '../dto/pay-occurrence.dto.js';
 import { Account } from '../entities/account.entity.js';
 import { BillPayment } from '../entities/bill-payment.entity.js';
 import { ProviderBill } from '../entities/provider-bill.entity.js';
+import { Reconciliation } from '../entities/reconciliation.entity.js';
 import { Transaction } from '../entities/transaction.entity.js';
 import { paymentCommand, type PaymentCommand } from '../payment-body.js';
 import { paymentDescription } from '../payment-description.js';
 import { PERSONAL } from './account.test-support.js';
+import { mysqlError } from './support/in-memory-where.js';
 
 const TARGET: PaymentTarget = { sourceAccountId: 3, billId: null, providerBillId: null, nominal: '2026-01-10', label: 'Loan', currency: 'BRL' };
 const PAID: PaymentCommand = { status: 'paid', paidOn: '2026-01-12', amount: 1000n, payingAccountId: 9, recordCharge: true };
@@ -35,6 +38,12 @@ function fakeDatabase(failOn?: number, error: Error = new Error('write failed'))
     order.push('paying');
     return {};
   });
+  // The statement and row locks of an undo: no open statement and no linked row by default.
+  const reconciliation = {
+    openStatement: jest.fn(async (_accountId: number, _manager?: unknown): Promise<Partial<Reconciliation> | null> => null),
+    lockTransactions: jest.fn(async (_manager: unknown, _accountId: number, _ids: number[]): Promise<Array<{ id: number; reconciliationId: number | null }>> => []),
+  };
+  const lockStatementRead = jest.fn(async (options?: unknown) => Object.assign(new Reconciliation(), { id: (options as { where: { id: number } }).where.id }));
 
   const transaction = async <R>(work: (manager: unknown) => Promise<R>): Promise<R> => {
     const staged: typeof committed = [];
@@ -49,6 +58,11 @@ function fakeDatabase(failOn?: number, error: Error = new Error('write failed'))
           if (entity === Account) {
             order.push('provider');
             return findProvider(options);
+          }
+
+          if (entity === Reconciliation) {
+            order.push('statement');
+            return lockStatementRead(options);
           }
 
           return Promise.reject(new Error('unexpected read'));
@@ -76,7 +90,7 @@ function fakeDatabase(failOn?: number, error: Error = new Error('write failed'))
 
   const repository = { findOneBy, manager: { transaction } };
 
-  return { writer: new BillPaymentWriter(repository as never, { resolve } as never), committed, findOneBy, findOne, findProvider, resolve, order };
+  return { writer: new BillPaymentWriter(repository as never, { resolve } as never, reconciliation as never), committed, reconciliation, lockStatementRead, findOneBy, findOne, findProvider, resolve, order };
 }
 
 describe('BillPaymentWriter', () => {
@@ -231,7 +245,9 @@ describe('BillPaymentWriter', () => {
   });
 
   it('undoes the linked transactions that still exist, then the row, atomically', async () => {
-    const payment = Object.assign(new BillPayment(), { id: 5, paymentTransactionId: 1, withdrawalTransactionId: null, chargeTransactionId: 3 });
+    const payment = Object.assign(new BillPayment(), {
+      id: 5, sourceAccountId: 3, status: 'paid', payingAccountId: null, paymentTransactionId: 1, withdrawalTransactionId: null, chargeTransactionId: 3,
+    });
     const ok = fakeDatabase();
     await ok.writer.remove(payment);
     expect(ok.committed.map(({ entity }) => entity)).toEqual(['delete-transactions', 'delete-payment']);
@@ -241,8 +257,99 @@ describe('BillPaymentWriter', () => {
     expect(failing.committed).toEqual([]);
 
     const skip = fakeDatabase();
-    await skip.writer.remove(Object.assign(new BillPayment(), { id: 6, paymentTransactionId: null, withdrawalTransactionId: null, chargeTransactionId: null }));
+    await skip.writer.remove(Object.assign(new BillPayment(), {
+      id: 6, sourceAccountId: 3, status: 'skipped', paymentTransactionId: null, withdrawalTransactionId: null, chargeTransactionId: null,
+    }));
     expect(skip.committed.map(({ entity }) => entity)).toEqual(['delete-payment']);
+    expect(skip.reconciliation.lockTransactions).not.toHaveBeenCalled();
+  });
+
+  describe('undo under the reconciliation locks', () => {
+    // Source 9 and paying 3 (reversed on purpose): every lock must still go in ascending id order.
+    const paid = () => Object.assign(new BillPayment(), {
+      id: 5, sourceAccountId: 9, status: 'paid', payingAccountId: 3, paymentTransactionId: 11, withdrawalTransactionId: 10, chargeTransactionId: 12,
+    });
+    const codeOf = async (promise: Promise<unknown>): Promise<unknown> => {
+      try {
+        await promise;
+      } catch (error) {
+        return (error as ConflictException).getResponse();
+      }
+      throw new Error('expected a rejection');
+    };
+
+    it('locks the accounts, then the open statements, then the rows, each in ascending id order', async () => {
+      const { writer, findProvider, reconciliation, lockStatementRead, order } = fakeDatabase();
+      reconciliation.openStatement.mockImplementation(async (accountId: number) => ({ id: accountId * 10 }));
+
+      await writer.remove(paid());
+
+      expect(findProvider.mock.calls.map(([options]) => (options as { where: { id: number }; lock: { mode: string } }))).toEqual([
+        { where: { id: 3 }, lock: { mode: 'pessimistic_write' } },
+        { where: { id: 9 }, lock: { mode: 'pessimistic_write' } },
+      ]);
+      expect(reconciliation.openStatement.mock.calls.map(([accountId]) => accountId)).toEqual([3, 9]);
+      expect(lockStatementRead.mock.calls.map(([options]) => (options as { where: { id: number } }).where.id)).toEqual([30, 90]);
+      expect(reconciliation.lockTransactions.mock.calls.map(([, accountId, ids]) => [accountId, ids])).toEqual([[3, [10]], [9, [11, 12]]]);
+      expect(order).toEqual(['provider', 'provider', 'statement', 'statement']);
+    });
+
+    it('locks a single account once when the paying account is the source', async () => {
+      const { writer, findProvider } = fakeDatabase();
+
+      await writer.remove(Object.assign(paid(), { payingAccountId: 9 }));
+
+      expect(findProvider).toHaveBeenCalledTimes(1);
+    });
+
+    it('answers TRANSACTION_CLEARED and deletes nothing when any linked row is cleared', async () => {
+      const { writer, reconciliation, committed } = fakeDatabase();
+      reconciliation.openStatement.mockResolvedValue({ id: 20 });
+      reconciliation.lockTransactions.mockImplementation(async (_manager, accountId) =>
+        accountId === 9 ? [{ id: 11, reconciliationId: 20 }, { id: 12, reconciliationId: 7 }] : []);
+
+      expect(await codeOf(writer.remove(paid()))).toMatchObject({ code: ErrorCodes.TRANSACTION_CLEARED });
+      expect(committed).toEqual([]);
+    });
+
+    it('treats a link to a statement when the account has no open one as cleared', async () => {
+      const { writer, reconciliation } = fakeDatabase();
+      reconciliation.lockTransactions.mockResolvedValue([{ id: 10, reconciliationId: 7 }]);
+
+      expect(await codeOf(writer.remove(paid()))).toMatchObject({ code: ErrorCodes.TRANSACTION_CLEARED });
+    });
+
+    it('deletes ticked rows, uncleared rows and rows that no longer exist', async () => {
+      const { writer, reconciliation, committed } = fakeDatabase();
+      reconciliation.openStatement.mockResolvedValue({ id: 20 });
+      reconciliation.lockTransactions.mockResolvedValue([{ id: 10, reconciliationId: 20 }, { id: 11, reconciliationId: null }]);
+
+      await writer.remove(paid());
+
+      expect(committed.map(({ entity }) => entity)).toEqual(['delete-transactions', 'delete-payment']);
+    });
+
+    it('re-checks the archived rule on the locked accounts, deleting nothing', async () => {
+      const { writer, findProvider, committed } = fakeDatabase();
+      findProvider.mockImplementation(async (options?: unknown) =>
+        Object.assign(new Account(), { id: (options as { where: { id: number } }).where.id, archivedAt: (options as { where: { id: number } }).where.id === 3 ? new Date() : null }));
+
+      expect(await codeOf(writer.remove(paid()))).toMatchObject({ code: ErrorCodes.ACCOUNT_ARCHIVED });
+      expect(committed).toEqual([]);
+    });
+
+    it('answers 404 when the source account is gone', async () => {
+      const { writer, findProvider } = fakeDatabase();
+      findProvider.mockResolvedValue(null);
+
+      await expect(writer.remove(paid())).rejects.toThrow(NotFoundException);
+    });
+
+    it.each(['ER_LOCK_DEADLOCK', 'ER_LOCK_WAIT_TIMEOUT'])('maps %s to CONCURRENT_UPDATE', async (code) => {
+      const { writer } = fakeDatabase(1, mysqlError(code));
+
+      expect(await codeOf(writer.remove(paid()))).toMatchObject({ code: ErrorCodes.CONCURRENT_UPDATE });
+    });
   });
 
   it('rethrows other errors untouched', async () => {

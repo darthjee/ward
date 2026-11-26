@@ -2,6 +2,8 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, IsNull, type EntityManager, type Repository } from 'typeorm';
 import { occurrenceAlreadyPaid } from './bill-conflicts.js';
+import { lockPaymentAccounts, lockPaymentRows } from './bill-payment-undo-locks.js';
+import { assertUndoable } from './bill-payment-undo.js';
 import type { OwnerContext } from '../core/owner-context.js';
 import { ownerNotFound } from '../core/parse-id.js';
 import { Account } from './entities/account.entity.js';
@@ -13,6 +15,8 @@ import { PayingAccountResolver } from './paying-account.resolver.js';
 import type { PaymentCommand } from './payment-body.js';
 import { paymentDescription } from './payment-description.js';
 import { isProviderBillOccurrence } from './provider-bill.schedule.js';
+import { mapDeadlock } from './reconciliation-conflicts.js';
+import { ReconciliationQuery } from './reconciliation.query.js';
 
 /** The occurrence a payment is recorded for. */
 export interface PaymentTarget {
@@ -49,17 +53,21 @@ export interface PaymentTarget {
 export class BillPaymentWriter {
   private readonly paymentRepository: Repository<BillPayment>;
   private readonly payingAccounts: PayingAccountResolver;
+  private readonly reconciliation: ReconciliationQuery;
 
   /**
    * @param {Repository<BillPayment>} paymentRepository - The bill payment repository.
    * @param {PayingAccountResolver} payingAccounts - Re-validates the paying account inside the transaction.
+   * @param {ReconciliationQuery} reconciliation - The statement lookups and row locks of an undo.
    */
   constructor(
   @InjectRepository(BillPayment) paymentRepository: Repository<BillPayment>,
     payingAccounts: PayingAccountResolver,
+    reconciliation: ReconciliationQuery,
   ) {
     this.paymentRepository = paymentRepository;
     this.payingAccounts = payingAccounts;
+    this.reconciliation = reconciliation;
   }
 
   /**
@@ -111,21 +119,36 @@ export class BillPaymentWriter {
 
   /**
    * Undoes a payment: deletes the transactions it created that still exist
-   * (even a charge already sent to the accountant), then the row.
+   * (even a charge already sent to the accountant), then the row. One DB transaction takes the
+   * account rows (ascending id), the open statements, then the linked transaction rows, and
+   * re-checks the archived rule under those locks.
    * @param {BillPayment} payment - The payment row.
    * @returns {Promise<void>}
+   * @throws {NotFoundException} 404 for a skip on an archived source.
+   * @throws {ConflictException} 409 `ACCOUNT_ARCHIVED`; `TRANSACTION_CLEARED` when any linked transaction
+   *   belongs to a finished reconciliation (nothing is deleted); `CONCURRENT_UPDATE` on a deadlock.
    */
   async remove(payment: BillPayment): Promise<void> {
     const ids = [payment.paymentTransactionId, payment.withdrawalTransactionId, payment.chargeTransactionId]
       .filter((id): id is number => id !== null);
 
-    await this.paymentRepository.manager.transaction(async (manager) => {
+    await mapDeadlock(() => this.paymentRepository.manager.transaction(async (manager) => {
+      const accounts = await lockPaymentAccounts(manager, payment);
+      const source = accounts.get(payment.sourceAccountId);
+
+      if (!source) {
+        throw ownerNotFound();
+      }
+
+      assertUndoable(payment, source, accounts.get(payment.payingAccountId ?? 0) ?? null);
+      await lockPaymentRows(manager, this.reconciliation, payment);
+
       if (ids.length > 0) {
         await manager.getRepository(Transaction).delete({ id: In(ids) });
       }
 
       await manager.getRepository(BillPayment).delete({ id: payment.id });
-    });
+    }));
   }
 
   async #recheck(manager: EntityManager, owner: OwnerContext, target: PaymentTarget, command: PaymentCommand): Promise<void> {

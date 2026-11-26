@@ -29,3 +29,10 @@ export function buildAccount(overrides: Partial<Account> = {}): Account {
 export const NO_BILLS_SUMMARY = {
   summaries: async (ids: number[]) => new Map(ids.map((id) => [id, { count: 0, monthly: 0n, yearly: 0n }])),
 } as never;
+
+/** A `ReconciliationQuery` stand-in for services built by hand: the account has no statement. */
+export const NO_RECONCILIATION = {
+  hasAny: jest.fn(async () => false),
+  latestFinished: jest.fn(async () => null),
+  openStatement: jest.fn(async () => null),
+} as never;

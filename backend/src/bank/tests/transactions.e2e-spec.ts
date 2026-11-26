@@ -11,10 +11,12 @@ import {
 } from './support/build-bank-test-app.js';
 import type { InMemoryBankRepos } from './support/in-memory-bank-repos.js';
 import { createOwnerFixtures, NOT_FOUND_CASES, ownerKeysIn, type OwnerFixtures } from './support/owner-matrix.js';
+import { reconciliationClient } from './support/reconciliation-e2e.js';
 
 jest.mock('../ledger.query.js', () => jest.requireActual('./support/in-memory-ledger.query.js'));
 jest.mock('../payment-generated.query.js', () => jest.requireActual('./support/in-memory-payment-generated.query.js'));
 jest.mock('../account-balances.query.js', () => jest.requireActual('./support/in-memory-ledger.query.js'));
+jest.mock('../reconciliation.query.js', () => jest.requireActual('./support/in-memory-reconciliation.query.js'));
 jest.mock('../provider-bills-summary.query.js', () => jest.requireActual('./support/in-memory-provider-bills-summary.query.js'));
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -69,6 +71,7 @@ describe('bank transaction routes (e2e)', () => {
         description: 'Rent',
         notes: 'January',
         payment_generated: false,
+        reconciliation: null,
         created_at: expect.any(String),
         updated_at: expect.any(String),
       });
@@ -240,7 +243,7 @@ describe('bank transaction routes (e2e)', () => {
       // 30 transactions dated before the anchor (Dec 2025): opening = 1000.00 - 30 × 1.00.
       expect(last.body.opening).toEqual({ date: '2026-01-01', amount: '970.00', balance: '970.00' });
       expect(first.body.transactions[0]).toEqual({
-        id: 100120, date: expect.any(String), amount: '1.00', description: 't120', notes: null, payment_generated: false, balance: '1090.00',
+        id: 100120, date: expect.any(String), amount: '1.00', description: 't120', notes: null, payment_generated: false, reconciliation: null, balance: '1090.00',
       });
       expect([...first.body.transactions, ...second.body.transactions, ...last.body.transactions]
         .every((row: { payment_generated: unknown }) => row.payment_generated === false)).toBe(true);
@@ -256,7 +259,39 @@ describe('bank transaction routes (e2e)', () => {
         transactions: [],
         opening: null,
         pagination: { page: 9, per_page: 50, total_pages: 3, total_count: 120 },
+        last_reconciled_date: null,
       });
+    });
+
+    it('carries the reconciliation of each row and the last reconciled date, through finish and undo', async () => {
+      const client = reconciliationClient(app, ALICE_ORG);
+      const { id } = await client.account();
+      const tickedId = await client.transaction(id, '2026-01-10', '10.00');
+      const otherId = await client.transaction(id, '2026-01-12', '5.00');
+      const read = async () => (await send(app, 'get', transactionPath(`/orgs/${ALICE_ORG}/bank`, id), ALICE).expect(200)).body;
+      const rowOf = (body: { transactions: Array<{ id: number }> }, rowId: number) => body.transactions.find((row) => row.id === rowId);
+
+      const before = await read();
+      expect(before.last_reconciled_date).toBeNull();
+      expect(before.transactions.every((row: { reconciliation: unknown }) => row.reconciliation === null)).toBe(true);
+      expect(before.opening).not.toHaveProperty('reconciliation');
+
+      const statement = await client.open(id, '2026-01-31', '1010.00');
+      await client.ticks(id, statement, { tick: [tickedId] }).expect(200);
+      const open = await read();
+      expect(rowOf(open, tickedId)).toMatchObject({ reconciliation: { id: statement, status: 'open', statement_date: '2026-01-31' } });
+      expect(rowOf(open, otherId)).toMatchObject({ reconciliation: null });
+      expect(open.last_reconciled_date).toBeNull();
+
+      await client.finish(id, statement).expect(200);
+      const finished = await read();
+      expect(rowOf(finished, tickedId)).toMatchObject({ reconciliation: { id: statement, status: 'finished', statement_date: '2026-01-31' } });
+      expect(finished.last_reconciled_date).toBe('2026-01-31');
+
+      await client.undo(id, statement).expect(200);
+      const undone = await read();
+      expect(rowOf(undone, tickedId)).toMatchObject({ reconciliation: { id: statement, status: 'open' } });
+      expect(undone.last_reconciled_date).toBeNull();
     });
 
     it.each(['0', '-1', 'abc', '1.5'])('rejects page=%s with a 400', async (page) => {
@@ -283,6 +318,28 @@ describe('bank transaction routes (e2e)', () => {
       const response = await send(app, 'get', transactionPath('/bank', anchored), ALICE).expect(200);
 
       expect(response.body.opening).toMatchObject({ amount: '7.00' });
+    });
+
+    it('refreshes the owner prefix on a 2xx PATCH and DELETE, and on no 409 (TRANSACTION_CLEARED)', async () => {
+      const client = reconciliationClient(app, ALICE_ORG);
+      const { id } = await client.account();
+      const kept = await client.transaction(id, '2026-01-10', '10.00');
+      const doomed = await client.transaction(id, '2026-01-11', '5.00');
+      const statement = await client.open(id, '2026-01-31', '1010.00');
+      await client.ticks(id, statement, { tick: [kept] }).expect(200);
+      await client.finish(id, statement).expect(200);
+      const path = (transactionId: number) => transactionPath(`/orgs/${ALICE_ORG}/bank`, id, transactionId);
+
+      const edited = await send(app, 'patch', path(doomed), ALICE, { description: 'x' }).expect(200);
+      const deleted = await send(app, 'delete', path(doomed), ALICE).expect(204);
+      const cleared = await send(app, 'patch', path(kept), ALICE, { amount: '11.00' }).expect(409);
+      const clearedDelete = await send(app, 'delete', path(kept), ALICE).expect(409);
+
+      expect(cleared.body.error.code).toBe('TRANSACTION_CLEARED');
+      expect(edited.headers['x-cache-invalidate']).toBe(`/orgs/${ALICE_ORG}/bank`);
+      expect(deleted.headers['x-cache-invalidate']).toBe(`/orgs/${ALICE_ORG}/bank`);
+      expect(cleared.headers['x-cache-invalidate']).toBeUndefined();
+      expect(clearedDelete.headers['x-cache-invalidate']).toBeUndefined();
     });
 
     it('is user-scoped (GET) and never (writes) for caching', async () => {

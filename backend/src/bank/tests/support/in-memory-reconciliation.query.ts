@@ -99,6 +99,10 @@ export class ReconciliationQuery {
     return new Map(statementIds.map((id) => [id, this.transactions.rows.filter((row) => row.reconciliationId === id).length]));
   }
 
+  async hasAny(accountId: number, _manager?: Manager): Promise<boolean> {
+    return this.reconciliations.rows.some((row) => row.accountId === accountId);
+  }
+
   async latestFinished(accountId: number, _manager?: Manager): Promise<Reconciliation | null> {
     const [latest] = this.#newestFirst(accountId).filter((row) => row.reconciledAt !== null);
 

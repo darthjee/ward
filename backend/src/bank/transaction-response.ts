@@ -1,8 +1,10 @@
 import { formatAmount } from './currency.js';
 import type { Account } from './entities/account.entity.js';
+import type { Reconciliation } from './entities/reconciliation.entity.js';
 import type { Transaction } from './entities/transaction.entity.js';
 import type { LedgerRow } from './ledger.query.js';
 import type { Pagination } from './pagination.js';
+import { reconciliationStatus } from './reconciliation-balance.js';
 
 /** The account type whose charges carry the accountant hand-off mark. */
 export const PROVIDER_EXPENSE_TYPE = 'provider_expense';
@@ -24,8 +26,18 @@ export interface TransactionResponse extends HandOffMark {
   notes: string | null;
   /** Whether a bill payment of the same owner generated the transaction. */
   payment_generated: boolean;
+  /** The statement the transaction is ticked on or cleared by, or `null` when it is on none. */
+  reconciliation: TransactionReconciliationResponse | null;
   created_at: Date;
   updated_at: Date;
+}
+
+/** The statement a transaction is ticked on (`open`) or cleared by (`finished`). */
+export interface TransactionReconciliationResponse {
+  id: number;
+  status: 'open' | 'finished';
+  /** `YYYY-MM-DD`. */
+  statement_date: string;
 }
 
 /** One ledger row of the ledger envelope. */
@@ -37,6 +49,8 @@ export interface LedgerRowResponse extends HandOffMark {
   notes: string | null;
   /** Whether a bill payment of the same owner generated the transaction. */
   payment_generated: boolean;
+  /** The statement the row is ticked on or cleared by, or `null` when it is on none. */
+  reconciliation: TransactionReconciliationResponse | null;
   balance: string;
 }
 
@@ -52,6 +66,8 @@ export interface LedgerResponse {
   transactions: LedgerRowResponse[];
   opening: LedgerOpeningResponse | null;
   pagination: Pagination;
+  /** The statement date of the latest finished reconciliation, or `null`. */
+  last_reconciled_date: string | null;
 }
 
 /**
@@ -73,9 +89,16 @@ export function handOffMark(account: Account, amount: bigint, sentAt: Date | nul
  * @param {Transaction} transaction - The transaction.
  * @param {Account} account - Its account (for the currency and the hand-off mark).
  * @param {boolean} paymentGenerated - Whether a bill payment of the same owner references it.
+ * @param {Reconciliation | null} statement - The statement it is linked to (looked up within its own
+ *   account), or `null` when it is on none.
  * @returns {TransactionResponse} Its public view, `amount` as a decimal string.
  */
-export function serializeTransaction(transaction: Transaction, account: Account, paymentGenerated: boolean): TransactionResponse {
+export function serializeTransaction(
+  transaction: Transaction,
+  account: Account,
+  paymentGenerated: boolean,
+  statement: Reconciliation | null,
+): TransactionResponse {
   return {
     id: transaction.id,
     date: transaction.date,
@@ -84,6 +107,9 @@ export function serializeTransaction(transaction: Transaction, account: Account,
     notes: transaction.notes,
     ...handOffMark(account, transaction.amount, transaction.sentToAccountantAt),
     payment_generated: paymentGenerated,
+    reconciliation: statement
+      ? { id: statement.id, status: reconciliationStatus(statement.reconciledAt), statement_date: statement.statementDate }
+      : null,
     created_at: transaction.createdAt,
     updated_at: transaction.updatedAt,
   };
@@ -96,14 +122,16 @@ export function serializeTransaction(transaction: Transaction, account: Account,
  * @param {bigint | null} opening - The effective opening amount on the last
  *   page, `null` on every other page.
  * @param {Pagination} pagination - The pagination metadata.
- * @returns {LedgerResponse} `{ transactions, opening, pagination }`, amounts and
- *   balances as decimal strings in the account's currency.
+ * @param {string | null} lastReconciledDate - The latest finished statement date, or `null`.
+ * @returns {LedgerResponse} `{ transactions, opening, pagination, last_reconciled_date }`, amounts
+ *   and balances as decimal strings in the account's currency.
  */
 export function serializeLedger(
   account: Account,
   rows: LedgerRow[],
   opening: bigint | null,
   pagination: Pagination,
+  lastReconciledDate: string | null,
 ): LedgerResponse {
   const format = (minor: bigint): string => formatAmount(minor, account.currency);
 
@@ -116,9 +144,13 @@ export function serializeLedger(
       notes: row.notes,
       ...handOffMark(account, row.amount, row.sentToAccountantAt),
       payment_generated: row.paymentGenerated,
+      reconciliation: row.reconciliation
+        ? { id: row.reconciliation.id, status: row.reconciliation.status, statement_date: row.reconciliation.statementDate }
+        : null,
       balance: format(row.balance),
     })),
     opening: opening === null ? null : { date: account.openingDate, amount: format(opening), balance: format(opening) },
     pagination,
+    last_reconciled_date: lastReconciledDate,
   };
 }

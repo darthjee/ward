@@ -1,5 +1,6 @@
 import { formatAmount } from './currency.js';
 import type { Account } from './entities/account.entity.js';
+import type { Reconciliation } from './entities/reconciliation.entity.js';
 
 const MASK_PREFIX = '•••• ';
 const MASK_VISIBLE_CHARACTERS = 4;
@@ -27,6 +28,22 @@ export interface AccountResponse {
   [nested: string]: unknown;
 }
 
+/** The reconciliation state the account detail carries (the list never does). */
+export interface ReconciliationFields {
+  /** The account's latest finished statement, or `null`. */
+  latestFinished: Reconciliation | null;
+  /** The id of the account's open statement, or `null`. */
+  openId: number | null;
+}
+
+/** The public `last_reconciliation` of the account detail. */
+export interface LastReconciliationResponse {
+  /** `YYYY-MM-DD`. */
+  statement_date: string;
+  statement_balance: string;
+  reconciled_at: Date;
+}
+
 /**
  * Options of {@link serializeAccount}.
  */
@@ -39,6 +56,8 @@ export interface SerializeAccountOptions {
   nested?: Record<string, unknown>;
   /** List-only top-level fields from the handler (e.g. `bills_summary`), if any. */
   extra?: Record<string, unknown>;
+  /** The detail's reconciliation state (`last_reconciliation`, `open_reconciliation_id`); absent on lists. */
+  reconciliation?: ReconciliationFields;
 }
 
 /**
@@ -83,5 +102,22 @@ export function serializeAccount(account: Account, options: SerializeAccountOpti
     response[account.type] = options.nested;
   }
 
+  if (options.reconciliation !== undefined) {
+    response.last_reconciliation = lastReconciliation(account, options.reconciliation.latestFinished);
+    response.open_reconciliation_id = options.reconciliation.openId;
+  }
+
   return options.extra === undefined ? response : { ...response, ...options.extra };
+}
+
+function lastReconciliation(account: Account, statement: Reconciliation | null): LastReconciliationResponse | null {
+  if (statement === null || statement.reconciledAt === null) {
+    return null;
+  }
+
+  return {
+    statement_date: statement.statementDate,
+    statement_balance: formatAmount(statement.statementBalance, account.currency),
+    reconciled_at: statement.reconciledAt,
+  };
 }

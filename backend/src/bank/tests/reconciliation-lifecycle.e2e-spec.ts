@@ -1,10 +1,11 @@
 import type { INestApplication } from '@nestjs/common';
 import type request from 'supertest';
-import { buildBankTestApp } from './support/build-bank-test-app.js';
+import { ALICE, buildBankTestApp, send } from './support/build-bank-test-app.js';
 import type { InMemoryBankRepos } from './support/in-memory-bank-repos.js';
 import { CONTEXTS, reconciliationClient } from './support/reconciliation-e2e.js';
 
 jest.mock('../ledger.query.js', () => jest.requireActual('./support/in-memory-ledger.query.js'));
+jest.mock('../payment-generated.query.js', () => jest.requireActual('./support/in-memory-payment-generated.query.js'));
 jest.mock('../account-balances.query.js', () => jest.requireActual('./support/in-memory-ledger.query.js'));
 jest.mock('../reconciliation.query.js', () => jest.requireActual('./support/in-memory-reconciliation.query.js'));
 jest.mock('../provider-bills-summary.query.js', () => jest.requireActual('./support/in-memory-provider-bills-summary.query.js'));
@@ -142,12 +143,90 @@ describe('reconciliation lifecycle (e2e)', () => {
       expect(undone.body).toMatchObject({ status: 'open', cleared_balance: '1000.00', ticked_sum: '180.00', difference: '0.00' });
     });
 
-    // The locks themselves belong to #166 (`TRANSACTION_CLEARED`, `ACCOUNT_RECONCILED` and the wider
-    // `CURRENCY_LOCKED` on the existing routes) and are not implemented here. Whichever of #165 and #166
-    // merges second turns these into real assertions and makes them green.
-    it.todo('(#166) a cleared row: PATCH amount / date and DELETE answer 409 TRANSACTION_CLEARED, a description edit is allowed');
-    it.todo('(#166) once undone, the rows of the statement unlock again (PATCH amount, DELETE succeed)');
-    it.todo('(#166) the account anchor (opening date / balance) and currency are 409 while a statement exists, open or finished');
-    it.todo('(#166) the anchor and currency locks are released when the last statement is cancelled, and still held after an undo');
+    // The existing routes (api/existing-routes.md): the transaction PATCH / DELETE and the account
+    // PATCH, locked by a statement. Their own matrices are in `transaction-locks.e2e-spec.ts` and
+    // `account-reconciliation-locks.e2e-spec.ts`.
+    const transactionPath = (accountId: number, transactionId: number): string =>
+      `${api().base}/accounts/${accountId}/transactions/${transactionId}.json`;
+    const patchTransaction = (accountId: number, transactionId: number, body: object) =>
+      send(app, 'patch', transactionPath(accountId, transactionId), ALICE, body);
+    const deleteTransaction = (accountId: number, transactionId: number) => send(app, 'delete', transactionPath(accountId, transactionId), ALICE);
+    const patchAccount = (accountId: number, body: object) => send(app, 'patch', `${api().base}/accounts/${accountId}.json`, ALICE, body);
+    const codeOf = (response: request.Response): string => response.body.error.code;
+
+    it('a cleared row: PATCH amount / date and DELETE answer 409 TRANSACTION_CLEARED, a description edit is allowed', async () => {
+      const { id, a, b, c, start, ticks, finish } = await setup();
+      const statement = (await start(id, { statement_date: '2026-01-31', statement_balance: '1180.00' }).expect(201)).body.id as number;
+      await ticks(id, statement, { tick: [a, b, c] }).expect(200);
+      await finish(id, statement).expect(200);
+
+      for (const response of [
+        await patchTransaction(id, a, { amount: '201.00' }),
+        await patchTransaction(id, a, { date: '2026-01-11' }),
+        await deleteTransaction(id, a),
+      ]) {
+        doesNotInvalidate(response);
+        expect(codeOf(response)).toBe('TRANSACTION_CLEARED');
+      }
+
+      invalidates(await patchTransaction(id, a, { description: 'Renamed' }).expect(200));
+      expect(repos.transactions.rows.find((row) => row.id === a)).toMatchObject({ amount: 20000n, date: '2026-01-10', description: 'Renamed' });
+    });
+
+    it('once undone, the rows of the statement unlock again (PATCH amount, DELETE succeed)', async () => {
+      const { id, a, b, c, start, ticks, finish, undo } = await setup();
+      const statement = (await start(id, { statement_date: '2026-01-31', statement_balance: '1180.00' }).expect(201)).body.id as number;
+      await ticks(id, statement, { tick: [a, b, c] }).expect(200);
+      await finish(id, statement).expect(200);
+      await patchTransaction(id, a, { amount: '201.00' }).expect(409);
+
+      await undo(id, statement).expect(200);
+
+      invalidates(await patchTransaction(id, a, { amount: '201.00' }).expect(200));
+      invalidates(await deleteTransaction(id, b).expect(204));
+      expect(linkOf(a)).toBe(statement);
+    });
+
+    it('the account anchor and currency are 409 while a statement exists, open or finished', async () => {
+      const { id, start, finish } = await setup();
+      const statement = (await start(id, { statement_date: '2026-01-31', statement_balance: '1000.00' }).expect(201)).body.id as number;
+
+      for (const state of ['open', 'finished']) {
+        if (state === 'finished') {
+          await finish(id, statement).expect(200);
+        }
+
+        for (const [body, code] of [
+          [{ opening_date: '2025-12-31' }, 'ACCOUNT_RECONCILED'],
+          [{ opening_balance: '1001.00' }, 'ACCOUNT_RECONCILED'],
+          [{ currency: 'USD' }, 'CURRENCY_LOCKED'],
+        ] as const) {
+          const response = await patchAccount(id, body);
+
+          doesNotInvalidate(response);
+          expect(codeOf(response)).toBe(code);
+        }
+      }
+    });
+
+    it('the anchor and currency locks are released when the last statement is cancelled, and still held after an undo', async () => {
+      const client = api();
+      const { id: empty } = await client.account({ opening_balance: '0' });
+      const { id, start, finish, undo, cancel } = await setup();
+      const anchored = (await start(id, { statement_date: '2026-01-31', statement_balance: '1000.00' }).expect(201)).body.id as number;
+      const zeroRow = (await start(empty, { statement_date: '2026-01-31', statement_balance: '0.00' }).expect(201)).body.id as number;
+      await finish(id, anchored).expect(200);
+      await finish(empty, zeroRow).expect(200);
+
+      await undo(id, anchored).expect(200);
+      await undo(empty, zeroRow).expect(200);
+      expect(codeOf(await patchAccount(id, { opening_date: '2025-12-31' }))).toBe('ACCOUNT_RECONCILED');
+      expect(codeOf(await patchAccount(empty, { currency: 'USD' }))).toBe('CURRENCY_LOCKED');
+
+      await cancel(id, anchored).expect(204);
+      await cancel(empty, zeroRow).expect(204);
+      invalidates(await patchAccount(id, { opening_date: '2025-12-31', opening_balance: '1001.00' }).expect(200));
+      invalidates(await patchAccount(empty, { currency: 'USD' }).expect(200));
+    });
   });
 });

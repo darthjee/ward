@@ -40,6 +40,7 @@ import { ReconciliationViewer } from './reconciliation-viewer.js';
 import { ReconciliationQuery } from './reconciliation.query.js';
 import { ReconciliationService } from './reconciliation.service.js';
 import { TransactionService } from './transaction.service.js';
+import { TransactionWriter } from './transaction.writer.js';
 
 // Re-exported so the resident `BankModuleLoader` reaches the service classes
 // only through its dynamic `import()` of this file.
@@ -113,6 +114,7 @@ export { TransactionService } from './transaction.service.js';
     ReconciliationTicksWriter,
     ReconciliationViewer,
     TransactionService,
+    TransactionWriter,
   ],
   exports: [
     AccountService,

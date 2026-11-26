@@ -6,6 +6,7 @@ import { ProviderExpenseAccountHandler } from '../account-types/provider-expense
 import { DebtDetails } from '../entities/debt-details.entity.js';
 import { InvestmentDetails } from '../entities/investment-details.entity.js';
 import { ProviderExpenseDetails } from '../entities/provider-expense-details.entity.js';
+import { Reconciliation } from '../entities/reconciliation.entity.js';
 
 describe('maskAccountNumber', () => {
   it.each([
@@ -51,6 +52,36 @@ describe('serializeAccount', () => {
     expect(response).not.toHaveProperty('organization_id');
     expect(response).not.toHaveProperty('userId');
     expect(response).not.toHaveProperty('organizationId');
+  });
+
+  describe('the detail reconciliation fields', () => {
+    const finished = Object.assign(new Reconciliation(), {
+      id: 4, accountId: 1, statementDate: '2026-01-31', statementBalance: -12345n, reconciledAt: new Date('2026-02-01T10:00:00Z'),
+    });
+
+    it('carries the latest finished statement (balance as a decimal string) and the open statement id', () => {
+      const response = serializeAccount(account, { balance: 0n, mask: false, reconciliation: { latestFinished: finished, openId: 5 } });
+
+      expect(response.last_reconciliation).toEqual({
+        statement_date: '2026-01-31',
+        statement_balance: '-123.45',
+        reconciled_at: new Date('2026-02-01T10:00:00Z'),
+      });
+      expect(response.open_reconciliation_id).toBe(5);
+    });
+
+    it('answers null for both when the account has no statement', () => {
+      const response = serializeAccount(account, { balance: 0n, mask: false, reconciliation: { latestFinished: null, openId: null } });
+
+      expect(response).toMatchObject({ last_reconciliation: null, open_reconciliation_id: null });
+    });
+
+    it('never adds the keys without the option (the list)', () => {
+      const response = serializeAccount(account, { balance: 0n, mask: true });
+
+      expect(response).not.toHaveProperty('last_reconciliation');
+      expect(response).not.toHaveProperty('open_reconciliation_id');
+    });
   });
 
   it('masks the account number when asked', () => {

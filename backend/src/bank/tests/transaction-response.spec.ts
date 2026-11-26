@@ -1,6 +1,7 @@
 import { buildPagination } from '../pagination.js';
 import { handOffMark, serializeLedger, serializeTransaction } from '../transaction-response.js';
 import { buildAccount } from './account.test-support.js';
+import { Reconciliation } from '../entities/reconciliation.entity.js';
 import { Transaction } from '../entities/transaction.entity.js';
 
 const SENT_AT = new Date('2026-11-09T12:00:00Z');
@@ -41,36 +42,52 @@ describe('serializeTransaction', () => {
   it('returns the public fields with the amount in the currency exponent', () => {
     const transaction = buildTransaction();
 
-    expect(serializeTransaction(transaction, buildAccount({ currency: 'JPY' }), false)).toEqual({
+    expect(serializeTransaction(transaction, buildAccount({ currency: 'JPY' }), false, null)).toEqual({
       id: 3,
       date: '2026-01-02',
       amount: '500',
       description: 'Sushi',
       notes: 'n',
       payment_generated: false,
+      reconciliation: null,
       created_at: new Date(0),
       updated_at: new Date(1),
     });
   });
 
   it('carries payment_generated: true for a payment-generated transaction', () => {
-    expect(serializeTransaction(buildTransaction(), buildAccount(), true)).toMatchObject({ payment_generated: true });
+    expect(serializeTransaction(buildTransaction(), buildAccount(), true, null)).toMatchObject({ payment_generated: true });
   });
 
   it('carries sent_to_accountant_at on a provider-expense charge (sent or unsent)', () => {
-    expect(serializeTransaction(buildTransaction({ amount: -500n, sentToAccountantAt: SENT_AT }), provider, false))
+    expect(serializeTransaction(buildTransaction({ amount: -500n, sentToAccountantAt: SENT_AT }), provider, false, null))
       .toMatchObject({ amount: '-5.00', sent_to_accountant_at: SENT_AT });
-    expect(serializeTransaction(buildTransaction({ amount: -500n }), provider, false))
+    expect(serializeTransaction(buildTransaction({ amount: -500n }), provider, false, null))
       .toMatchObject({ sent_to_accountant_at: null });
   });
 
   it('omits the key on a provider-expense payment', () => {
-    expect(serializeTransaction(buildTransaction({ amount: 500n }), provider, false)).not.toHaveProperty('sent_to_accountant_at');
+    expect(serializeTransaction(buildTransaction({ amount: 500n }), provider, false, null)).not.toHaveProperty('sent_to_accountant_at');
   });
 
   it('omits the key on a charge of another account type', () => {
-    expect(serializeTransaction(buildTransaction({ amount: -500n }), buildAccount({ type: 'regular' }), false))
+    expect(serializeTransaction(buildTransaction({ amount: -500n }), buildAccount({ type: 'regular' }), false, null))
       .not.toHaveProperty('sent_to_accountant_at');
+  });
+});
+
+describe('serializeTransaction reconciliation', () => {
+  const statement = (reconciledAt: Date | null) =>
+    Object.assign(new Reconciliation(), { id: 4, accountId: 1, statementDate: '2026-01-31', reconciledAt });
+
+  it('maps the statement of a ticked transaction as open', () => {
+    expect(serializeTransaction(buildTransaction(), buildAccount(), false, statement(null)).reconciliation)
+      .toEqual({ id: 4, status: 'open', statement_date: '2026-01-31' });
+  });
+
+  it('maps the statement of a cleared transaction as finished', () => {
+    expect(serializeTransaction(buildTransaction(), buildAccount(), false, statement(new Date(5))).reconciliation)
+      .toEqual({ id: 4, status: 'finished', statement_date: '2026-01-31' });
   });
 });
 
@@ -79,21 +96,45 @@ describe('serializeLedger', () => {
   const rows = [{ id: 7, date: '2026-11-01', amount: -1250n, description: 'x', notes: null, sentToAccountantAt: null, paymentGenerated: false, reconciliation: null, balance: 98750n }];
 
   it('builds the envelope with the opening row', () => {
-    expect(serializeLedger(account, rows, 100000n, buildPagination(1, 50, 1))).toEqual({
-      transactions: [{ id: 7, date: '2026-11-01', amount: '-12.50', description: 'x', notes: null, payment_generated: false, balance: '987.50' }],
+    expect(serializeLedger(account, rows, 100000n, buildPagination(1, 50, 1), '2026-10-31')).toEqual({
+      transactions: [{ id: 7, date: '2026-11-01', amount: '-12.50', description: 'x', notes: null, payment_generated: false, reconciliation: null, balance: '987.50' }],
       opening: { date: '2026-10-01', amount: '1000.00', balance: '1000.00' },
       pagination: { page: 1, per_page: 50, total_pages: 1, total_count: 1 },
+      last_reconciled_date: '2026-10-31',
     });
   });
 
+  it('maps the reconciliation of a row, open or finished, and null when the row is on none', () => {
+    const open = { id: 4, status: 'open' as const, statementDate: '2026-10-31' };
+    const finished = { id: 3, status: 'finished' as const, statementDate: '2026-09-30' };
+
+    const response = serializeLedger(
+      account,
+      [{ ...rows[0], reconciliation: open }, { ...rows[0], id: 6, reconciliation: finished }, { ...rows[0], id: 5 }],
+      null,
+      buildPagination(1, 50, 3),
+      null,
+    );
+
+    expect(response.transactions.map((row) => row.reconciliation)).toEqual([
+      { id: 4, status: 'open', statement_date: '2026-10-31' },
+      { id: 3, status: 'finished', statement_date: '2026-09-30' },
+      null,
+    ]);
+  });
+
+  it('never carries the reconciliation on the virtual opening row', () => {
+    expect(serializeLedger(account, rows, 100000n, buildPagination(1, 50, 1), null).opening).not.toHaveProperty('reconciliation');
+  });
+
   it('carries the payment-generated flag of every row', () => {
-    const generated = serializeLedger(account, [{ ...rows[0], paymentGenerated: true }], null, buildPagination(1, 50, 1));
+    const generated = serializeLedger(account, [{ ...rows[0], paymentGenerated: true }], null, buildPagination(1, 50, 1), null);
 
     expect(generated.transactions[0].payment_generated).toBe(true);
   });
 
   it('sets opening to null when not on the last page', () => {
-    expect(serializeLedger(account, rows, null, buildPagination(1, 50, 120)).opening).toBeNull();
+    expect(serializeLedger(account, rows, null, buildPagination(1, 50, 120), null).opening).toBeNull();
   });
 
   it('marks only the charges of a provider-expense account, never the opening row', () => {
@@ -103,7 +144,7 @@ describe('serializeLedger', () => {
       { id: 6, date: '2026-10-30', amount: -100n, description: 'Charge', notes: null, sentToAccountantAt: null, paymentGenerated: false, reconciliation: null, balance: 3n },
     ];
 
-    const response = serializeLedger(provider, providerRows, 0n, buildPagination(1, 50, 3));
+    const response = serializeLedger(provider, providerRows, 0n, buildPagination(1, 50, 3), null);
 
     expect(response.transactions[0]).not.toHaveProperty('sent_to_accountant_at');
     expect(response.transactions[1]).toMatchObject({ sent_to_accountant_at: SENT_AT });
@@ -112,7 +153,7 @@ describe('serializeLedger', () => {
   });
 
   it('never carries the key on another account type', () => {
-    const response = serializeLedger(account, [{ ...rows[0], sentToAccountantAt: SENT_AT }], 100000n, buildPagination(1, 50, 1));
+    const response = serializeLedger(account, [{ ...rows[0], sentToAccountantAt: SENT_AT }], 100000n, buildPagination(1, 50, 1), null);
 
     expect(response.transactions[0]).not.toHaveProperty('sent_to_accountant_at');
   });
