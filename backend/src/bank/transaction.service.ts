@@ -77,10 +77,11 @@ export class TransactionService {
   async ledger(owner: OwnerContext, accountId: number, page: number): Promise<LedgerResponse> {
     const account = await this.#ledgerAccount(owner, accountId);
     const pagination = buildPagination(page, LEDGER_PER_PAGE, await this.ledgerQuery.count(account.id));
+    const lastReconciledDate = await this.ledgerQuery.lastReconciledDate(account.id);
     const rows = page > pagination.total_pages ? [] : await this.ledgerQuery.page(owner, account, page, LEDGER_PER_PAGE);
     const opening = page === pagination.total_pages ? await this.ledgerQuery.openingEffective(account) : null;
 
-    return serializeLedger(account, rows, opening, pagination);
+    return serializeLedger(account, rows, opening, pagination, lastReconciledDate);
   }
 
   /**

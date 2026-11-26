@@ -28,6 +28,14 @@ export interface TransactionResponse extends HandOffMark {
   updated_at: Date;
 }
 
+/** The statement a transaction is ticked on (`open`) or cleared by (`finished`). */
+export interface TransactionReconciliationResponse {
+  id: number;
+  status: 'open' | 'finished';
+  /** `YYYY-MM-DD`. */
+  statement_date: string;
+}
+
 /** One ledger row of the ledger envelope. */
 export interface LedgerRowResponse extends HandOffMark {
   id: number;
@@ -37,6 +45,8 @@ export interface LedgerRowResponse extends HandOffMark {
   notes: string | null;
   /** Whether a bill payment of the same owner generated the transaction. */
   payment_generated: boolean;
+  /** The statement the row is ticked on or cleared by, or `null` when it is on none. */
+  reconciliation: TransactionReconciliationResponse | null;
   balance: string;
 }
 
@@ -52,6 +62,8 @@ export interface LedgerResponse {
   transactions: LedgerRowResponse[];
   opening: LedgerOpeningResponse | null;
   pagination: Pagination;
+  /** The statement date of the latest finished reconciliation, or `null`. */
+  last_reconciled_date: string | null;
 }
 
 /**
@@ -96,14 +108,16 @@ export function serializeTransaction(transaction: Transaction, account: Account,
  * @param {bigint | null} opening - The effective opening amount on the last
  *   page, `null` on every other page.
  * @param {Pagination} pagination - The pagination metadata.
- * @returns {LedgerResponse} `{ transactions, opening, pagination }`, amounts and
- *   balances as decimal strings in the account's currency.
+ * @param {string | null} lastReconciledDate - The latest finished statement date, or `null`.
+ * @returns {LedgerResponse} `{ transactions, opening, pagination, last_reconciled_date }`, amounts
+ *   and balances as decimal strings in the account's currency.
  */
 export function serializeLedger(
   account: Account,
   rows: LedgerRow[],
   opening: bigint | null,
   pagination: Pagination,
+  lastReconciledDate: string | null,
 ): LedgerResponse {
   const format = (minor: bigint): string => formatAmount(minor, account.currency);
 
@@ -116,9 +130,13 @@ export function serializeLedger(
       notes: row.notes,
       ...handOffMark(account, row.amount, row.sentToAccountantAt),
       payment_generated: row.paymentGenerated,
+      reconciliation: row.reconciliation
+        ? { id: row.reconciliation.id, status: row.reconciliation.status, statement_date: row.reconciliation.statementDate }
+        : null,
       balance: format(row.balance),
     })),
     opening: opening === null ? null : { date: account.openingDate, amount: format(opening), balance: format(opening) },
     pagination,
+    last_reconciled_date: lastReconciledDate,
   };
 }

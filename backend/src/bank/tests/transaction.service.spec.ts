@@ -53,6 +53,7 @@ function setup(account: Account | null = buildAccount(), stored: Transaction | n
     count: jest.fn(async () => 0),
     page: jest.fn(async (): Promise<LedgerRow[]> => []),
     openingEffective: jest.fn(async () => 100000n),
+    lastReconciledDate: jest.fn(async (): Promise<string | null> => null),
   };
   const billPaymentRepository = createInMemoryBankRepo(BillPayment);
   // Source accounts of the seeded bill payments: 1 belongs to ORGANIZATION (3), 2 to another organization.
@@ -404,7 +405,18 @@ describe('TransactionService', () => {
         transactions: [],
         opening: { date: '2026-01-01', amount: '1000.00', balance: '1000.00' },
         pagination: { page: 1, per_page: 50, total_pages: 1, total_count: 0 },
+        last_reconciled_date: null,
       });
+    });
+
+    it('passes the last reconciled date of the account through', async () => {
+      const { service, ledgerQuery } = setup();
+      ledgerQuery.lastReconciledDate.mockResolvedValue('2026-01-31');
+
+      const result = await service.ledger(PERSONAL, 1, 1);
+
+      expect(ledgerQuery.lastReconciledDate).toHaveBeenCalledWith(1);
+      expect(result.last_reconciled_date).toBe('2026-01-31');
     });
 
     it('omits the opening row before the last page', async () => {
@@ -418,7 +430,7 @@ describe('TransactionService', () => {
       expect(ledgerQuery.openingEffective).not.toHaveBeenCalled();
       expect(result.opening).toBeNull();
       expect(result.transactions).toEqual([
-        { id: 120, date: '2026-01-10', amount: '-1.00', description: 't120', notes: null, payment_generated: false, balance: '50.00' },
+        { id: 120, date: '2026-01-10', amount: '-1.00', description: 't120', notes: null, payment_generated: false, reconciliation: null, balance: '50.00' },
       ]);
       expect(result.pagination).toEqual({ page: 2, per_page: 50, total_pages: 3, total_count: 120 });
     });
@@ -444,6 +456,7 @@ describe('TransactionService', () => {
         transactions: [],
         opening: null,
         pagination: { page: 4, per_page: 50, total_pages: 1, total_count: 10 },
+        last_reconciled_date: null,
       });
     });
 
