@@ -10,8 +10,8 @@ import {
   withoutTimestamp,
 } from './support/build-bank-test-app.js';
 import type { InMemoryBankRepos } from './support/in-memory-bank-repos.js';
-import { reconciliationClient } from './support/reconciliation-e2e.js';
 import { createOwnerFixtures, NOT_FOUND_CASES, ownerKeysIn, type OwnerFixtures } from './support/owner-matrix.js';
+import { reconciliationClient } from './support/reconciliation-e2e.js';
 
 jest.mock('../ledger.query.js', () => jest.requireActual('./support/in-memory-ledger.query.js'));
 jest.mock('../payment-generated.query.js', () => jest.requireActual('./support/in-memory-payment-generated.query.js'));
@@ -71,6 +71,7 @@ describe('bank transaction routes (e2e)', () => {
         description: 'Rent',
         notes: 'January',
         payment_generated: false,
+        reconciliation: null,
         created_at: expect.any(String),
         updated_at: expect.any(String),
       });

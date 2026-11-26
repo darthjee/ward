@@ -8,12 +8,15 @@ import { RegularAccountHandler } from '../account-types/regular-account.handler.
 import type { CreateTransactionDto } from '../dto/create-transaction.dto.js';
 import { Account } from '../entities/account.entity.js';
 import { BillPayment } from '../entities/bill-payment.entity.js';
+import { Reconciliation } from '../entities/reconciliation.entity.js';
 import { Transaction } from '../entities/transaction.entity.js';
 import type { LedgerRow } from '../ledger.query.js';
 import { TransactionService } from '../transaction.service.js';
+import { TransactionWriter } from '../transaction.writer.js';
 import { buildAccount, NO_BILLS_SUMMARY, ORGANIZATION, PERSONAL } from './account.test-support.js';
 import { createInMemoryBankRepo } from './support/in-memory-bank-repos.js';
 import { PaymentGeneratedQuery } from './support/in-memory-payment-generated.query.js';
+import { mysqlError } from './support/in-memory-where.js';
 
 function buildTransaction(overrides: Partial<Transaction> = {}): Transaction {
   return Object.assign(new Transaction(), {
@@ -34,12 +37,66 @@ function row(id: number, balance: bigint): LedgerRow {
   return { id, date: '2026-01-10', amount: -100n, description: `t${id}`, notes: null, sentToAccountantAt: null, paymentGenerated: false, reconciliation: null, balance };
 }
 
-function setup(account: Account | null = buildAccount(), stored: Transaction | null = buildTransaction()) {
+function buildStatement(overrides: Partial<Reconciliation> = {}): Reconciliation {
+  return Object.assign(new Reconciliation(), {
+    id: 9,
+    accountId: 1,
+    statementDate: '2026-01-31',
+    statementBalance: 0n,
+    reconciledAt: null,
+    ...overrides,
+  });
+}
+
+interface SetupOptions {
+  /** The statements of the account (open when `reconciledAt` is `null`). */
+  statements?: Reconciliation[];
+}
+
+function setup(account: Account | null = buildAccount(), stored: Transaction | null = buildTransaction(), options: SetupOptions = {}) {
+  const statements = options.statements ?? [];
+  const accountLocks: string[] = [];
+  const statementLocks: string[] = [];
   const transactionRepository = {
     create: jest.fn((fields: Partial<Transaction>) => buildTransaction({ id: undefined, ...fields })),
     save: jest.fn(async (transaction: Transaction) => ({ ...transaction, id: transaction.id ?? 42 })),
     findOneBy: jest.fn(async () => stored),
     delete: jest.fn(async () => ({})),
+    manager: undefined as unknown,
+  };
+  // The write transaction's manager: the account row is re-read under a recorded lock, the
+  // statement lookups are account-scoped like the real SQL.
+  const manager = {
+    transaction: jest.fn(async <R>(work: (m: unknown) => Promise<R>): Promise<R> => work(manager)),
+    getRepository: (entity: unknown): unknown => {
+      if (entity === Account) {
+        return { findOne: jest.fn(async ({ lock }: { lock?: { mode: string } }) => {
+          if (lock) accountLocks.push(lock.mode);
+          return account;
+        }) };
+      }
+      if (entity === Reconciliation) {
+        const find = ({ id, accountId }: { id: number; accountId: number }): Reconciliation | null =>
+          statements.find((statement) => statement.id === id && statement.accountId === accountId) ?? null;
+
+        return {
+          findOneBy: jest.fn(async (where: { id: number; accountId: number }) => find(where)),
+          findOne: jest.fn(async ({ where, lock }: { where: { id: number; accountId: number }; lock?: { mode: string } }) => {
+            if (lock) statementLocks.push(lock.mode);
+            return find(where);
+          }),
+        };
+      }
+      return transactionRepository;
+    },
+  };
+  transactionRepository.manager = manager;
+  const reconciliationQuery = {
+    openStatement: jest.fn(async () => statements.find((statement) => statement.reconciledAt === null) ?? null),
+    lockTransactions: jest.fn(async (_manager: unknown, accountId: number, ids: number[]) =>
+      stored && stored.accountId === accountId && ids.includes(stored.id)
+        ? [{ id: stored.id, date: stored.date, amount: stored.amount, reconciliationId: stored.reconciliationId ?? null }]
+        : []),
   };
   const accounts = {
     findOwned: jest.fn(async () => {
@@ -65,15 +122,18 @@ function setup(account: Account | null = buildAccount(), stored: Transaction | n
   const paymentGenerated = new PaymentGeneratedQuery(billPaymentRepository, accountRepository);
   jest.spyOn(paymentGenerated, 'isPaymentGenerated');
   const registry = new AccountTypeRegistry([new RegularAccountHandler(), new ProviderExpenseAccountHandler(NO_BILLS_SUMMARY)]);
+  const writer = new TransactionWriter(transactionRepository as never, paymentGenerated as never, reconciliationQuery as never, registry);
   const service = new TransactionService(
     transactionRepository as never,
-    paymentGenerated as never,
     accounts as never,
     registry,
     ledgerQuery as never,
+    writer,
   );
 
-  return { service, transactionRepository, billPaymentRepository, paymentGenerated, accounts, ledgerQuery };
+  return {
+    service, transactionRepository, billPaymentRepository, paymentGenerated, accounts, ledgerQuery, manager, accountLocks, statementLocks, reconciliationQuery,
+  };
 }
 
 const createDto = (fields: Partial<CreateTransactionDto> = {}): CreateTransactionDto =>
@@ -111,6 +171,7 @@ describe('TransactionService', () => {
         description: 'Coffee',
         notes: null,
         payment_generated: false,
+        reconciliation: null,
         created_at: expect.any(Date),
         updated_at: expect.any(Date),
       });
@@ -371,6 +432,114 @@ describe('TransactionService', () => {
     });
   });
 
+  describe('update under the reconciliation locks', () => {
+    const FINISHED = buildStatement({ id: 8, statementDate: '2025-12-31', reconciledAt: new Date('2026-01-01T00:00:00Z') });
+    const OPEN = buildStatement({ id: 9, statementDate: '2026-01-31' });
+    const clearedRow = () => buildTransaction({ reconciliationId: 8 });
+    const tickedRow = () => buildTransaction({ reconciliationId: 9 });
+
+    it('re-reads the account and the row under a pessimistic write lock, inside one DB transaction', async () => {
+      const { service, manager, accountLocks, reconciliationQuery } = setup();
+
+      await service.update(PERSONAL, 1, 5, { description: 'Tea' });
+
+      expect(manager.transaction).toHaveBeenCalledTimes(1);
+      expect(accountLocks).toEqual(['pessimistic_write']);
+      expect(reconciliationQuery.lockTransactions).toHaveBeenCalledWith(manager, 1, [5]);
+    });
+
+    it('answers CONCURRENT_UPDATE when the database picks the request as a deadlock victim', async () => {
+      const { service, manager } = setup();
+      manager.transaction.mockRejectedValue(mysqlError('ER_LOCK_DEADLOCK'));
+
+      expect(await conflictCode(service.update(PERSONAL, 1, 5, { description: 'Tea' }))).toBe(ErrorCodes.CONCURRENT_UPDATE);
+    });
+
+    it('checks the archived account (409) before the payment-generated 403', async () => {
+      const { service, billPaymentRepository } = setup(buildAccount({ archivedAt: new Date() }));
+      billPaymentRepository.rows.push(Object.assign(new BillPayment(), { id: 1, sourceAccountId: 1, chargeTransactionId: 5 }));
+
+      expect(await conflictCode(service.update({ ...ORGANIZATION, role: 'user' }, 1, 5, {}))).toBe(ErrorCodes.ACCOUNT_ARCHIVED);
+    });
+
+    it('rejects an invalid amount before locking anything', async () => {
+      const { service, manager } = setup(buildAccount(), buildTransaction(), { statements: [FINISHED] });
+
+      await expect(service.update(PERSONAL, 1, 5, { amount: '0' })).rejects.toThrow(BadRequestException);
+      expect(manager.transaction).not.toHaveBeenCalled();
+    });
+
+    it('answers 404 for an unknown transaction before the 400', async () => {
+      const { service } = setup(buildAccount(), null);
+
+      await expect(service.update(PERSONAL, 1, 5, { amount: '0' })).rejects.toThrow(NotFoundException);
+    });
+
+    it.each([
+      ['amount', { amount: '12' }],
+      ['date', { date: '2026-01-11' }],
+      ['amount with a description', { amount: '12', description: 'Tea' }],
+    ])('answers TRANSACTION_CLEARED when a cleared row changes its %s, applying nothing', async (_label, dto) => {
+      const { service, transactionRepository } = setup(buildAccount(), clearedRow(), { statements: [FINISHED] });
+
+      expect(await conflictCode(service.update(PERSONAL, 1, 5, dto))).toBe(ErrorCodes.TRANSACTION_CLEARED);
+      expect(transactionRepository.save).not.toHaveBeenCalled();
+    });
+
+    it('accepts a cleared row with the same value (12.5 vs 12.50) and a new description, with its statement', async () => {
+      const { service } = setup(buildAccount(), clearedRow(), { statements: [FINISHED] });
+
+      await expect(service.update(PERSONAL, 1, 5, { amount: '-12.5', date: '2026-01-10', description: 'Tea', notes: 'n' })).resolves.toMatchObject({
+        description: 'Tea',
+        reconciliation: { id: 8, status: 'finished', statement_date: '2025-12-31' },
+      });
+    });
+
+    it('checks the payment-generated 403 before TRANSACTION_CLEARED', async () => {
+      const { service, billPaymentRepository } = setup(buildAccount(), clearedRow(), { statements: [FINISHED] });
+      billPaymentRepository.rows.push(Object.assign(new BillPayment(), { id: 1, sourceAccountId: 1, chargeTransactionId: 5 }));
+
+      await expect(service.update({ ...ORGANIZATION, role: 'user' }, 1, 5, { amount: '12' })).rejects.toThrow(ForbiddenException);
+    });
+
+    it('treats a link to a statement other than the open one as cleared', async () => {
+      const { service } = setup(buildAccount(), clearedRow(), { statements: [FINISHED, OPEN] });
+
+      expect(await conflictCode(service.update(PERSONAL, 1, 5, { date: '2026-01-11' }))).toBe(ErrorCodes.TRANSACTION_CLEARED);
+    });
+
+    it('lets a ticked row change its amount and keeps it ticked', async () => {
+      const { service, transactionRepository } = setup(buildAccount(), tickedRow(), { statements: [OPEN] });
+
+      const result = await service.update(PERSONAL, 1, 5, { amount: '12' });
+
+      expect(transactionRepository.save).toHaveBeenCalledWith(expect.objectContaining({ reconciliationId: 9 }));
+      expect(result.reconciliation).toEqual({ id: 9, status: 'open', statement_date: '2026-01-31' });
+    });
+
+    it('locks the open statement row, after the account, when the date is edited', async () => {
+      const { service, statementLocks } = setup(buildAccount(), tickedRow(), { statements: [OPEN] });
+
+      await service.update(PERSONAL, 1, 5, { date: '2026-01-20' });
+      await service.update(PERSONAL, 1, 5, { description: 'Tea' });
+
+      expect(statementLocks).toEqual(['pessimistic_write']);
+    });
+
+    it.each([
+      ['after the statement date', '2026-02-01', null],
+      ['before the opening date', '2025-12-31', null],
+      ['on the statement date', '2026-01-31', 9],
+      ['on the opening date', '2026-01-01', 9],
+    ])('moving a ticked row %s leaves reconciliationId = %s', async (_label, date, expected) => {
+      const { service, transactionRepository } = setup(buildAccount(), tickedRow(), { statements: [OPEN] });
+
+      await service.update(PERSONAL, 1, 5, { date });
+
+      expect(transactionRepository.save).toHaveBeenCalledWith(expect.objectContaining({ reconciliationId: expected }));
+    });
+  });
+
   describe('delete', () => {
     it('hard-deletes the transaction of the account', async () => {
       const { service, transactionRepository } = setup();
@@ -391,6 +560,39 @@ describe('TransactionService', () => {
       const { service } = setup(buildAccount({ archivedAt: new Date() }));
 
       expect(await conflictCode(service.delete(PERSONAL, 1, 5))).toBe(ErrorCodes.ACCOUNT_ARCHIVED);
+    });
+    it('answers TRANSACTION_CLEARED for a cleared row, as any role, deleting nothing', async () => {
+      const finished = buildStatement({ id: 8, reconciledAt: new Date() });
+      const { service, transactionRepository } = setup(buildAccount(), buildTransaction({ reconciliationId: 8 }), { statements: [finished] });
+
+      expect(await conflictCode(service.delete({ ...ORGANIZATION, role: 'admin' }, 1, 5))).toBe(ErrorCodes.TRANSACTION_CLEARED);
+      expect(await conflictCode(service.delete({ ...ORGANIZATION, role: 'owner' }, 1, 5))).toBe(ErrorCodes.TRANSACTION_CLEARED);
+      expect(transactionRepository.delete).not.toHaveBeenCalled();
+    });
+
+    it('deletes a ticked row', async () => {
+      const { service, transactionRepository } = setup(buildAccount(), buildTransaction({ reconciliationId: 9 }), { statements: [buildStatement()] });
+
+      await service.delete(PERSONAL, 1, 5);
+
+      expect(transactionRepository.delete).toHaveBeenCalledWith({ id: 5, accountId: 1 });
+    });
+
+    it('locks the account and the row inside one DB transaction', async () => {
+      const { service, manager, accountLocks, reconciliationQuery } = setup();
+
+      await service.delete(PERSONAL, 1, 5);
+
+      expect(manager.transaction).toHaveBeenCalledTimes(1);
+      expect(accountLocks).toEqual(['pessimistic_write']);
+      expect(reconciliationQuery.lockTransactions).toHaveBeenCalledWith(manager, 1, [5]);
+    });
+
+    it('answers CONCURRENT_UPDATE on a lock wait timeout', async () => {
+      const { service, manager } = setup();
+      manager.transaction.mockRejectedValue(mysqlError('ER_LOCK_WAIT_TIMEOUT'));
+
+      expect(await conflictCode(service.delete(PERSONAL, 1, 5))).toBe(ErrorCodes.CONCURRENT_UPDATE);
     });
   });
 

@@ -1,6 +1,7 @@
 import { buildPagination } from '../pagination.js';
 import { handOffMark, serializeLedger, serializeTransaction } from '../transaction-response.js';
 import { buildAccount } from './account.test-support.js';
+import { Reconciliation } from '../entities/reconciliation.entity.js';
 import { Transaction } from '../entities/transaction.entity.js';
 
 const SENT_AT = new Date('2026-11-09T12:00:00Z');
@@ -41,36 +42,52 @@ describe('serializeTransaction', () => {
   it('returns the public fields with the amount in the currency exponent', () => {
     const transaction = buildTransaction();
 
-    expect(serializeTransaction(transaction, buildAccount({ currency: 'JPY' }), false)).toEqual({
+    expect(serializeTransaction(transaction, buildAccount({ currency: 'JPY' }), false, null)).toEqual({
       id: 3,
       date: '2026-01-02',
       amount: '500',
       description: 'Sushi',
       notes: 'n',
       payment_generated: false,
+      reconciliation: null,
       created_at: new Date(0),
       updated_at: new Date(1),
     });
   });
 
   it('carries payment_generated: true for a payment-generated transaction', () => {
-    expect(serializeTransaction(buildTransaction(), buildAccount(), true)).toMatchObject({ payment_generated: true });
+    expect(serializeTransaction(buildTransaction(), buildAccount(), true, null)).toMatchObject({ payment_generated: true });
   });
 
   it('carries sent_to_accountant_at on a provider-expense charge (sent or unsent)', () => {
-    expect(serializeTransaction(buildTransaction({ amount: -500n, sentToAccountantAt: SENT_AT }), provider, false))
+    expect(serializeTransaction(buildTransaction({ amount: -500n, sentToAccountantAt: SENT_AT }), provider, false, null))
       .toMatchObject({ amount: '-5.00', sent_to_accountant_at: SENT_AT });
-    expect(serializeTransaction(buildTransaction({ amount: -500n }), provider, false))
+    expect(serializeTransaction(buildTransaction({ amount: -500n }), provider, false, null))
       .toMatchObject({ sent_to_accountant_at: null });
   });
 
   it('omits the key on a provider-expense payment', () => {
-    expect(serializeTransaction(buildTransaction({ amount: 500n }), provider, false)).not.toHaveProperty('sent_to_accountant_at');
+    expect(serializeTransaction(buildTransaction({ amount: 500n }), provider, false, null)).not.toHaveProperty('sent_to_accountant_at');
   });
 
   it('omits the key on a charge of another account type', () => {
-    expect(serializeTransaction(buildTransaction({ amount: -500n }), buildAccount({ type: 'regular' }), false))
+    expect(serializeTransaction(buildTransaction({ amount: -500n }), buildAccount({ type: 'regular' }), false, null))
       .not.toHaveProperty('sent_to_accountant_at');
+  });
+});
+
+describe('serializeTransaction reconciliation', () => {
+  const statement = (reconciledAt: Date | null) =>
+    Object.assign(new Reconciliation(), { id: 4, accountId: 1, statementDate: '2026-01-31', reconciledAt });
+
+  it('maps the statement of a ticked transaction as open', () => {
+    expect(serializeTransaction(buildTransaction(), buildAccount(), false, statement(null)).reconciliation)
+      .toEqual({ id: 4, status: 'open', statement_date: '2026-01-31' });
+  });
+
+  it('maps the statement of a cleared transaction as finished', () => {
+    expect(serializeTransaction(buildTransaction(), buildAccount(), false, statement(new Date(5))).reconciliation)
+      .toEqual({ id: 4, status: 'finished', statement_date: '2026-01-31' });
   });
 });
 

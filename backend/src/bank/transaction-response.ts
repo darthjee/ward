@@ -1,8 +1,10 @@
 import { formatAmount } from './currency.js';
 import type { Account } from './entities/account.entity.js';
+import type { Reconciliation } from './entities/reconciliation.entity.js';
 import type { Transaction } from './entities/transaction.entity.js';
 import type { LedgerRow } from './ledger.query.js';
 import type { Pagination } from './pagination.js';
+import { reconciliationStatus } from './reconciliation-balance.js';
 
 /** The account type whose charges carry the accountant hand-off mark. */
 export const PROVIDER_EXPENSE_TYPE = 'provider_expense';
@@ -24,6 +26,8 @@ export interface TransactionResponse extends HandOffMark {
   notes: string | null;
   /** Whether a bill payment of the same owner generated the transaction. */
   payment_generated: boolean;
+  /** The statement the transaction is ticked on or cleared by, or `null` when it is on none. */
+  reconciliation: TransactionReconciliationResponse | null;
   created_at: Date;
   updated_at: Date;
 }
@@ -85,9 +89,16 @@ export function handOffMark(account: Account, amount: bigint, sentAt: Date | nul
  * @param {Transaction} transaction - The transaction.
  * @param {Account} account - Its account (for the currency and the hand-off mark).
  * @param {boolean} paymentGenerated - Whether a bill payment of the same owner references it.
+ * @param {Reconciliation | null} statement - The statement it is linked to (looked up within its own
+ *   account), or `null` when it is on none.
  * @returns {TransactionResponse} Its public view, `amount` as a decimal string.
  */
-export function serializeTransaction(transaction: Transaction, account: Account, paymentGenerated: boolean): TransactionResponse {
+export function serializeTransaction(
+  transaction: Transaction,
+  account: Account,
+  paymentGenerated: boolean,
+  statement: Reconciliation | null,
+): TransactionResponse {
   return {
     id: transaction.id,
     date: transaction.date,
@@ -96,6 +107,9 @@ export function serializeTransaction(transaction: Transaction, account: Account,
     notes: transaction.notes,
     ...handOffMark(account, transaction.amount, transaction.sentToAccountantAt),
     payment_generated: paymentGenerated,
+    reconciliation: statement
+      ? { id: statement.id, status: reconciliationStatus(statement.reconciledAt), statement_date: statement.statementDate }
+      : null,
     created_at: transaction.createdAt,
     updated_at: transaction.updatedAt,
   };
