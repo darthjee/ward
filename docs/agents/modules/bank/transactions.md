@@ -63,8 +63,9 @@ and the balance on 1 Nov is still 10,000.
 
 **Known trade-off** — a wrongly backfilled transaction is silently absorbed into the history
 before the anchor, instead of surfacing as a mismatch against the bank statement. Matching the
-ledger against the statement is the *Reconciliation* epic
-([#85](https://github.com/darthjee/ward/issues/85)).
+ledger against a bank statement is [reconciliation](reconciliation.md): once any statement exists
+for the account, `openingDate` and `openingBalance` are locked (409 `ACCOUNT_RECONCILED`; see
+[Lock matrix](reconciliation.md#lock-matrix)).
 
 ### Future-dated transactions
 
@@ -85,11 +86,17 @@ future-dated transactions later needs no data migration.
 | `amount` | yes | yes | Signed: positive = money in, negative = money out; zero rejected |
 | `description` | yes | yes | Trimmed, non-blank, at most 255 characters |
 | `notes` | no | yes | At most 2000 characters |
+| `reconciliationId` | no | no | Nullable FK to `bank_reconciliations`: `NULL` is uncleared, an open statement means ticked, a finished one means cleared. Set only by the [reconciliation](reconciliation.md#reconciliation-entity) routes, never by a transaction body |
 | `sentToAccountantAt` | no | no | Nullable `DATETIME`, provider-expense charges only, set and cleared by the [accountant hand-off](provider-expense.md#accountant-hand-off) |
 | `createdAt` / `updatedAt` | — | — | |
 
-- **Editable and hard-deletable** — nothing is locked until reconciliation exists
-  ([#85](https://github.com/darthjee/ward/issues/85)).
+- **Cleared rows are locked** — a row linked to a finished [reconciliation](reconciliation.md)
+  statement keeps `description` and `notes` editable, while changing `amount` or `date`, or
+  deleting it, answers 409 `TRANSACTION_CLEARED` (no role bypasses it; undo the statement
+  first). Other rows are editable and hard-deletable. Deleting a ticked row drops its tick, and a
+  date moved outside the open statement's range unticks it. See the
+  [Lock matrix](reconciliation.md#lock-matrix). Responses and ledger rows carry `reconciliation`
+  (`null` or `{ id, status, statement_date }`).
 - An **archived account's** transactions are read-only: create, edit and delete answer 409
   `ACCOUNT_ARCHIVED`.
 - **No `kind` column** — the sign and the description say what a transaction is (payment,
@@ -152,7 +159,7 @@ contract with no exception. It reads the resident config and does not load the l
 
 ## Deferred
 
-- Reconciliation: [#85](https://github.com/darthjee/ward/issues/85)
+- Statement import (reconciliation): [#175](https://github.com/darthjee/ward/issues/175)
 - Linked transfers: [#86](https://github.com/darthjee/ward/issues/86)
 - Counterparty / payee: [#87](https://github.com/darthjee/ward/issues/87)
 - Currency conversion: [#88](https://github.com/darthjee/ward/issues/88)

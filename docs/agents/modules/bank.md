@@ -32,6 +32,7 @@ came with Epic [#119](https://github.com/darthjee/ward/issues/119).
 | [bank/investment.md](bank/investment.md) | Investment accounts: ledger as current value, movements, informational fields |
 | [bank/provider-expense.md](bank/provider-expense.md) | Provider-expense accounts: payable ledger, provider fields, the accountant hand-off |
 | [bank/bills.md](bank/bills.md) | Hybrid bill model, provider bills and their kinds, schedule fields, recurrence, paying / skipping / undoing, payment keys |
+| [bank/reconciliation.md](bank/reconciliation.md) | Statement checkpoints, cleared transactions and their lock, the lock matrix, concurrency |
 | [bank/ui.md](bank/ui.md) | The Bank menu, per-type submenus, provider bills, Add / edit bill, Bill history, Calendar |
 
 The per-endpoint reference is [Routes — Bank](../backend/routes/bank.md).
@@ -47,6 +48,7 @@ The per-endpoint reference is [Routes — Bank](../backend/routes/bank.md).
 | `ProviderExpenseDetails` | `bank_provider_expense_details` | 1:1 with a `provider_expense` account, same pattern |
 | `ProviderBill` | `bank_provider_bills` | Recurring and one-off bills of a provider-expense account (`kind`) |
 | `BillPayment` | `bank_bill_payments` | One row per paid or skipped occurrence |
+| `Reconciliation` | `bank_reconciliations` | A statement checkpoint of an account (`open` or `finished`); `bank_transactions.reconciliation_id` links ticked / cleared rows |
 
 Every FK between these tables is real (same module). Column detail lives in each concern page.
 
@@ -107,10 +109,10 @@ organization ([#94](https://github.com/darthjee/ward/issues/94)).
 
 ## Routes
 
-See [Routes — Bank](../backend/routes/bank.md). Nine thin resident controllers
+See [Routes — Bank](../backend/routes/bank.md). Ten thin resident controllers
 (`AccountsController`, `TransactionsController`, `SettingsController`,
 `AccountantController`, `CalendarController`, `BillsController`, `BillPaymentsController`,
-`ProviderBillsController`, `ProviderBillPaymentsController`)
+`ProviderBillsController`, `ProviderBillPaymentsController`, `ReconciliationsController`)
 load the lazy `BankModule` on the first bank request and delegate to its services.
 `settings.json` reads the resident `BANK_CONFIG` and does not load the module.
 

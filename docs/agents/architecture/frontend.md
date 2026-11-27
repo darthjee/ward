@@ -50,6 +50,8 @@ frontend/assets/js/
         common/                #   shared bank pieces: amounts.js (parse/format money),
                                #   currencies.js, CurrencySelect, BankPagination, pageQuery.js,
                                #   dates.js, bankErrors.js, BankErrorAlert, ConfirmModal
+        common/reconciliation/ #   reconcile mode, statements history, cleared marker and
+                               #   warning badge (ReconciliationsClient in client/)
         accounts/pages/        #   BankAccountList, BankAccountDetail (+ ledger),
                                #   BankAccountNew, BankAccountEdit (+ controllers/, helpers/,
                                #   hooks/)

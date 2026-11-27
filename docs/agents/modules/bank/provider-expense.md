@@ -121,8 +121,9 @@ provider bills (see [bills.md § Provider bills](bills.md#provider-bills)).
   the one exception to the archived read-only rule.
 - **Editing or deleting a sent charge** is allowed with a warning in the UI; an edit keeps the
   mark, and a PATCH that turns the charge positive clears it (a payment is never marked).
-  Locking sent charges is left to *Reconciliation*
-  ([#85](https://github.com/darthjee/ward/issues/85)).
+  The hand-off mark and the [cleared marker](reconciliation.md) are independent: a sent charge
+  stays editable unless it is cleared by a finished statement, and then the
+  [lock matrix](reconciliation.md#lock-matrix) applies.
 - Turning `forAccountant` off keeps existing marks; the account just leaves future previews.
 
 ### Caps
@@ -179,7 +180,6 @@ prefills its amount from the provider's single recurring bill (empty with zero o
 - Receipts / attachments: [#96](https://github.com/darthjee/ward/issues/96)
 - PDF accountant export: [#97](https://github.com/darthjee/ward/issues/97)
 - Refunds via categories: [#89](https://github.com/darthjee/ward/issues/89)
-- Reconciliation locks on sent charges: [#85](https://github.com/darthjee/ward/issues/85)
 - Linked transfers: [#86](https://github.com/darthjee/ward/issues/86)
 - Per-transaction bill link: [#140](https://github.com/darthjee/ward/issues/140)
 

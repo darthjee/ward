@@ -1,9 +1,9 @@
 # Routes — Bank
 
-Routes of the lazy `bank` module (`backend/src/bank/`), served by nine thin resident
+Routes of the lazy `bank` module (`backend/src/bank/`), served by ten thin resident
 controllers: `AccountsController`, `TransactionsController`, `SettingsController`,
 `AccountantController`, `CalendarController`, `BillsController`, `BillPaymentsController`,
-`ProviderBillsController` and `ProviderBillPaymentsController`. Each is
+`ProviderBillsController`, `ProviderBillPaymentsController` and `ReconciliationsController`. Each is
 declared with `@OwnerScopedController('bank')`, so every route is mounted under **both** base
 paths (the external `/api` prefix is added by the proxy):
 
@@ -14,7 +14,7 @@ The controllers parse the ids, load the lazy `BankModule` on the first bank requ
 (`BankModuleLoader` → `LazyModuleLoaderService#loadOnFirstRequest()`) and delegate to its
 `AccountService` / `TransactionService` / `AccountantService` / `CalendarService` /
 `BillService` / `BillPaymentService` / `BillHistoryService` / `ProviderBillService` /
-`ProviderBillPaymentService` (provider bills resolve owner-scoped through
+`ProviderBillPaymentService` / `ReconciliationService` (provider bills resolve owner-scoped through
 `ProviderBillResolver`; default paying accounts go through `PayingAccountResolver`). `settings.json` reads the
 resident `BANK_CONFIG` and does not load the module. The rules behind these routes (ownership,
 ledger, currency, account types, the accountant hand-off, bills) are in the
@@ -71,6 +71,10 @@ passes every check. Every `GET` is open to every member, and nothing needs `owne
 | POST | `provider-bills/:id/occurrences/:dueDate/payment.json` | `user` |
 | DELETE | `provider-bills/:id/occurrences/:dueDate/payment.json` | `admin` |
 | POST | `accountant/mark-sent.json`, `accountant/mark-unsent.json` | `user` |
+| POST / PATCH | `accounts/:accountId/reconciliations.json`, `reconciliations/:id.json`, `reconciliations/:id/ticks.json` | `user` |
+| POST | `accounts/:accountId/reconciliations/:id/finish.json` | `user` |
+| DELETE | `accounts/:accountId/reconciliations/:id.json` (cancel) | `admin` |
+| POST | `accounts/:accountId/reconciliations/:id/undo.json` | `admin` |
 
 The pattern: everyday writes (transactions, bills, pay / skip, accountant marks) need `user`;
 every `DELETE` (undoing a payment included) and every account-structure write need `admin`.
@@ -104,6 +108,10 @@ stays the enforcement.
   `investment` object (see [Investment object](#investment-object)), and `provider_expense`
   carries a `provider_expense` object (see [Provider-expense object](#provider-expense-object)). Sending another type's nested object (e.g.
   `debt` on a regular account) → `400`.
+- The **detail** response (not the list) also carries `last_reconciliation`
+  (`{ statement_date, statement_balance, reconciled_at }` or `null`) and
+  `open_reconciliation_id` (`number | null`); see
+  [Reconciliation locks on existing routes](#reconciliation-locks-on-existing-routes).
 
 ## Accounts
 
@@ -112,7 +120,7 @@ stays the enforcement.
 | GET | `<base>/accounts.json?type=regular&archived=false` | — | `200` list of accounts of that `type` (`regular` default, `debt`, `investment`, `provider_expense`), sorted by name; `archived=true` also lists archived ones (with `archived_at` set); `provider_expense` rows also carry `bills_summary` (see [Provider-expense object](#provider-expense-object)) | `400` type without a handler, invalid `archived` | `user-scoped` |
 | POST | `<base>/accounts.json` | `CreateAccountDto` | `201` account | `400` validation / type without a handler / wrong nested object / non-zero `opening_balance` on an investment; `409 ACCOUNT_NAME_TAKEN` | `never` |
 | GET | `<base>/accounts/:accountId.json` | — | `200` account (full number) | `404` | `user-scoped` |
-| PATCH | `<base>/accounts/:accountId.json` | `UpdateAccountDto` | `200` account | `400`; `404`; `409 ACCOUNT_ARCHIVED` (anything but `name` on an archived account), `CURRENCY_LOCKED` (currency change once the account has transactions), `ACCOUNT_NAME_TAKEN` | `never` |
+| PATCH | `<base>/accounts/:accountId.json` | `UpdateAccountDto` | `200` account | `400`; `404`; `409 ACCOUNT_ARCHIVED` (anything but `name` on an archived account), `CURRENCY_LOCKED` (currency change once the account has transactions or any statement), `ACCOUNT_RECONCILED` (`opening_date` / `opening_balance` change once any statement exists), `ACCOUNT_NAME_TAKEN` | `never` |
 | DELETE | `<base>/accounts/:accountId.json` | — | `204` | `404`; `409 ACCOUNT_HAS_TRANSACTIONS` (message points to archive; also on the FK race) | `never` |
 | POST | `<base>/accounts/:accountId/archive.json` | — | `200` account (idempotent) | `404` | `never` |
 | POST | `<base>/accounts/:accountId/unarchive.json` | — | `200` account (idempotent) | `404`; `409 ACCOUNT_NAME_TAKEN` | `never` |
@@ -265,15 +273,15 @@ transaction routes unchanged.
 |---|---|---|---|---|---|
 | GET | `<base>/accounts/:accountId/transactions.json?page=N` | — | `200` ledger envelope | `400` invalid `page`; `404` | `user-scoped` |
 | POST | `<base>/accounts/:accountId/transactions.json` | `CreateTransactionDto` | `201` transaction | `400`; `404`; `409 ACCOUNT_ARCHIVED` | `never` |
-| PATCH | `<base>/accounts/:accountId/transactions/:transactionId.json` | `UpdateTransactionDto` | `200` transaction | `400`; `404`; `409 ACCOUNT_ARCHIVED` | `never` |
-| DELETE | `<base>/accounts/:accountId/transactions/:transactionId.json` | — | `204` (hard delete) | `404`; `409 ACCOUNT_ARCHIVED` | `never` |
+| PATCH | `<base>/accounts/:accountId/transactions/:transactionId.json` | `UpdateTransactionDto` | `200` transaction | `400`; `404`; `409 ACCOUNT_ARCHIVED`, `TRANSACTION_CLEARED` | `never` |
+| DELETE | `<base>/accounts/:accountId/transactions/:transactionId.json` | — | `204` (hard delete) | `404`; `409 ACCOUNT_ARCHIVED`, `TRANSACTION_CLEARED` | `never` |
 
 `CreateTransactionDto`: `date` (required), `amount` (required signed decimal string, non-zero,
 validated against the **account's** currency), `description` (required, trimmed, non-blank, at
 most 255 characters), `notes` (optional, at most 2000 characters). `UpdateTransactionDto`: the
 same fields, all optional. A transaction never moves between accounts.
 
-Transaction response: `{ id, date, amount, description, notes, payment_generated, created_at, updated_at }`.
+Transaction response: `{ id, date, amount, description, notes, payment_generated, reconciliation, created_at, updated_at }`.
 
 - **`payment_generated`** — boolean, never `null`: `true` when a bill payment of the same owner
   (joined through its source account, filtered by the owner) references the transaction as its
@@ -298,8 +306,9 @@ The project's first paginated route; the `pagination` block is the convention fo
 {
   "transactions": [ { "id": 7, "date": "2026-11-01", "amount": "-12.50",
                       "description": "…", "notes": null, "payment_generated": false,
-                      "balance": "987.50" } ],
+                      "reconciliation": null, "balance": "987.50" } ],
   "opening": { "date": "2026-10-01", "amount": "1000.00", "balance": "1000.00" },
+  "last_reconciled_date": null,
   "pagination": { "page": 1, "per_page": 50, "total_pages": 3, "total_count": 120 }
 }
 ```
@@ -311,6 +320,9 @@ The project's first paginated route; the `pagination` block is the convention fo
 - `payment_generated` (boolean, never `null`) is computed per row inside the ledger query with
   a correlated, owner-scoped `EXISTS` over `bank_bill_payments` (no query per row), with the same
   rule as the transaction response.
+- `reconciliation` is `null` (uncleared) or `{ id, status: 'open' | 'finished', statement_date }`;
+  `last_reconciled_date` is the latest finished `statement_date` or `null`. See
+  [Reconciliation locks on existing routes](#reconciliation-locks-on-existing-routes).
 - `balance` is the running balance, computed with a window function over the account's whole
   ledger before the `LIMIT`, so it is correct across pages.
 - `opening` is the virtual opening row (`opening_balance` − SUM(transactions dated before
@@ -490,7 +502,9 @@ a debt → `400`. Check order: path `404`, body `400`, paying account `422`, the
 - **Undo** — `204`; deletes the linked transactions that still exist (a charge already sent to
   the accountant included) and the row, in one DB transaction. No payment → `404`. A `paid`
   payment whose source or paying account is archived → `409 ACCOUNT_ARCHIVED`; a skip on an
-  archived source, or a one-off whose provider is archived → `404`. Undo looks the row up with
+  archived source, or a one-off whose provider is archived → `404`. A linked payment,
+  withdrawal or charge transaction cleared by a finished statement → `409 TRANSACTION_CLEARED`
+  (see [Reconciliation locks on existing routes](#reconciliation-locks-on-existing-routes)). Undo looks the row up with
   no schedule check, so off-schedule payments can be undone.
 
 ### Bill history
@@ -511,6 +525,118 @@ a debt → `400`. Check order: path `404`, body `400`, paying account `422`, the
 `off_schedule` is `true` when `due_date` is not a nominal occurrence of the account's current
 schedule pattern (`due_day`, `due_month`, frequency, `bills_from`; archived and
 `show_in_calendar` are ignored). An archived account's history stays readable.
+
+## Reconciliations
+
+Served by `ReconciliationsController`, delegating to the lazy `ReconciliationService`. The model,
+lifecycle and lock rules are in [Reconciliation](../../modules/bank/reconciliation.md). Each
+write declares `@MinOrgRole`, enforced by `OwnerContextGuard` (everyday writes need `user`;
+cancel is a DELETE and undo reverses a finished statement, so both need `admin`).
+
+| Method | Route | Body | Success | Errors | Min role | Cache |
+|---|---|---|---|---|---|---|
+| GET | `<base>/accounts/:accountId/reconciliations.json?page=N` | — | `200` history envelope | `400` page; `404` | — | `user-scoped` |
+| POST | `<base>/accounts/:accountId/reconciliations.json` | `statement_date`, `statement_balance` | `201` statement | `400` (date before `opening_date` or later than UTC today + 1 day, balance beyond the bound); `404`; `409 ACCOUNT_ARCHIVED`, `RECONCILIATION_OPEN`, `RECONCILIATION_OUT_OF_ORDER` | `user` | `never` |
+| GET | `<base>/accounts/:accountId/reconciliations/:id.json` | — | `200` statement | `404` | — | `user-scoped` |
+| PATCH | `<base>/accounts/:accountId/reconciliations/:id.json` | `statement_date?`, `statement_balance?` | `200` statement | `400`; `404`; `409 RECONCILIATION_FINISHED`, `RECONCILIATION_OUT_OF_ORDER`, `ACCOUNT_ARCHIVED` | `user` | `never` |
+| DELETE | `<base>/accounts/:accountId/reconciliations/:id.json` | — | `204` (cancel, drops the ticks) | `404`; `409 RECONCILIATION_FINISHED`, `ACCOUNT_ARCHIVED` | `admin` | `never` |
+| PATCH | `<base>/accounts/:accountId/reconciliations/:id/ticks.json` | `tick: id[]`, `untick: id[]` | `200` statement | `400`; `404` (an id not on the account, in either array); `409 RECONCILIATION_FINISHED`, `TRANSACTION_NOT_ELIGIBLE`, `ACCOUNT_ARCHIVED` | `user` | `never` |
+| POST | `<base>/accounts/:accountId/reconciliations/:id/finish.json` | `{}` | `200` statement | `404`; `409 RECONCILIATION_UNBALANCED`, `RECONCILIATION_FINISHED`, `ACCOUNT_ARCHIVED` | `user` | `never` |
+| POST | `<base>/accounts/:accountId/reconciliations/:id/undo.json` | `{}` | `200` statement (now `open`) | `404`; `409 RECONCILIATION_NOT_LATEST`, `RECONCILIATION_OPEN`, `RECONCILIATION_NOT_FINISHED`, `ACCOUNT_ARCHIVED` | `admin` | `never` |
+
+- **One bulk ticks route** serves both a single checkbox (one id) and "tick all on page / untick
+  all" (up to the 50-row ledger page). Both arrays are optional, at most 50 raw ids each, are
+  de-duplicated, must be disjoint, and at least one must be non-empty; the whole batch is applied
+  in one DB transaction and fails as a whole. Ticking a ticked row, or unticking an unticked one,
+  is a no-op.
+- **Statement response**: `{ id, status, statement_date, statement_balance, reconciled_at,
+  cleared_balance, ticked_sum, difference, transaction_count, created_at, updated_at }`. On a
+  finished statement `difference` is `"0…"` and `ticked_sum` is the amount it cleared. Every
+  write returns it, so the summary bar updates from the response.
+- **History envelope**: `{ reconciliations: [...], pagination: {...} }`, newest first by
+  `statement_date` then `id`, 50 per page, with the standard `pagination` block. It includes the
+  open statement (at the top). Each row carries `id`, `status`, `statement_date`,
+  `statement_balance`, `reconciled_at`, `transaction_count` and `undoable` (true only on the
+  latest finished statement when none is open).
+
+### Reconciliation check order
+
+1. Org or non-member 404, then the role 403 (so a `user` calling cancel or undo gets 403 for any
+   statement id, even one that does not exist).
+2. DTO-shape 400 from `@StrictBody()` (types, array size, unknown fields, the date rule), plus the
+   ticks checks that need no account (empty after de-duplication, overlapping `tick` and `untick`).
+3. Path 404: `parseId` on the account, the owner-scoped account lookup, the statement by
+   `{ id, accountId }`, then the ticks ids (one account-scoped query).
+4. Account-dependent 400: the balance against the account currency, and `statement_date` before
+   `opening_date`.
+5. `ACCOUNT_ARCHIVED`, then the state 409s (within a ticks batch: `RECONCILIATION_FINISHED`, then
+   `TRANSACTION_NOT_ELIGIBLE`).
+
+No 409 is reachable by a non-member, so a statement's state is never disclosed outside the
+account's members. Every 409 message is fixed text.
+
+### Reconciliation error codes
+
+All 409, defined in `backend/src/core/error-codes.ts` with factories in
+`backend/src/bank/reconciliation-conflicts.ts`:
+
+| Code | When |
+|---|---|
+| `RECONCILIATION_OPEN` | Start while a statement is open; undo while a statement is open |
+| `RECONCILIATION_FINISHED` | Edit, tick, cancel or finish on a finished statement |
+| `RECONCILIATION_NOT_FINISHED` | Undo on a statement that is not finished |
+| `RECONCILIATION_NOT_LATEST` | Undo on a finished statement that is not the latest |
+| `RECONCILIATION_OUT_OF_ORDER` | A `statement_date` not strictly after the latest finished statement |
+| `RECONCILIATION_UNBALANCED` | Finish while the difference is not 0 |
+| `TRANSACTION_NOT_ELIGIBLE` | Tick of a row outside the date range, before the anchor, or cleared by another statement |
+| `TRANSACTION_CLEARED` | Changing `amount` / `date` of, deleting, or undoing the payment of a cleared row |
+| `ACCOUNT_RECONCILED` | Changing `opening_date` / `opening_balance` once any statement exists |
+| `ACCOUNT_ARCHIVED` | Existing code, reused for every write |
+
+### Reconciliation caching
+
+- The controller is `@OwnerScopedController('bank')`: GETs are `user-scoped`, every write is
+  `@CachePolicy(CacheClass.Never)`, and the class-level `InvalidatesOwner()` clears only the
+  caller's own `/bank` (or `/orgs/<id>/bank`) subtree on a 2xx, which refreshes the ledger flags,
+  the account detail and the history. No per-account path invalidation is used.
+- 400 and 409 bodies are never cached, and a failed write emits no invalidation.
+- Navi warms nothing: every reconciliation GET is user-scoped and changes on every tick. The proxy
+  needs no change.
+
+## Reconciliation locks on existing routes
+
+- **Transaction PATCH** — when the row is cleared, a body whose `amount` or `date` differs from
+  the stored value answers `409 TRANSACTION_CLEARED`; an unchanged value, `description` and
+  `notes` pass. Order: `404`, `400`, `ACCOUNT_ARCHIVED`, the payment-generated `403`, then
+  `TRANSACTION_CLEARED`. A PATCH that moves a **ticked** row's date past the open statement's
+  `statement_date`, or before `opening_date`, unticks it. The write runs under the common lock
+  order (account row, statement, transaction rows).
+- **Transaction DELETE** — a cleared row answers `409 TRANSACTION_CLEARED`; deleting a ticked row
+  is allowed and drops the tick.
+- **`reconciliation` field** — on the transaction POST / PATCH responses (account-scoped lookup)
+  and on every ledger row: `null`, or `{ id, status, statement_date }`. The ledger query adds it
+  with a `LEFT JOIN` on `r.id = t.reconciliation_id AND r.account_id = t.account_id`, outside the
+  window subquery so the running-balance window is not widened. The virtual `opening` row never
+  carries it.
+- **Ledger envelope** — `last_reconciled_date`, the latest finished `statement_date` or `null`,
+  from one query served by the `(account_id, statement_date)` index. The frontend derives its
+  warning badge from it.
+- **Account detail** — `last_reconciliation` and `open_reconciliation_id` (detail only, one lookup
+  gated like the list extras, so the list pays nothing).
+- **Account PATCH** — once any statement exists, open or finished, an `opening_date` or
+  `opening_balance` that differs from the stored value answers `409 ACCOUNT_RECONCILED`, and a
+  currency change answers `409 CURRENCY_LOCKED` (not only when transactions exist). The check
+  runs under the account row lock. **DELETE** is unchanged: it needs no transactions, so the
+  cascade only removes zero-row statements.
+- **Payment undos** — all three (debt occurrence, one-off `bills/:id/payment`, provider-bill
+  occurrence) answer `409 TRANSACTION_CLEARED` when any linked payment, withdrawal or charge
+  transaction is cleared, checked under the same row locks as a finish. A merely ticked linked
+  transaction is deleted with its tick. Bill and provider-bill DELETE are unchanged (already `409`
+  when paid).
+- **Accountant hand-off** — no interaction: the hand-off mark and the cleared marker are
+  independent.
+- **Caching** — every changed route keeps its class; the reconciliation writes refresh them
+  through the owner-prefix invalidation.
 
 ## Settings
 
@@ -581,6 +707,7 @@ are in [Bank — Bills → Provider bills](../../modules/bank/bills.md#provider-
 | 409 | `PROVIDER_BILL_PAID` | DELETE, or moving a one-off, with a paid payment |
 | 409 | `PROVIDER_BILL_LIMIT` | 51st recurring bill on a provider |
 | 409 | `ACCOUNT_ARCHIVED` | Create under an archived provider; archived move target; undo of a paid row on an archived account |
+| 409 | `TRANSACTION_CLEARED` | Undo of a payment whose linked transaction is cleared |
 | 409 | `OCCURRENCE_ALREADY_PAID` | Paying or skipping an occurrence that already has a row |
 | 422 | `ACCOUNT_NOT_FOUND` / `CURRENCY_MISMATCH` | `paying_account_id` (or a one-off's move target currency) fails the checks; generic body |
 

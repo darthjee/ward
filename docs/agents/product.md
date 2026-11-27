@@ -80,8 +80,9 @@ More modules will follow. Each one gets its own page under `modules/` once speci
 ### `bank`
 
 Tracks bank accounts, business expenses handed to the accountant, and bills to pay. Decided by
-Epics [#26](https://github.com/darthjee/ward/issues/26) and
-[#119](https://github.com/darthjee/ward/issues/119) (provider bills) and documented in
+Epics [#26](https://github.com/darthjee/ward/issues/26),
+[#119](https://github.com/darthjee/ward/issues/119) (provider bills) and
+[#85](https://github.com/darthjee/ward/issues/85) (reconciliation) and documented in
 [Bank](modules/bank.md):
 
 - one `Account` entity with four types (`regular`, `debt`, `investment`, `provider_expense`),
@@ -95,6 +96,10 @@ Epics [#26](https://github.com/darthjee/ward/issues/26) and
   has one ledger, one balance and one accountant flag;
 - debt bills are derived from the debt's schedule, and paying any bill writes ledger
   transactions in one DB transaction;
+- statement reconciliation: the user ticks the ledger rows that appear on the bank statement and
+  finishes at difference 0, which marks them cleared and locks their `amount`, `date` and
+  delete (Epic [#85](https://github.com/darthjee/ward/issues/85), see
+  [Reconciliation](modules/bank/reconciliation.md));
 - user-or-organization-owned (see Domain data ownership above).
 
 The concerns it deferred are open GitHub epics, linked from each `modules/bank/` page.
