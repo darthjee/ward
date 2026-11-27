@@ -61,6 +61,7 @@ describe('AccountDetailHelper', () => {
       context: { kind: 'personal' },
       canManageAccounts: true,
       canDelete: true,
+      reconcile: undefined,
     }, HANDLERS);
   });
 

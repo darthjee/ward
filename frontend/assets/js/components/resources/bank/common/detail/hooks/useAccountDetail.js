@@ -3,6 +3,7 @@ import useOwnerContext from '../../../../../common/ownerContext/hooks/useOwnerCo
 import useCan from '../../../../../common/ownerContext/hooks/useCan.js';
 import { ACTIONS } from '../../../../../../utils/permissions/orgPermissions.js';
 import useAccountLedger from './useAccountLedger.js';
+import useReconcile from '../../reconciliation/hooks/useReconcile.js';
 import useLedgerForm from './useLedgerForm.js';
 import BankAccountDetailController from '../controllers/BankAccountDetailController.js';
 import LedgerFormController from '../controllers/LedgerFormController.js';
@@ -67,6 +68,10 @@ export default function useAccountDetail(base) {
     goToFirstPage: () => navigate(ledgerPageHref(context, base, accountId, 1)),
   }), [context, accountId, actions, reload, base]);
 
+  const { reconcile, reconcileHandlers } = useReconcile({
+    context, accountId, account: ledger.data?.account, reload,
+  });
+
   const handlers = buildDetailHandlers({
     form,
     actions,
@@ -97,8 +102,9 @@ export default function useAccountDetail(base) {
       canManageAccounts,
       canDelete,
       canEditPaymentTransactions,
+      reconcile,
     },
-    handlers,
+    handlers: { ...handlers, reconcile: reconcileHandlers },
     reload,
     setError,
     ledgerForm: { form, actions },

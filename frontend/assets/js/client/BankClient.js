@@ -1,4 +1,5 @@
 import ApiClient from './ApiClient.js';
+import ReconciliationsClient from './ReconciliationsClient.js';
 import TypedAccountsClient from './TypedAccountsClient.js';
 import { ACCOUNT_FIELDS, accountPath, whitelist } from './accountBodies.js';
 import { contextPath } from '../utils/context/ownerContext.js';
@@ -11,13 +12,15 @@ const TRANSACTION_FIELDS = ['date', 'amount', 'description', 'notes'];
  *
  * @description The typed account calls (`createDebt`, `updateDebt`, `createInvestment`,
  * `updateInvestment`, `createProviderExpense`, `updateProviderExpense`) come from
- * {@link TypedAccountsClient}. Every method takes the owner context first and builds its path through
+ * {@link TypedAccountsClient}; the reconciliation calls (`listReconciliations`, `startReconciliation`, ...)
+ * from {@link ReconciliationsClient}. Every method takes the owner context first and builds its path through
  * `contextPath` (`/bank/...` for Personal, `/orgs/:orgId/bank/...` for an organization). Every
  * method may resolve `undefined` when the session turned out to be expired (see
  * {@link ApiClient}).
  */
 const BankClient = {
   ...TypedAccountsClient,
+  ...ReconciliationsClient,
 
   /**
    * List the accounts of one type (regular by default).

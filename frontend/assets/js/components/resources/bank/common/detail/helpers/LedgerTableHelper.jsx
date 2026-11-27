@@ -2,6 +2,8 @@ import Table from 'react-bootstrap/cjs/Table.js';
 import Button from 'react-bootstrap/cjs/Button.js';
 import { formatMoney } from '../../amounts.js';
 import { formatDate } from '../../dates.js';
+import TickCellHelper from '../../reconciliation/helpers/TickCellHelper.jsx';
+import { visibleRows } from '../../reconciliation/controllers/eligibility.js';
 
 /**
  * Render a transaction's notes, read-only, beneath its description.
@@ -79,6 +81,23 @@ function renderActions(transaction, state, handlers) {
 }
 
 /**
+ * The class of a transaction row: highlighted while edited, dimmed when ineligible in reconcile
+ * mode.
+ *
+ * @param {object} transaction - The ledger row.
+ * @param {object} state - Table state.
+ * @param {boolean} editing - Whether the row is being edited.
+ * @returns {string|undefined} The class.
+ */
+function rowClassName(transaction, state, editing) {
+  if (editing) {
+    return 'table-warning';
+  }
+
+  return state.reconcile ? TickCellHelper.rowClassName(transaction, state.reconcile) : undefined;
+}
+
+/**
  * Render one transaction row; the row being edited is highlighted.
  *
  * @param {object} transaction - The ledger row.
@@ -90,7 +109,8 @@ function renderRow(transaction, state, handlers) {
   const editing = state.editingId === transaction.id;
 
   return (
-    <tr key={transaction.id} className={editing ? 'table-warning' : undefined}>
+    <tr key={transaction.id} className={rowClassName(transaction, state, editing)}>
+      {state.reconcile ? TickCellHelper.render(transaction, state.reconcile, handlers.reconcile) : null}
       <td className="text-nowrap">{formatDate(transaction.date)}</td>
       <td className="text-break">
         {transaction.description}
@@ -118,6 +138,7 @@ function renderOpening(opening, state) {
 
   return (
     <tr className="text-muted fst-italic">
+      {state.reconcile ? TickCellHelper.renderEmpty() : null}
       <td className="text-nowrap">{formatDate(opening.date)}</td>
       <td>Opening balance</td>
       <td className="text-end text-nowrap">{formatMoney(opening.amount, state.currency)}</td>
@@ -138,15 +159,21 @@ const LedgerTableHelper = {
    *
    * @param {{ledger: object, currency: string, editingId: (number|null), readOnly: boolean,
    *   busy: boolean, canDelete: boolean, canEditPaymentTransactions: boolean, page: number,
-   *   firstPageHref: string, renderRowExtra: Function}} state - Table state (`canDelete`:
+   *   firstPageHref: string, renderRowExtra: Function, reconcile: object}} state - Table state (`canDelete`:
    *   whether the caller's role may delete transactions; `canEditPaymentTransactions`: whether
    *   it may edit payment-generated ones); the optional `renderRowExtra(transaction)` adds content under a row's
    *   description (also on an archived account).
-   * @param {{onEdit: Function, onDeleteTransaction: Function}} handlers - Row handlers.
+   * @param {{onEdit: Function, onDeleteTransaction: Function, reconcile: object}} handlers -
+   *   Row handlers (`reconcile.onToggle` ticks a row). With `state.reconcile` (reconcile mode:
+   *   `{ account, statement, ticked, onlyUncleared }`) a leading Cleared checkbox column is
+   *   added, ineligible rows are dimmed and the opening row has no checkbox.
    * @returns {React.ReactElement} The rendered ledger.
    */
   render(state, handlers) {
-    const { transactions, opening } = state.ledger;
+    const { opening } = state.ledger;
+    const transactions = state.reconcile
+      ? visibleRows(state.ledger.transactions, state.reconcile, state.reconcile.onlyUncleared)
+      : state.ledger.transactions;
 
     if (transactions.length === 0 && !opening) {
       return (
@@ -162,6 +189,7 @@ const LedgerTableHelper = {
       <Table responsive size="sm">
         <thead>
           <tr>
+            {state.reconcile ? TickCellHelper.renderHeader() : null}
             <th>Date</th>
             <th>Description</th>
             <th className="text-end">Amount</th>

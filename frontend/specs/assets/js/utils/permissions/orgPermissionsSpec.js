@@ -32,6 +32,7 @@ describe('orgPermissions', () => {
     const MATRIX = [
       [ACTIONS.WRITE, { user: true, admin: true, owner: true }],
       [ACTIONS.UNDO_PAYMENT, { user: false, admin: true, owner: true }],
+      [ACTIONS.UNDO_RECONCILIATION, { user: false, admin: true, owner: true }],
       [ACTIONS.EDIT_PAYMENT_TRANSACTION, { user: false, admin: true, owner: true }],
       [ACTIONS.MANAGE_ACCOUNTS, { user: false, admin: true, owner: true }],
       [ACTIONS.RENAME_ORGANIZATION, { user: false, admin: true, owner: true }],

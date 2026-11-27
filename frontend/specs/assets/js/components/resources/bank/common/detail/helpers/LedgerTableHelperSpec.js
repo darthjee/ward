@@ -177,4 +177,71 @@ describe('LedgerTableHelper', () => {
 
     expect(page.containsInOrder('02/05/2026', 'Coffee', '01/05/2026', 'Salary')).toBeTrue();
   });
+
+  describe('in reconcile mode', () => {
+    const ACCOUNT = { opening_date: '2026-01-01' };
+    const STATEMENT = { id: 4, statement_date: '2026-05-01' };
+
+    function reconcileState(extra = {}) {
+      return {
+        account: ACCOUNT, statement: STATEMENT, ticked: new Map(), onlyUncleared: false, ...extra,
+      };
+    }
+
+    function reconcileOutput(extra, overrides) {
+      handlers.reconcile = { onToggle: jasmine.createSpy('onToggle') };
+
+      return renderedOutput(LedgerTableHelper.render(state({ reconcile: reconcileState(extra), ...overrides }), handlers));
+    }
+
+    it('adds the Cleared column only in reconcile mode', () => {
+      expect(reconcileOutput().containsInOrder('Cleared', 'Date')).toBeTrue();
+      expect(output().contains('Cleared')).toBeFalse();
+      expect(output().contains('type="checkbox"')).toBeFalse();
+    });
+
+    it('enables the checkbox of an eligible row', () => {
+      const page = reconcileOutput({ ticked: new Map([[1, true]]) });
+
+      expect(page.contains('aria-label="Tick Salary" checked=""')).toBeTrue();
+      expect(page.contains('aria-label="Tick Coffee"')).toBeTrue();
+    });
+
+    it('disables the checkbox of an ineligible row and dims it', () => {
+      const page = reconcileOutput({ statement: { id: 4, statement_date: '2026-05-01' } });
+
+      expect(page.containsInOrder('class="text-muted opacity-50"', 'Coffee')).toBeTrue();
+      expect(page.containsInOrder('aria-label="Tick Coffee"', 'disabled=""')).toBeTrue();
+    });
+
+    it('does not dim an eligible row', () => {
+      expect(reconcileOutput().containsInOrder('Salary', 'opacity-50')).toBeFalse();
+    });
+
+    it('has no checkbox on the opening row', () => {
+      const page = reconcileOutput({}, { ledger: { transactions: [], opening: OPENING } });
+
+      expect(page.containsTag('input')).toBeFalse();
+      expect(page.contains('Opening balance')).toBeTrue();
+    });
+
+    it('calls the toggle handler from the checkbox', () => {
+      handlers.reconcile = { onToggle: jasmine.createSpy('onToggle') };
+      const tree = LedgerTableHelper.render(state({ reconcile: reconcileState() }), handlers);
+      const [checkbox] = findAll(tree, (node) => node.props?.['aria-label'] === 'Tick Salary');
+
+      checkbox.props.onChange();
+
+      expect(handlers.reconcile.onToggle).toHaveBeenCalledWith(ROWS[1]);
+    });
+
+    it('hides the cleared and ticked rows when Show only uncleared is on', () => {
+      const rows = [{ ...ROWS[0], reconciliation: { id: 1 } }, { ...ROWS[1], reconciliation: { id: 4 } }, { ...ROWS[0], id: 3, description: 'Rent', reconciliation: null }];
+      const page = reconcileOutput({ onlyUncleared: true }, { ledger: { transactions: rows, opening: null } });
+
+      expect(page.contains('Rent')).toBeTrue();
+      expect(page.contains('Salary')).toBeFalse();
+      expect(page.contains('Coffee')).toBeFalse();
+    });
+  });
 });
