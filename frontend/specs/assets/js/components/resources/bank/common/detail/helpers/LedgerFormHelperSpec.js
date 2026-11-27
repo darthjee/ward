@@ -1,4 +1,4 @@
-import LedgerFormHelper from '../../../../../../../../../assets/js/components/resources/bank/common/detail/helpers/LedgerFormHelper.jsx';
+import LedgerFormHelper, { CLEARED_HINT } from '../../../../../../../../../assets/js/components/resources/bank/common/detail/helpers/LedgerFormHelper.jsx';
 import { initialLedgerForm } from '../../../../../../../../../assets/js/components/resources/bank/common/detail/hooks/useLedgerForm.js';
 import { classifyError } from '../../../../../../../../../assets/js/components/resources/bank/common/bankErrors.js';
 import ApiError from '../../../../../../../../../assets/js/client/ApiError.js';
@@ -87,5 +87,62 @@ describe('LedgerFormHelper', () => {
     expect(handlers.onDirectionChange).toHaveBeenCalledWith('in');
     expect(handlers.onCancelEdit).toHaveBeenCalled();
     expect(handlers.onToggleNotes).toHaveBeenCalled();
+  });
+
+  describe('locked fields on a cleared row', () => {
+    const cleared = { id: 3, description: 'Coffee', reconciliation: { id: 2, status: 'finished', statement_date: '2026-03-31' } };
+
+    function controls(form) {
+      const tree = LedgerFormHelper.render(state(form), handlers);
+      const named = (name) => findAll(tree, (node) => node.props?.name === name)[0];
+      const directionButtons = findAll(tree, (node) => node.props?.['aria-pressed'] !== undefined);
+
+      return { named, directionButtons };
+    }
+
+    it('makes date and amount read-only and disables the direction toggle', () => {
+      const { named, directionButtons } = controls({ editing: cleared });
+
+      expect(named('date').props.readOnly).toBeTrue();
+      expect(named('amount').props.readOnly).toBeTrue();
+      expect(directionButtons.length).toBe(2);
+      directionButtons.forEach((button) => expect(button.props.disabled).toBeTrue());
+    });
+
+    it('keeps description and notes editable', () => {
+      const { named } = controls({ editing: cleared, notesOpen: true });
+
+      expect(named('description').props.readOnly).toBeUndefined();
+      expect(named('notes').props.readOnly).toBeUndefined();
+    });
+
+    it('shows the hint', () => {
+      expect(output({ editing: cleared }).contains(CLEARED_HINT)).toBeTrue();
+    });
+
+    it('locks nothing when editing an uncleared row', () => {
+      const { named, directionButtons } = controls({ editing: { id: 3, description: 'Coffee', reconciliation: null } });
+
+      expect(named('date').props.readOnly).toBeFalse();
+      expect(named('amount').props.readOnly).toBeFalse();
+      directionButtons.forEach((button) => expect(button.props.disabled).toBeFalse());
+      expect(output({ editing: { id: 3, description: 'Coffee', reconciliation: null } }).contains(CLEARED_HINT)).toBeFalse();
+    });
+
+    it('locks nothing when editing a row on an open statement', () => {
+      const open = { id: 3, description: 'Coffee', reconciliation: { id: 4, status: 'open', statement_date: '2026-04-30' } };
+      const { named } = controls({ editing: open });
+
+      expect(named('date').props.readOnly).toBeFalse();
+      expect(named('amount').props.readOnly).toBeFalse();
+    });
+
+    it('locks nothing on the create form', () => {
+      const { named, directionButtons } = controls();
+
+      expect(named('date').props.readOnly).toBeFalse();
+      expect(named('amount').props.readOnly).toBeFalse();
+      directionButtons.forEach((button) => expect(button.props.disabled).toBeFalse());
+    });
   });
 });
