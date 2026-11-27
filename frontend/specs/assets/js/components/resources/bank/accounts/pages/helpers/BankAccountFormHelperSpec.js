@@ -24,6 +24,7 @@ function output(state = {}) {
     defaultCurrency: 'BRL',
     settingsFailed: false,
     currencyLocked: false,
+    openingLocked: false,
     archived: false,
     idPrefix: 'acc-',
     ...state,

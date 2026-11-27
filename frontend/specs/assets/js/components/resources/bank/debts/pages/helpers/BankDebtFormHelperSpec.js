@@ -1,6 +1,7 @@
 import BankDebtFormHelper, {
   ARCHIVED_NOTICE,
 } from '../../../../../../../../../assets/js/components/resources/bank/debts/pages/helpers/BankDebtFormHelper.jsx';
+import { OPENING_LOCKED_HINT } from '../../../../../../../../../assets/js/components/resources/bank/common/form/helpers/AccountFormHelper.jsx';
 import { emptyDebtFields } from '../../../../../../../../../assets/js/components/resources/bank/debts/pages/controllers/debtFormFields.js';
 import { renderedOutput } from '../../../../../../../../support/renderedOutput.js';
 
@@ -20,6 +21,7 @@ function output(fields = {}, state = {}) {
     defaultCurrency: 'BRL',
     settingsFailed: false,
     currencyLocked: false,
+    openingLocked: false,
     archived: false,
     idPrefix: 'debt-',
     payingAccounts: [{ id: 3, name: 'Main BRL', currency: 'BRL' }, { id: 4, name: 'Main USD', currency: 'USD' }],
@@ -95,5 +97,16 @@ describe('BankDebtFormHelper', () => {
     expect(page.contains('Interest rate')).toBeFalse();
     expect(page.contains('Bills from')).toBeFalse();
     expect(page.contains('Creditor')).toBeFalse();
+  });
+
+  it('makes Loan date and Amount owed read-only, with the hint, when the opening fields are locked', () => {
+    const page = output({}, { openingLocked: true });
+
+    expect(page.containsInOrder('id="debt-opening_date"', 'readOnly=""', 'id="debt-opening_balance"', 'readOnly=""')).toBeTrue();
+    expect(page.contains(OPENING_LOCKED_HINT.replace("'", '&#x27;'))).toBeTrue();
+  });
+
+  it('leaves Loan date and Amount owed editable otherwise', () => {
+    expect(output().contains('readOnly')).toBeFalse();
   });
 });

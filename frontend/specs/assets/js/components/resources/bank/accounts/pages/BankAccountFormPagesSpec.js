@@ -96,6 +96,8 @@ describe('bank account form pages', () => {
       expect(options.cancelHref).toBe('#/orgs/5/bank/accounts/12');
       expect(state.fields).toBeNull();
       expect(state.archived).toBeFalse();
+      expect(state.openingLocked).toBeFalse();
+      expect(state.currencyLocked).toBeFalse();
     });
 
     it('does not submit before the account is loaded', () => {

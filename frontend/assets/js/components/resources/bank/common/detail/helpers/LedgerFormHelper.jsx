@@ -1,5 +1,19 @@
 import Button from 'react-bootstrap/cjs/Button.js';
 import BankErrorAlert from '../../BankErrorAlert.jsx';
+import { isCleared } from '../../reconciliation/controllers/eligibility.js';
+
+export const CLEARED_HINT = 'Cleared on a reconciled statement — undo the statement to change amount or date.';
+
+/**
+ * Whether the form is editing a row cleared by a finished statement (its amount and date are
+ * locked).
+ *
+ * @param {{editing: (object|null)}} form - The form state.
+ * @returns {boolean} True when the edited row is cleared.
+ */
+function isLocked(form) {
+  return Boolean(form.editing) && isCleared(form.editing);
+}
 
 /**
  * Read an own property of a possibly-missing object, without bracket access.
@@ -15,14 +29,14 @@ function readField(source, name) {
 /**
  * Render one labelled control with its inline error.
  *
- * @param {{name: string, label: string, type: string, extra: object, className: string}} field -
- *   The field.
+ * @param {{name: string, label: string, type: string, extra: object, className: string,
+ *   hint: string}} field - The field (`hint`: optional help text under the input).
  * @param {object} state - Form state.
  * @param {Function} onChange - Change handler (reads the input's `name`).
  * @returns {React.ReactElement} The control.
  */
 function renderControl({
-  name, label, type = 'text', extra = {}, className = 'col-md',
+  name, label, type = 'text', extra = {}, className = 'col-md', hint,
 }, state, onChange) {
   const error = readField(state.form.fieldErrors, name);
   const id = `${state.idPrefix}${name}`;
@@ -41,6 +55,7 @@ function renderControl({
         {...extra}
       />
       {error && <div className="invalid-feedback">{error}</div>}
+      {hint && <div className="form-text">{hint}</div>}
     </div>
   );
 }
@@ -50,14 +65,16 @@ function renderControl({
  *
  * @param {string} direction - `'out'` or `'in'`.
  * @param {Function} onDirectionChange - Called with the picked direction.
+ * @param {boolean} locked - Whether the toggle is disabled (flipping it changes the amount's sign).
  * @returns {React.ReactElement} The toggle.
  */
-function renderDirection(direction, onDirectionChange) {
+function renderDirection(direction, onDirectionChange, locked) {
   const button = (value, label) => (
     <Button
       size="sm"
       variant={direction === value ? 'secondary' : 'outline-secondary'}
       aria-pressed={direction === value}
+      disabled={locked}
       onClick={() => onDirectionChange(value)}
     >
       {label}
@@ -132,6 +149,7 @@ const LedgerFormHelper = {
    */
   render(state, handlers) {
     const { form } = state;
+    const locked = isLocked(form);
     const title = form.editing ? `Editing “${form.editing.description}”` : 'New transaction';
 
     return (
@@ -140,11 +158,11 @@ const LedgerFormHelper = {
         <BankErrorAlert error={form.error} />
         <div className="row g-2 align-items-start">
           {renderControl({
-            name: 'date', label: 'Date', type: 'date', extra: { max: state.today }, className: 'col-md-auto',
+            name: 'date', label: 'Date', type: 'date', extra: { max: state.today, readOnly: locked }, className: 'col-md-auto',
           }, state, handlers.onFieldChange)}
-          {renderDirection(form.values.direction, handlers.onDirectionChange)}
+          {renderDirection(form.values.direction, handlers.onDirectionChange, locked)}
           {renderControl({
-            name: 'amount', label: 'Amount', extra: { inputMode: 'decimal' }, className: 'col-md-2',
+            name: 'amount', label: 'Amount', extra: { inputMode: 'decimal', readOnly: locked }, className: 'col-md-2', hint: locked ? CLEARED_HINT : null,
           }, state, handlers.onFieldChange)}
           {renderControl({ name: 'description', label: 'Description' }, state, handlers.onFieldChange)}
         </div>

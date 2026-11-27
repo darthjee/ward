@@ -1,5 +1,5 @@
 import {
-  eligibleIds, isEligible, isTicked, visibleRows,
+  eligibleIds, isCleared, isEligible, isTicked, visibleRows,
 } from '../../../../../../../../../assets/js/components/resources/bank/common/reconciliation/controllers/eligibility.js';
 
 const ACCOUNT = { opening_date: '2026-01-01' };
@@ -68,6 +68,20 @@ describe('eligibility', () => {
       const rows = [row(1, '2026-02-10'), row(2, '2026-05-01'), row(3, '2026-02-11', { id: 2 }), row(4, '2026-03-01', { id: 4 })];
 
       expect(eligibleIds(rows, CTX)).toEqual([1, 4]);
+    });
+  });
+
+  describe('isCleared', () => {
+    it('is true for a row on a finished statement', () => {
+      expect(isCleared(row(1, '2026-02-10', { id: 2, status: 'finished' }))).toBeTrue();
+    });
+
+    it('is false for a row on an open statement', () => {
+      expect(isCleared(row(1, '2026-02-10', { id: 4, status: 'open' }))).toBeFalse();
+    });
+
+    it('is false for an uncleared row', () => {
+      expect(isCleared(row(1, '2026-02-10'))).toBeFalse();
     });
   });
 

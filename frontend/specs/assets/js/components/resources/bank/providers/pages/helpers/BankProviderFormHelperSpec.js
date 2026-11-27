@@ -21,6 +21,7 @@ function output(state = {}, fields = {}) {
     defaultCurrency: 'BRL',
     settingsFailed: false,
     currencyLocked: false,
+    openingLocked: false,
     archived: false,
     idPrefix: 'prov-',
     ...state,

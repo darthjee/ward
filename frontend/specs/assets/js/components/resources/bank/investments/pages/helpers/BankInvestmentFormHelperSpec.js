@@ -1,6 +1,7 @@
 import BankInvestmentFormHelper, {
   ARCHIVED_NOTICE,
 } from '../../../../../../../../../assets/js/components/resources/bank/investments/pages/helpers/BankInvestmentFormHelper.jsx';
+import { OPENING_LOCKED_HINT } from '../../../../../../../../../assets/js/components/resources/bank/common/form/helpers/AccountFormHelper.jsx';
 import { emptyInvestmentFields } from '../../../../../../../../../assets/js/components/resources/bank/investments/pages/controllers/investmentFormFields.js';
 import { renderedOutput } from '../../../../../../../../support/renderedOutput.js';
 
@@ -20,6 +21,7 @@ function output(fields = {}, state = {}) {
     defaultCurrency: 'BRL',
     settingsFailed: false,
     currencyLocked: false,
+    openingLocked: false,
     archived: false,
     idPrefix: 'inv-',
     ...state,
@@ -88,5 +90,13 @@ describe('BankInvestmentFormHelper', () => {
     expect(page.contains(ARCHIVED_NOTICE)).toBeTrue();
     expect(page.contains('Kind')).toBeFalse();
     expect(page.contains('Institution')).toBeFalse();
+  });
+
+  it('locks only the start date, with the hint, when the opening fields are locked', () => {
+    const page = output({}, { openingLocked: true });
+
+    expect(page.containsInOrder('id="inv-opening_date"', 'readOnly=""')).toBeTrue();
+    expect(page.contains('name="opening_balance"')).toBeFalse();
+    expect(page.contains(OPENING_LOCKED_HINT.replace("'", '&#x27;'))).toBeTrue();
   });
 });

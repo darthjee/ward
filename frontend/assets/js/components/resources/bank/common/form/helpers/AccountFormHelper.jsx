@@ -9,6 +9,12 @@ export const SETTINGS_WARNING = 'Could not load the default currency. Please cho
 /** Notice shown on an archived account's edit page. */
 export const ARCHIVED_NOTICE = 'This account is archived: only its name can change.';
 
+/** Hint shown under the opening fields while statements exist. */
+export const OPENING_LOCKED_HINT = "Opening date and balance can't change while statements exist — cancel or undo the statements first.";
+
+/** Hint shown under the locked currency when the lock comes from statements. */
+export const CURRENCY_RECONCILED_HINT = "Currency can't change once the account has statements.";
+
 /** Default labels of the common fields; sections override some (e.g. Debts' "Creditor"). */
 const DEFAULT_LABELS = new Map([
   ['name', 'Name'],
@@ -73,11 +79,21 @@ function renderOpeningBalance(state, onChange, labels, omit) {
     <AccountFormInput
       name="opening_balance"
       label={labels.get('opening_balance')}
-      extra={{ inputMode: 'decimal' }}
+      extra={{ inputMode: 'decimal', readOnly: Boolean(state.openingLocked) }}
       state={state}
       onChange={onChange}
     />
   );
+}
+
+/**
+ * Render the hint under the opening fields, only while they are locked.
+ *
+ * @param {{openingLocked: boolean}} state - Form state.
+ * @returns {React.ReactElement|null} The hint, or `null`.
+ */
+function renderOpeningHint({ openingLocked }) {
+  return openingLocked ? <div className="form-text mb-3">{OPENING_LOCKED_HINT}</div> : null;
 }
 
 /**
@@ -105,6 +121,7 @@ function renderFullFields(state, handlers, options) {
         defaultCode={state.defaultCurrency}
         onChange={handlers.onCurrencyChange}
         locked={state.currencyLocked}
+        lockedHint={state.currencyLockReason === 'reconciled' ? CURRENCY_RECONCILED_HINT : undefined}
         error={readField(state.fieldErrors, 'currency') ?? null}
         idPrefix={state.idPrefix}
       />
@@ -112,11 +129,12 @@ function renderFullFields(state, handlers, options) {
         name="opening_date"
         label={labels.get('opening_date')}
         type="date"
-        extra={{ max: localToday() }}
+        extra={{ max: localToday(), readOnly: Boolean(state.openingLocked) }}
         state={state}
         onChange={onFieldChange}
       />
       {renderOpeningBalance(state, onFieldChange, labels, options.omitOpeningBalance)}
+      {renderOpeningHint(state)}
       {renderSlot(options.renderExtraFields, state, handlers)}
       <AccountFormInput name="notes" label={labels.get('notes')} type="textarea" state={state} onChange={onFieldChange} />
     </>
@@ -173,8 +191,10 @@ const AccountFormHelper = {
    *
    * @param {{fields: (object|null), fieldErrors: object, submitError: (object|null),
    *   loadError: (object|null), pending: boolean, defaultCurrency: (string|null),
-   *   settingsFailed: boolean, currencyLocked: boolean, archived: boolean, idPrefix: string}}
-   *   state - Form state.
+   *   settingsFailed: boolean, currencyLocked: boolean, currencyLockReason: (string|null),
+   *   openingLocked: boolean, archived: boolean, idPrefix: string}} state - Form state
+   *   (`openingLocked`: the opening date and balance are read-only, with a hint; `currencyLockReason`:
+   *   `'reconciled'` swaps the locked-currency hint for a statement-specific one).
    * @param {{onSubmit: Function, onFieldChange: Function, onCurrencyChange: Function,
    *   onRetry: Function, onDismiss: Function, onRetryLoad: Function}} handlers - Event handlers.
    * @param {{heading: string, submitLabel: string, cancelHref: string, labels: object,

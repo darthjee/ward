@@ -3,7 +3,9 @@ import Button from 'react-bootstrap/cjs/Button.js';
 import { formatMoney } from '../../amounts.js';
 import { formatDate } from '../../dates.js';
 import TickCellHelper from '../../reconciliation/helpers/TickCellHelper.jsx';
-import { visibleRows } from '../../reconciliation/controllers/eligibility.js';
+import { isCleared, visibleRows } from '../../reconciliation/controllers/eligibility.js';
+import ClearedMarker from '../../reconciliation/ClearedMarker.jsx';
+import UnreconciledWarningBadge from '../../reconciliation/UnreconciledWarningBadge.jsx';
 
 /**
  * Render a transaction's notes, read-only, beneath its description.
@@ -20,7 +22,7 @@ function renderNotes(notes) {
 }
 
 /**
- * Render a row's Delete button, offered only to a role that may delete.
+ * Render a row's Delete button, offered only to a role that may delete, and never on a cleared row.
  *
  * @param {object} transaction - The ledger row.
  * @param {{canDelete: boolean, busy: boolean}} state - Table state.
@@ -28,7 +30,7 @@ function renderNotes(notes) {
  * @returns {React.ReactElement|null} The button, or `null`.
  */
 function renderDelete(transaction, { canDelete, busy }, handlers) {
-  if (!canDelete) {
+  if (!canDelete || isCleared(transaction)) {
     return null;
   }
 
@@ -115,6 +117,8 @@ function renderRow(transaction, state, handlers) {
       <td className="text-break">
         {transaction.description}
         {renderNotes(transaction.notes)}
+        <ClearedMarker transaction={transaction} />
+        <UnreconciledWarningBadge transaction={transaction} lastReconciledDate={state.ledger.last_reconciled_date} />
         {state.renderRowExtra ? state.renderRowExtra(transaction) : null}
       </td>
       <td className="text-end text-nowrap">{formatMoney(transaction.amount, state.currency)}</td>

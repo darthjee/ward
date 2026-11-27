@@ -1,5 +1,6 @@
 import Button from 'react-bootstrap/cjs/Button.js';
 import { formatMoney } from '../../amounts.js';
+import LastReconciledLine from '../LastReconciledLine.jsx';
 import { contextHash } from '../../../../../../utils/context/ownerContext.js';
 
 /** Banner shown on an archived account. */
@@ -102,7 +103,8 @@ const AccountHeaderHelper = {
    * Render the account header: the archived banner, the name, the actions — Edit (Rename when
    * archived) linking to `<base>/:id/edit` and Archive / Unarchive when the role manages
    * accounts, and Delete only when the account is active, has no transactions and the role may
-   * delete —, the current balance, then the section's own details block.
+   * delete —, the current balance, the last reconciled line (when reconciled), then the section's own
+   * details block.
    *
    * @param {{account: object, hasTransactions: boolean, actionPending: (string|null),
    *   context: object, base: string, details: React.ReactNode, canManageAccounts: boolean,
@@ -136,6 +138,7 @@ const AccountHeaderHelper = {
           {' '}
           <strong>{formatMoney(account.balance, account.currency)}</strong>
         </p>
+        <LastReconciledLine account={account} />
         {details}
       </>
     );
