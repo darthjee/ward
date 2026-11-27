@@ -9,6 +9,7 @@ export const ROLES = Object.freeze({
 export const ACTIONS = Object.freeze({
   WRITE: 'write',
   UNDO_PAYMENT: 'undo_payment',
+  UNDO_RECONCILIATION: 'undo_reconciliation',
   EDIT_PAYMENT_TRANSACTION: 'edit_payment_transaction',
   MANAGE_ACCOUNTS: 'manage_accounts',
   RENAME_ORGANIZATION: 'rename_organization',
@@ -24,6 +25,7 @@ const ROLE_RANK = new Map([
 const MIN_ROLE = new Map([
   [ACTIONS.WRITE, ROLES.USER],
   [ACTIONS.UNDO_PAYMENT, ROLES.ADMIN],
+  [ACTIONS.UNDO_RECONCILIATION, ROLES.ADMIN],
   [ACTIONS.EDIT_PAYMENT_TRANSACTION, ROLES.ADMIN],
   [ACTIONS.MANAGE_ACCOUNTS, ROLES.ADMIN],
   [ACTIONS.RENAME_ORGANIZATION, ROLES.ADMIN],
