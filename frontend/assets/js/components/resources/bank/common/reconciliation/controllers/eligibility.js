@@ -37,6 +37,16 @@ export function isTicked(row, { statement, ticked }) {
 }
 
 /**
+ * Whether a row is cleared by a finished statement (a row on an open statement is not).
+ *
+ * @param {object} row - The ledger row.
+ * @returns {boolean} True when the row is cleared.
+ */
+export function isCleared(row) {
+  return row.reconciliation?.status === 'finished';
+}
+
+/**
  * The ids of the eligible rows.
  *
  * @param {Array<object>} rows - The ledger rows.
