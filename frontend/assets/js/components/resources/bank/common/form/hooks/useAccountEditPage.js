@@ -7,22 +7,62 @@ import Router from '../../../../../../utils/routing/Router.js';
 import { currentHash } from '../../currentHash.js';
 import { guardAccountType } from '../../detail/accountTypeGuard.js';
 
+const NO_LOCKS = { currencyLocked: false, openingLocked: false, currencyLockReason: null };
+
+/**
+ * Derive the locks of the edit form from the loaded account and its ledger.
+ *
+ * @description The opening date and balance lock once the account has a statement (finished or
+ * open). The currency locks with the first transaction, or once a statement exists, even with
+ * no transactions, because the server answers `409 CURRENCY_LOCKED` as soon as one exists.
+ * @param {{last_reconciliation: (object|null), open_reconciliation_id: (number|null)}} account -
+ *   The account detail.
+ * @param {{pagination: {total_count: number}}} ledger - Ledger page 1.
+ * @returns {{currencyLocked: boolean, openingLocked: boolean,
+ *   currencyLockReason: (string|null)}} The locks (`currencyLockReason`: `'reconciled'`,
+ *   `'transactions'` or `null`).
+ */
+export function editLocks(account, ledger) {
+  const reconciled = Boolean(account.last_reconciliation || account.open_reconciliation_id);
+  const hasTransactions = ledger.pagination.total_count > 0;
+  let currencyLockReason = null;
+
+  if (reconciled) {
+    currencyLockReason = 'reconciled';
+  } else if (hasTransactions) {
+    currencyLockReason = 'transactions';
+  }
+
+  return { currencyLocked: hasTransactions || reconciled, openingLocked: reconciled, currencyLockReason };
+}
+
 /**
  * Merge a (re)loaded account into the form: the first load fills every field; a reload (after
- * a `409`) keeps the user's values but resets a now-locked currency.
+ * a `409`) keeps the user's values but resets a now-locked currency and now-locked opening
+ * fields.
  *
  * @param {object|null} fields - The current fields.
  * @param {object} account - The loaded account.
  * @param {boolean} locked - Whether the currency is locked.
  * @param {Function} [fieldsFrom] - Builds the form fields of an account.
+ * @param {boolean} [openingLocked] - Whether the opening date and balance are locked.
  * @returns {object} The next fields.
  */
-export function mergeLoadedAccount(fields, account, locked, fieldsFrom = fieldsFromAccount) {
+export function mergeLoadedAccount(fields, account, locked, fieldsFrom = fieldsFromAccount, openingLocked = false) {
   if (!fields) {
     return fieldsFrom(account);
   }
 
-  return locked ? { ...fields, currency: account.currency } : fields;
+  if (!locked && !openingLocked) {
+    return fields;
+  }
+
+  const fresh = openingLocked ? fieldsFrom(account) : {};
+  const opening = Object.fromEntries(
+    ['opening_date', 'opening_balance'].filter((name) => name in fresh).map((name) => [name, fresh[name]]),
+  );
+
+  return { ...fields, ...(locked ? { currency: account.currency } : {}), ...opening };
 }
 
 /**
@@ -50,7 +90,7 @@ export default function useAccountEditPage(Controller, { base, fieldsFrom, idPre
   const { forbidden, allowed } = useManageAccountsGate();
   const [accountId] = useState(() => Router.extractContextParams(`${base}/:accountId/edit`, currentHash()).accountId);
   const [account, setAccount] = useState(null);
-  const [locked, setLocked] = useState(false);
+  const [locks, setLocks] = useState(NO_LOCKS);
   const [loadError, setLoadError] = useState(null);
   const [attempt, setAttempt] = useState(0);
   const loader = useMemo(() => new BankAccountLoader(), []);
@@ -65,12 +105,12 @@ export default function useAccountEditPage(Controller, { base, fieldsFrom, idPre
 
   useEffect(() => (forbidden ? undefined : buildBankAccountLoadEffect(loader, context, accountId, 1, guardAccountType({
     onLoaded: ({ account: loaded, ledger }) => {
-      const hasTransactions = ledger.pagination.total_count > 0;
+      const next = editLocks(loaded, ledger);
 
       setAccount(loaded);
-      setLocked(hasTransactions);
+      setLocks(next);
       setLoadError(null);
-      setFields((fields) => mergeLoadedAccount(fields, loaded, hasTransactions, fieldsFrom));
+      setFields((fields) => mergeLoadedAccount(fields, loaded, next.currencyLocked, fieldsFrom, next.openingLocked));
     },
     onNotFound: () => setNotFound(true),
     onError: setLoadError,
@@ -93,7 +133,9 @@ export default function useAccountEditPage(Controller, { base, fieldsFrom, idPre
       pending: form.pending,
       defaultCurrency: account?.currency ?? null,
       settingsFailed: false,
-      currencyLocked: locked,
+      currencyLocked: locks.currencyLocked,
+      currencyLockReason: locks.currencyLockReason,
+      openingLocked: locks.openingLocked,
       archived: Boolean(account?.archived_at),
       idPrefix,
     },
