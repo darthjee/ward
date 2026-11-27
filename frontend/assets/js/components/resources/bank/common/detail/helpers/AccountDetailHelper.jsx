@@ -6,6 +6,8 @@ import LedgerFormHelper from './LedgerFormHelper.jsx';
 import LedgerTableHelper from './LedgerTableHelper.jsx';
 import { contextHash } from '../../../../../../utils/context/ownerContext.js';
 import { ledgerPageHref } from '../ledgerPageHref.js';
+import ReconcileSectionHelper from '../../reconciliation/helpers/ReconcileSectionHelper.jsx';
+import { ledgerReconcile } from '../../reconciliation/helpers/reconcileLayout.js';
 
 /**
  * Render a section slot, or nothing when the section has none.
@@ -148,8 +150,12 @@ function renderLoaded(state, handlers, options) {
         context: state.context,
         canManageAccounts: state.canManageAccounts,
         canDelete: state.canDelete,
+        reconcile: state.reconcile,
       }, handlers)}
       {renderSlot(options.renderAfterHeader, account, handlers, state)}
+      {ReconcileSectionHelper.render({
+        account, today: localToday(), rows: ledger.transactions, reconcile: state.reconcile,
+      }, handlers.reconcile)}
       <BankErrorAlert error={state.error} onRetry={handlers.onRetry} onDismiss={handlers.onDismiss} />
       <h2 className="h4 mt-4">Ledger</h2>
       {renderSlot(options.renderShortcuts, account, handlers, state)}
@@ -165,6 +171,7 @@ function renderLoaded(state, handlers, options) {
         page: state.page,
         firstPageHref: hrefFor(1),
         renderRowExtra: bindRowExtra(options.renderRowExtra, handlers, state),
+        reconcile: ledgerReconcile(state.reconcile, account),
       }, handlers)}
       <BankPagination
         page={state.page}
@@ -208,7 +215,7 @@ const AccountDetailHelper = {
    *   data: ({account: object, ledger: object}|null), loadError: (object|null),
    *   error: (object|null), form: object, actionPending: (string|null),
    *   confirmation: (object|null), canManageAccounts: boolean, canDelete: boolean,
-   *   canEditPaymentTransactions: boolean}} state -
+   *   canEditPaymentTransactions: boolean, reconcile: object}} state -
    *   Page state, including the caller's permissions.
    * @param {object} handlers - Page handlers (see `buildDetailHandlers`).
    * @param {{base: string, backLabel: string, renderHeader: Function,

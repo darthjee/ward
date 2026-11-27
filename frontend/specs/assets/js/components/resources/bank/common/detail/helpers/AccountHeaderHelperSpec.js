@@ -9,7 +9,9 @@ const ACCOUNT = {
   id: 7, name: 'Car loan', currency: 'BRL', balance: '-9500.00', archived_at: null,
 };
 const noop = () => undefined;
-const HANDLERS = { onArchive: noop, onUnarchive: noop, onDeleteAccount: noop };
+const HANDLERS = {
+  onArchive: noop, onUnarchive: noop, onDeleteAccount: noop, reconcile: { onReconcile: noop },
+};
 
 function output(state = {}, account = {}) {
   return renderedOutput(AccountHeaderHelper.render({
@@ -23,6 +25,23 @@ function output(state = {}, account = {}) {
     canDelete: true,
     ...state,
   }, HANDLERS));
+}
+
+function findAll(node, predicate, acc = []) {
+  if (Array.isArray(node)) {
+    node.forEach((child) => findAll(child, predicate, acc));
+    return acc;
+  }
+
+  if (!node || typeof node !== 'object') {
+    return acc;
+  }
+
+  if (predicate(node)) {
+    acc.push(node);
+  }
+
+  return findAll(node.props?.children, predicate, acc);
 }
 
 describe('AccountHeaderHelper', () => {
@@ -92,5 +111,57 @@ describe('AccountHeaderHelper', () => {
 
   it('escapes the name', () => {
     expect(output({}, { name: '<img src=x>' }).containsTag('img')).toBeFalse();
+  });
+
+  describe('reconcile button', () => {
+    const RECONCILE = { canWrite: true, pending: false };
+
+    function buttons(state, account, handlers = HANDLERS) {
+      const tree = AccountHeaderHelper.render({
+        account: { ...ACCOUNT, ...account },
+        hasTransactions: false,
+        actionPending: null,
+        context: { kind: 'personal' },
+        base: '/bank/debts',
+        canManageAccounts: true,
+        canDelete: true,
+        ...state,
+      }, handlers);
+
+      return findAll(tree, (node) => typeof node.props?.children === 'string'
+        && ['Reconcile', 'Continue reconciliation'].includes(node.props.children));
+    }
+
+    it('shows Reconcile to a role that may write', () => {
+      expect(output({ reconcile: RECONCILE }).contains('>Reconcile<')).toBeTrue();
+    });
+
+    it('shows Continue reconciliation when a statement is open', () => {
+      const page = output({ reconcile: RECONCILE }, { open_reconciliation_id: 4 });
+
+      expect(page.contains('>Continue reconciliation<')).toBeTrue();
+      expect(page.contains('>Reconcile<')).toBeFalse();
+    });
+
+    it('is hidden when the account is archived', () => {
+      expect(output({ reconcile: RECONCILE }, { archived_at: '2026-02-01T00:00:00.000Z' }).contains('Reconcile')).toBeFalse();
+    });
+
+    it('is hidden without the write permission', () => {
+      expect(output({ reconcile: { ...RECONCILE, canWrite: false } }).contains('Reconcile')).toBeFalse();
+    });
+
+    it('is hidden when the reconcile state is not given', () => {
+      expect(output().contains('Reconcile')).toBeFalse();
+    });
+
+    it('calls the handler on click', () => {
+      const onReconcile = jasmine.createSpy('onReconcile');
+      const [button] = buttons({ reconcile: RECONCILE }, {}, { ...HANDLERS, reconcile: { onReconcile } });
+
+      button.props.onClick();
+
+      expect(onReconcile).toHaveBeenCalled();
+    });
   });
 });

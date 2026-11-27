@@ -65,6 +65,26 @@ function renderDeleteButton(deletable, busy, onDelete) {
 }
 
 /**
+ * Render the Reconcile / Continue reconciliation button, offered on an active account to a
+ * role that may write.
+ *
+ * @param {{account: object, reconcile: ({canWrite: boolean}|undefined)}} state - Header state.
+ * @param {{reconcile: ({onReconcile: Function}|undefined)}} handlers - Action handlers.
+ * @returns {React.ReactElement|null} The button, or `null`.
+ */
+function renderReconcileButton({ account, reconcile }, handlers) {
+  if (account.archived_at || !reconcile?.canWrite) {
+    return null;
+  }
+
+  return (
+    <Button variant="outline-primary" onClick={handlers.reconcile.onReconcile} disabled={reconcile.pending}>
+      {account.open_reconciliation_id ? 'Continue reconciliation' : 'Reconcile'}
+    </Button>
+  );
+}
+
+/**
  * Render the archived banner.
  *
  * @param {boolean} archived - Whether the account is archived.
@@ -86,11 +106,12 @@ const AccountHeaderHelper = {
    *
    * @param {{account: object, hasTransactions: boolean, actionPending: (string|null),
    *   context: object, base: string, details: React.ReactNode, canManageAccounts: boolean,
-   *   canDelete: boolean}} state - The account, the "has transactions" signal, the in-flight
+   *   canDelete: boolean, reconcile: object}} state - The account, the "has transactions" signal, the in-flight
    *   action, the owner context, the section base path, the details block (e.g. the regular
    *   `<dl>`, or the debt info block) and the caller's permissions.
-   * @param {{onArchive: Function, onUnarchive: Function, onDeleteAccount: Function}} handlers -
-   *   Action handlers.
+   * @param {{onArchive: Function, onUnarchive: Function, onDeleteAccount: Function,
+   *   reconcile: object}} handlers - Action handlers (`reconcile.onReconcile` opens the
+   *   reconcile mode).
    * @returns {React.ReactElement} The rendered header.
    */
   render(state, handlers) {
@@ -105,6 +126,7 @@ const AccountHeaderHelper = {
         {renderBanner(archived)}
         <div className="d-flex flex-wrap align-items-center gap-2 mb-3">
           <h1 className="me-auto mb-0 text-break">{account.name}</h1>
+          {renderReconcileButton(state, handlers)}
           {renderEditLink(state, archived)}
           {renderArchiveButton(Boolean(canManageAccounts), archived, busy, handlers)}
           {renderDeleteButton(Boolean(canDelete) && !archived && !hasTransactions, busy, handlers.onDeleteAccount)}

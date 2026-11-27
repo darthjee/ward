@@ -61,6 +61,7 @@ describe('AccountDetailHelper', () => {
       context: { kind: 'personal' },
       canManageAccounts: true,
       canDelete: true,
+      reconcile: undefined,
     }, HANDLERS);
   });
 
@@ -231,5 +232,58 @@ describe('AccountDetailHelper', () => {
     }), HANDLERS, options));
 
     expect(page.containsAttribute('href', '#/bank/things/3?page=1')).toBeTrue();
+  });
+
+  describe('reconcile mode', () => {
+    const STATEMENT = {
+      id: 4, statement_date: '2026-03-31', statement_balance: '10.00', cleared_balance: '10.00', difference: '0.00',
+    };
+    const RECONCILE = {
+      mode: 'active', statement: STATEMENT, ticked: new Map(), onlyUncleared: false, pending: false, error: null,
+      cancelConfirm: false, canWrite: true, canCancel: true,
+    };
+
+    function render(reconcile, extraOptions = {}) {
+      return renderedOutput(AccountDetailHelper.render(state({ reconcile }), HANDLERS, { ...options, ...extraOptions }));
+    }
+
+    it('renders the summary bar and the Cleared column in active mode', () => {
+      const page = render(RECONCILE);
+
+      expect(page.contains('aria-label="Reconciliation"')).toBeTrue();
+      expect(page.contains('Cleared')).toBeTrue();
+    });
+
+    it('renders the section after the header slot', () => {
+      const page = render(RECONCILE, { renderAfterHeader: () => 'AFTER-HEADER' });
+
+      expect(page.containsInOrder('HEADER', 'AFTER-HEADER', 'Reconciliation')).toBeTrue();
+    });
+
+    it('is gone once the mode is off', () => {
+      const page = render({ ...RECONCILE, mode: 'off', statement: null });
+
+      expect(page.contains('aria-label="Reconciliation"')).toBeFalse();
+      expect(page.contains('Cleared')).toBeFalse();
+    });
+
+    it('renders the statement form in form mode, without the checkbox column', () => {
+      const page = render({
+        ...RECONCILE, mode: 'form', formKind: 'start', fields: { statement_date: '2026-03-31', statement_balance: '' }, fieldErrors: {},
+      });
+
+      expect(page.contains('Start reconciliation')).toBeTrue();
+      expect(page.contains('>Cleared<')).toBeFalse();
+    });
+
+    it('keeps the inline transaction form in active mode', () => {
+      expect(render(RECONCILE).contains('id="ledger-description"')).toBeTrue();
+    });
+
+    it('passes the reconcile state to the header', () => {
+      render(RECONCILE);
+
+      expect(options.renderHeader.calls.mostRecent().args[0].reconcile).toBe(RECONCILE);
+    });
   });
 });
