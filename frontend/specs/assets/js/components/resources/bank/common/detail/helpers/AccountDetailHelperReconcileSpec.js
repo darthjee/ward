@@ -116,6 +116,31 @@ describe('AccountDetailHelper (reconciliation)', () => {
     });
   });
 
+  describe('last reconciled header data', () => {
+    const LAST = { statement_date: '2026-03-31', statement_balance: '10.00', reconciled_at: '2026-04-01T10:00:00.000Z' };
+
+    it('hands the header the account of the (reloaded) page data, so a finish or an undo refreshes the line', () => {
+      const reconciled = { ...ACCOUNT, last_reconciliation: LAST };
+
+      AccountDetailHelper.render(state({ data: { account: reconciled, ledger: LEDGER } }), HANDLERS, options);
+      expect(options.renderHeader.calls.mostRecent().args[0].account.last_reconciliation).toBe(LAST);
+
+      AccountDetailHelper.render(state({ data: { account: { ...ACCOUNT, last_reconciliation: null }, ledger: LEDGER } }), HANDLERS, options);
+      expect(options.renderHeader.calls.mostRecent().args[0].account.last_reconciliation).toBeNull();
+    });
+
+    it('reloads the account after an undo', () => {
+      const handlers = {
+        reconcile: { onReset: noop }, onRetryLoad: jasmine.createSpy('onRetryLoad'),
+      };
+      const [history] = findAll(AccountDetailHelper.render(state(), handlers, options), (node) => node.props?.historyVersion !== undefined);
+
+      history.props.onUndone();
+
+      expect(handlers.onRetryLoad).toHaveBeenCalled();
+    });
+  });
+
   describe('statements history', () => {
     ['/bank/accounts', '/bank/debts', '/bank/investments', '/bank/providers'].forEach((base) => {
       it(`is rendered after the ledger under ${base}`, () => {

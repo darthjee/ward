@@ -84,6 +84,21 @@ describe('AccountHeaderHelper', () => {
     expect(output().containsInOrder('Car loan', formatMoney('-9500.00', 'BRL'), 'Debt info')).toBeTrue();
   });
 
+  describe('last reconciled line', () => {
+    const LAST = { statement_date: '2026-03-31', statement_balance: '120.00', reconciled_at: '2026-04-01T10:00:00.000Z' };
+
+    it('renders under the balance, before the details', () => {
+      const page = output({}, { last_reconciliation: LAST });
+
+      expect(page.containsInOrder('Balance:', 'Last reconciled:', 'Debt info')).toBeTrue();
+    });
+
+    it('is absent when the account was never reconciled', () => {
+      expect(output({}, { last_reconciliation: null }).contains('Last reconciled')).toBeFalse();
+      expect(output().contains('Last reconciled')).toBeFalse();
+    });
+  });
+
   it('links Edit under the given section base, in both contexts', () => {
     expect(output().containsAttribute('href', '#/bank/debts/7/edit')).toBeTrue();
     expect(output({ context: { kind: 'organization', orgId: 5 } }).containsAttribute('href', '#/orgs/5/bank/debts/7/edit'))
