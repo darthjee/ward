@@ -77,6 +77,22 @@ Applies to every account type.
   - its **skip-only** `bank_bill_payments` rows (a paid row has transactions).
 - Cascade delete of an account with history is not provided.
 
+## Statements
+
+Every account has **statement checkpoints** (see [reconciliation](reconciliation.md)): at most one
+open statement at a time, plus the history of finished ones (the Statements history on the
+account detail).
+
+- The account **detail** (not the list) carries `last_reconciliation`
+  (`{ statement_date, statement_balance, reconciled_at }` or `null`) and `open_reconciliation_id`.
+- Once any statement exists, open or finished, `opening_date` and `opening_balance` cannot change
+  (409 `ACCOUNT_RECONCILED`) and neither can the currency (409 `CURRENCY_LOCKED`, widened from
+  "the account has transactions"): a zero-row statement is stored in the old currency's minor
+  units. Cancel or undo the statements to unlock them.
+- **Hard delete** is unchanged: it needs no transactions, so the `ON DELETE CASCADE` only ever
+  removes zero-row statements.
+- Statement writes on an archived account answer 409 `ACCOUNT_ARCHIVED`; the GETs keep working.
+
 ## Regular accounts
 
 - A `regular` account is an everyday bank account. It has no details table and no nested
@@ -116,6 +132,7 @@ Accounts and ledgers are financial data. These rules apply to the whole `bank` m
 ## Deferred
 
 - Authorship / audit trail: [#95](https://github.com/darthjee/ward/issues/95)
+- Statement audit log: [#177](https://github.com/darthjee/ward/issues/177)
 - Move an account between owners: [#93](https://github.com/darthjee/ward/issues/93)
 
 ## Differences from the original spec

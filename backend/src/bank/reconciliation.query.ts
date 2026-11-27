@@ -18,7 +18,7 @@ export interface HistoryPage {
  * The bulk and aggregate SQL of the reconciliation routes, in its own fakeable class (the e2e
  * specs swap it for an in-memory twin, the MySQL integration spec covers the real SQL). Every
  * method is one statement: no entity hydration beyond the locked narrow columns, never one query
- * per row (see `docs/agents/specs/reconciliation/security.md`, *Memory*). The write helpers take
+ * per row (see `docs/agents/modules/bank/reconciliation.md`, *Memory*). The write helpers take
  * the transaction's `EntityManager`. Callers have already scoped the account to its owner.
  */
 @Injectable()

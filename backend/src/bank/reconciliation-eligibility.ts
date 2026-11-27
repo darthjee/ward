@@ -1,4 +1,4 @@
-// Pure eligibility rules of the reconciliation (see `docs/agents/specs/reconciliation/model.md`,
+// Pure eligibility rules of the reconciliation (see `docs/agents/modules/bank/reconciliation.md`, *Statement lifecycle*,
 // *Transaction change*, *Statement lifecycle* and *Lock matrix*). Dates are `YYYY-MM-DD` strings
 // compared lexically, as elsewhere with `ledger-date.ts`.
 

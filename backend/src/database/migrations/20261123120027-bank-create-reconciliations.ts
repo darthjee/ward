@@ -26,7 +26,7 @@ export const TRANSACTIONS_RECONCILIATION_SQL = `ALTER TABLE \`${TRANSACTIONS}\`
 
 /**
  * Creates the Bank module's `bank_reconciliations` table (statement checkpoints, see
- * `docs/agents/specs/reconciliation/model.md`) and the nullable `bank_transactions.reconciliation_id`
+ * `docs/agents/modules/bank/reconciliation.md`, *Reconciliation entity* and *Migration*) and the nullable `bank_transactions.reconciliation_id`
  * link. `down` drops the link and then the table with raw SQL, because TypeORM's `dropTable` would try
  * to read the generated column's expression from `typeorm_metadata`; reconciliation data is lost on
  * rollback.

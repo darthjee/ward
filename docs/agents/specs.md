@@ -63,9 +63,7 @@ this file changes.
 
 ## Active specs
 
-| Feature | Spec | Epic |
-|---|---|---|
-| Reconciliation (statement checkpoints, cleared transactions and their lock) | [specs/reconciliation/](specs/reconciliation/README.md) | [#85](https://github.com/darthjee/ward/issues/85) |
+none
 
 ## Completed specs
 
@@ -73,6 +71,7 @@ Features whose specs were folded into the permanent docs, and where their defini
 
 | Feature | Folded into | Epic | Follow-up epics |
 |---|---|---|---|
+| Reconciliation (statement checkpoints, cleared transactions and their lock); built by #164 to #168, specs were `specs/reconciliation/`, removed by #157 | [modules/bank/reconciliation.md](modules/bank/reconciliation.md), [modules/bank/transactions.md](modules/bank/transactions.md), [modules/bank/accounts.md](modules/bank/accounts.md), [modules/bank/bills.md](modules/bank/bills.md), [modules/bank/ui.md](modules/bank/ui.md), [backend/routes/bank.md](backend/routes/bank.md#reconciliations) | [#85](https://github.com/darthjee/ward/issues/85) | [#175](https://github.com/darthjee/ward/issues/175), [#176](https://github.com/darthjee/ward/issues/176), [#177](https://github.com/darthjee/ward/issues/177) |
 | Organization permission system (`owner` / `admin` / `user` enforced per action); built by #143 (backend) and #144 (frontend), folded by #145 | [modules/auth/organizations.md](modules/auth/organizations.md#roles), [backend/routes/auth.md](backend/routes/auth.md#organization-routes), [backend/routes/bank.md](backend/routes/bank.md#minimum-role), [modules/bank.md](modules/bank.md), [architecture/frontend.md](architecture/frontend.md#permissions-organization-roles) | [#81](https://github.com/darthjee/ward/issues/81) | [#82](https://github.com/darthjee/ward/issues/82), [#95](https://github.com/darthjee/ward/issues/95) |
 | Split provider: a provider holds N recurring / one-off provider bills; specs were `specs/split-provider/`, removed by #126 | [modules/bank/bills.md](modules/bank/bills.md), [modules/bank/provider-expense.md](modules/bank/provider-expense.md), [modules/bank/ui.md](modules/bank/ui.md), [backend/routes/bank.md](backend/routes/bank.md), [product.md](product.md) | [#119](https://github.com/darthjee/ward/issues/119) | [#140](https://github.com/darthjee/ward/issues/140), [#141](https://github.com/darthjee/ward/issues/141), [#101](https://github.com/darthjee/ward/issues/101) |
 | Deployment (Render backend, SSH-hosted proxy and frontend, tag-driven CircleCI release); specs were `specs/deploy/`, removed by #16 | [deployment.md](deployment.md), [environment-variables.md](environment-variables.md) §4 | [#10](https://github.com/darthjee/ward/issues/10) | — |

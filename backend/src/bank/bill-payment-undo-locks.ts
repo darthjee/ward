@@ -6,7 +6,7 @@ import { transactionCleared } from './reconciliation-conflicts.js';
 import { lockStatement } from './reconciliation-guards.js';
 import type { ReconciliationQuery } from './reconciliation.query.js';
 
-// The locks of a payment undo, in the fixed order of `docs/agents/specs/reconciliation/security.md`
+// The locks of a payment undo, in the fixed order of `docs/agents/modules/bank/reconciliation.md`, *Concurrency*
 // (*Concurrency*): the account rows in ascending id, then the open statements of those accounts,
 // then the linked transaction rows (ascending id per account). A payment touches up to two
 // accounts: the source (payment and charge rows) and the paying account (the withdrawal row).

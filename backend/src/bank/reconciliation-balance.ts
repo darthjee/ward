@@ -1,5 +1,5 @@
 // Pure money helpers of the reconciliation formulas (see
-// `docs/agents/specs/reconciliation/model.md`, *Formulas*). Every computation is done in `bigint`,
+// `docs/agents/modules/bank/reconciliation.md`, *Formulas*). Every computation is done in `bigint`,
 // never `Number`, so values near the 10^13 bound keep full precision.
 //
 // Debt sign: the API takes and returns the signed value (a debt account's balance is negative) and

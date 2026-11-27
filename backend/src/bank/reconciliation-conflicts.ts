@@ -4,7 +4,7 @@ import { ErrorCodes } from '../core/error-codes.js';
 
 /*
  * The messages are fixed static text: they never carry a balance, difference, date, id or count
- * (see `docs/agents/specs/reconciliation/security.md`, *Data sensitivity*).
+ * (see `docs/agents/modules/bank/reconciliation.md`, *Data sensitivity and ownership*).
  */
 
 /**

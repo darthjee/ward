@@ -251,6 +251,11 @@ One `bank_bill_payments` row per occurrence:
 - Paying twice → 409 `OCCURRENCE_ALREADY_PAID`; two different bills of one provider paid on
   the same date both succeed (see [Payment keys](#payment-keys)).
 - No owner columns: the row inherits the owner from its source account.
+- **Undo vs. cleared rows** — all three undos (debt occurrence, one-off, provider-bill
+  occurrence) answer 409 `TRANSACTION_CLEARED` when any linked payment, withdrawal or charge
+  transaction is cleared by a finished [reconciliation](reconciliation.md#lock-matrix) statement.
+  If a linked transaction is only ticked, the undo deletes it and the tick goes with it. Bill and
+  provider-bill DELETE are unchanged: a paid bill is already 409.
 
 ### Payment keys
 

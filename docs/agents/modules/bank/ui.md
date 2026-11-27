@@ -64,20 +64,81 @@ modal, error alert, schedule fields), parameterised per type, never copied
   date defaults to today, opening balance to 0. `type` is never shown: it comes from the
   submenu.
 
-## Reconciliation markers
+## Reconciliation
 
-The shared ledger and detail pages show the reconciliation state for all four account types
-(spec: [ledger UI](../../specs/reconciliation/ui/ledger.md)).
+Statement reconciliation lives on the shared `bank/common` account detail page, so all four
+account types get it with no per-type copy (code under `bank/common/reconciliation/` and
+`bank/common/detail/`; client `ReconciliationsClient.js`, spread into `BankClient`). The model and
+rules are in [Reconciliation](reconciliation.md); the routes in
+[Routes — Bank](../../backend/routes/bank.md#reconciliations).
 
-- **Ledger badges** — inside the description cell of the shared ledger table: a cleared marker
-  on a row of a finished statement (the statement date is in its tooltip), and a warning badge
-  on an uncleared row dated on or before the ledger's `last_reconciled_date`.
-- **Cleared rows** — `amount`, `date` and the In / Out direction toggle are read-only in the
-  ledger form, and Delete is hidden.
+### Entry point and role gating
+
+A **Reconcile** button in the account header actions row, next to Edit and Archive. It reads
+**Continue reconciliation** when the account detail's `open_reconciliation_id` is set, and is
+hidden on an archived account or when the user cannot write. Controls are gated through `useCan`
+and `ACTIONS`, matching the backend minimum role (a hidden control is UX only; the backend 403 is
+the enforcement):
+
+| Control | Action | Min role |
+|---|---|---|
+| Reconcile / Continue, Edit statement, the checkboxes and bulk ticks, Finish | `ACTIONS.WRITE` | `user` |
+| Cancel | `ACTIONS.DELETE` | `admin` |
+| History Undo | `ACTIONS.UNDO_RECONCILIATION` | `admin` |
+
+### Start and edit statement form
+
+The statement date defaults to today with `max` today (a UX default: the server accepts up to UTC
+today + 1 day). The statement balance is a decimal input parsed like the other amounts. On a debt
+it is labelled "Amount owed" and negated on load and on submit, like the debt opening balance.
+
+### Reconcile mode
+
+Rendered on the account detail page:
+
+- a sticky **summary bar** with the statement date, statement balance, cleared balance and the
+  **Difference** (highlighted unless 0), and the actions **Finish** (enabled only at 0),
+  **Edit statement** and **Cancel** (behind a confirmation modal);
+- a **checkbox column** in the ledger, enabled only on eligible rows (on or after `opening_date`,
+  on or before `statement_date`, not cleared by another statement). Ineligible rows are dimmed,
+  and the opening row has no checkbox;
+- **Show only uncleared**, a local filter on the loaded page;
+- **Tick all on page / Untick all**, one call to the bulk ticks route;
+- **Optimistic toggle**: the checkbox flips, `PATCH …/ticks.json` runs, the difference is taken
+  from the response, and the toggle reverts on error;
+- the inline transaction form stays usable, so a new transaction can be added and then ticked.
+
+### Statements history
+
+A section rendered for every type from the shared account detail, modelled on
+[Bill history](#schedule-fields-and-bill-history): statement date, balance, `reconciled_at` and
+row count, newest first, paginated, with the open statement on top ("Continue"). **Undo**
+appears only where the row is `undoable` and the user is `admin`, behind a confirmation modal.
+Drilling from a statement to a ledger filtered to its rows is deferred:
+[#176](https://github.com/darthjee/ward/issues/176).
+
+### Ledger markers and locks
+
+- **Cleared marker** — a "✓ cleared" marker on rows of a finished statement, with the statement
+  date in its tooltip.
+- **Locked fields** — on a cleared row `amount`, `date` and the In / Out toggle are read-only in
+  the ledger form and Delete is hidden. The server 409 stays the backstop.
+- **Warning badge** — "Not on reconciled statement of `<date>`" on an uncleared row dated on or
+  before the ledger's `last_reconciled_date`. It is derived in the frontend from that envelope
+  field alone, so it costs no per-row query.
 - **Header line** — "Last reconciled: `<date>` · `<balance>`" on the account detail, with the
   balance negated on debts.
 - **Edit form** — the opening fields are read-only, and the currency is locked, whenever
-  `last_reconciliation` or `open_reconciliation_id` is set on the account.
+  `last_reconciliation` or `open_reconciliation_id` is set on the account, with a hint to cancel
+  or undo the statements first.
+
+### Errors
+
+Errors go through the bank error alert and `classifyError`, with a fixed message per code for
+`RECONCILIATION_UNBALANCED`, `RECONCILIATION_OPEN`, `RECONCILIATION_OUT_OF_ORDER`,
+`RECONCILIATION_NOT_LATEST`, `RECONCILIATION_FINISHED`, `TRANSACTION_NOT_ELIGIBLE`,
+`TRANSACTION_CLEARED` and `ACCOUNT_RECONCILED`
+(`reconciliation/controllers/reconciliationErrors.js`).
 
 ## Accounts
 
