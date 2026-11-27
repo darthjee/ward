@@ -27,7 +27,7 @@ export interface TransactionEdit {
 /**
  * The locked transaction PATCH and DELETE (lazy `BankModule`). One DB transaction takes the lock
  * order account row, then (for a date edit) the open statement row, then the transaction row, and
- * applies the lock matrix of `docs/agents/specs/reconciliation/model.md`: the amount and the date
+ * applies the lock matrix of `docs/agents/modules/bank/reconciliation.md` (*Lock matrix*): the amount and the date
  * of a cleared row (linked to a finished statement) are frozen, a ticked row moved out of its
  * statement's range is unticked, and a cleared row cannot be deleted. A request rejected by a
  * lock applies nothing.

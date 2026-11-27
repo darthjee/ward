@@ -2,7 +2,7 @@ import { Column, CreateDateColumn, Entity, PrimaryGeneratedColumn, UpdateDateCol
 import { bigintTransformer } from './bigint.transformer.js';
 
 /**
- * A statement checkpoint of an account (see `docs/agents/specs/reconciliation/model.md`). Owns table
+ * A statement checkpoint of an account (see `docs/agents/modules/bank/reconciliation.md`, *Reconciliation entity*). Owns table
  * `bank_reconciliations`. It never stores an owner: it inherits it through its account. `accountId`
  * is a real FK (`ON DELETE CASCADE`), declared in the migration only.
  *

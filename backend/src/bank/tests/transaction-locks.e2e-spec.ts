@@ -19,7 +19,7 @@ jest.mock('../account-balances.query.js', () => jest.requireActual('./support/in
 jest.mock('../reconciliation.query.js', () => jest.requireActual('./support/in-memory-reconciliation.query.js'));
 jest.mock('../provider-bills-summary.query.js', () => jest.requireActual('./support/in-memory-provider-bills-summary.query.js'));
 
-// The lock matrix of `docs/agents/specs/reconciliation/model.md` on `PATCH` and `DELETE
+// The lock matrix of `docs/agents/modules/bank/reconciliation.md` (*Lock matrix*) on `PATCH` and `DELETE
 // .../transactions/:id.json` (api/existing-routes.md): the rows are the three states of a
 // transaction, the columns the changed fields.
 

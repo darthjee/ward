@@ -8,7 +8,7 @@ import { accountReconciled } from './reconciliation-conflicts.js';
 import type { ReconciliationQuery } from './reconciliation.query.js';
 
 // The statement-aware checks of `AccountService.update()` (see
-// `docs/agents/specs/reconciliation/api/existing-routes.md`, *Accounts*). They run inside the
+// `docs/agents/backend/routes/bank.md`, *Reconciliation locks on existing routes*). They run inside the
 // account's write transaction, under the account row lock, so a concurrent statement start (which
 // takes the same lock first) is either fully before or fully after them.
 

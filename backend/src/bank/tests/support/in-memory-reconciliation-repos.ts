@@ -3,7 +3,7 @@ import type { Reconciliation } from '../../entities/reconciliation.entity.js';
 import type { Transaction } from '../../entities/transaction.entity.js';
 
 // The `bank_reconciliations` rules of the in-memory bank repositories (see
-// `docs/agents/specs/reconciliation/model.md`): the unique-open key, `ON DELETE SET NULL` of
+// `docs/agents/modules/bank/reconciliation.md`, *Reconciliation entity*): the unique-open key, `ON DELETE SET NULL` of
 // `bank_transactions.reconciliation_id` and (wired in `in-memory-bank-repos.ts`) `ON DELETE
 // CASCADE` from the account. The `pessimistic_write` lock is recorded by the generic repo's
 // `findOne({ where, lock })` into `repo.locks`. The real schema is covered by the MySQL

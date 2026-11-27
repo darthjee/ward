@@ -11,7 +11,7 @@ import { ownerNotFound } from '../core/parse-id.js';
 
 // The locks and the account-dependent checks shared by every reconciliation write, in the fixed
 // order account row -> statement row -> transaction rows (see
-// `docs/agents/specs/reconciliation/api/reconciliations.md`, *Concurrency* and *Check order*).
+// `docs/agents/modules/bank/reconciliation.md`, *Concurrency*, and `docs/agents/backend/routes/bank.md`, *Reconciliation check order*).
 // Every message is fixed static text: it never carries a balance, date, id or count.
 
 /**
