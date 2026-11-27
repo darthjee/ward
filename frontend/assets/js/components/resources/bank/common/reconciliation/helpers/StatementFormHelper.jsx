@@ -19,7 +19,7 @@ const StatementFormHelper = {
    *
    * @param {{account: object, today: string, reconcile: {formKind: string, fields: object,
    *   fieldErrors: object, pending: boolean, error: (object|null)}}} state - Form state.
-   * @param {{onFieldChange: Function, onSubmit: Function, onCloseForm: Function,
+   * @param {{onFieldChange: Function, onSubmitStatement: Function, onCloseForm: Function,
    *   onDismissError: Function}} handlers - Form handlers.
    * @returns {React.ReactElement} The form.
    */
@@ -28,7 +28,7 @@ const StatementFormHelper = {
     const fieldState = { fields: reconcile.fields, fieldErrors: reconcile.fieldErrors, idPrefix: 'statement-' };
 
     return (
-      <form className="mb-3" aria-label="Statement" noValidate onSubmit={handlers.onSubmit}>
+      <form className="mb-3" aria-label="Statement" noValidate onSubmit={handlers.onSubmitStatement}>
         <BankErrorAlert error={reconcile.error} onDismiss={handlers.onDismissError} />
         <AccountFormInput
           name="statement_date"

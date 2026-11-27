@@ -68,4 +68,34 @@ describe('useAccountDetail', () => {
     expect(state.canDelete).toBeFalse();
     expect(state.canEditPaymentTransactions).toBeFalse();
   });
+
+  describe('reconcile', () => {
+    it('exposes the reconcile state, off, and its handlers', () => {
+      installFakeWindow({ location: { hash: '#/bank/accounts/7' } });
+
+      const { state, handlers } = probe('/bank/accounts');
+
+      expect(state.reconcile).toEqual(jasmine.objectContaining({ mode: 'off', statement: null }));
+      expect(handlers.reconcile.onReconcile).toEqual(jasmine.any(Function));
+      expect(handlers.reconcile.onFinish).toEqual(jasmine.any(Function));
+    });
+
+    it('grants write but not cancel to a user', () => {
+      installFakeWindow({ location: { hash: '#/orgs/5/bank/accounts/7' } });
+
+      const { state } = probe('/bank/accounts', { kind: 'organization', orgId: 5 }, 'user');
+
+      expect(state.reconcile.canWrite).toBeTrue();
+      expect(state.reconcile.canCancel).toBeFalse();
+    });
+
+    it('grants write and cancel to an admin', () => {
+      installFakeWindow({ location: { hash: '#/orgs/5/bank/accounts/7' } });
+
+      const { state } = probe('/bank/accounts', { kind: 'organization', orgId: 5 }, 'admin');
+
+      expect(state.reconcile.canWrite).toBeTrue();
+      expect(state.reconcile.canCancel).toBeTrue();
+    });
+  });
 });

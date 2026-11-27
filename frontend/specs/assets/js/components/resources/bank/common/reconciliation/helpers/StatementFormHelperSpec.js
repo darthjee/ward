@@ -5,7 +5,7 @@ import { renderedOutput } from '../../../../../../../../support/renderedOutput.j
 
 const HANDLERS = {
   onFieldChange: () => undefined,
-  onSubmit: () => undefined,
+  onSubmitStatement: () => undefined,
   onCloseForm: () => undefined,
   onDismissError: () => undefined,
 };
