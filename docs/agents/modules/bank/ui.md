@@ -64,6 +64,21 @@ modal, error alert, schedule fields), parameterised per type, never copied
   date defaults to today, opening balance to 0. `type` is never shown: it comes from the
   submenu.
 
+## Reconciliation markers
+
+The shared ledger and detail pages show the reconciliation state for all four account types
+(spec: [ledger UI](../../specs/reconciliation/ui/ledger.md)).
+
+- **Ledger badges** — inside the description cell of the shared ledger table: a cleared marker
+  on a row of a finished statement (the statement date is in its tooltip), and a warning badge
+  on an uncleared row dated on or before the ledger's `last_reconciled_date`.
+- **Cleared rows** — `amount`, `date` and the In / Out direction toggle are read-only in the
+  ledger form, and Delete is hidden.
+- **Header line** — "Last reconciled: `<date>` · `<balance>`" on the account detail, with the
+  balance negated on debts.
+- **Edit form** — the opening fields are read-only, and the currency is locked, whenever
+  `last_reconciliation` or `open_reconciliation_id` is set on the account.
+
 ## Accounts
 
 `<ui>/accounts`, `<ui>/accounts/new`, `<ui>/accounts/:accountId`,
