@@ -252,6 +252,16 @@ describe('ReconcileController', () => {
       expect(state.ticked.size).toBe(0);
     });
 
+    it('resets the mode, keeping the history version', () => {
+      active({ historyVersion: 3, ticked: new Map([[1, true]]) });
+      build().resetMode();
+
+      expect(state.mode).toBe('off');
+      expect(state.statement).toBeNull();
+      expect(state.ticked.size).toBe(0);
+      expect(state.historyVersion).toBe(3);
+    });
+
     it('dismisses the error', () => {
       active({ error: { kind: 'conflict' } });
       build().dismissError();

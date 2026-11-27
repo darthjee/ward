@@ -245,6 +245,18 @@ export default class ReconcileController extends ReconcileTicker {
   }
 
   /**
+   * Leave the reconcile mode without a request (e.g. after a statement was undone elsewhere on
+   * the page). The history version is kept, since the caller reloads the history itself.
+   *
+   * @returns {void} Nothing.
+   */
+  resetMode() {
+    this.setReconcile((previous) => ({
+      ...INITIAL_RECONCILE, ticked: new Map(), historyVersion: previous.historyVersion,
+    }));
+  }
+
+  /**
    * Dismiss the alert.
    *
    * @returns {void} Nothing.

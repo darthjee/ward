@@ -6,6 +6,7 @@ import LedgerFormHelper from './LedgerFormHelper.jsx';
 import LedgerTableHelper from './LedgerTableHelper.jsx';
 import { contextHash } from '../../../../../../utils/context/ownerContext.js';
 import { ledgerPageHref } from '../ledgerPageHref.js';
+import StatementsHistory from '../../reconciliation/StatementsHistory.jsx';
 import ReconcileSectionHelper from '../../reconciliation/helpers/ReconcileSectionHelper.jsx';
 import { ledgerReconcile } from '../../reconciliation/helpers/reconcileLayout.js';
 
@@ -128,6 +129,18 @@ function bindRowExtra(slot, handlers, state) {
 }
 
 /**
+ * Run after a statement was undone: leave the reconcile mode and reload the account and ledger
+ * (the rows unlock and the header picks up the reopened statement).
+ *
+ * @param {{reconcile: {onReset: Function}, onRetryLoad: Function}} handlers - Page handlers.
+ * @returns {void} Nothing.
+ */
+function onHistoryUndone(handlers) {
+  handlers.reconcile.onReset();
+  handlers.onRetryLoad();
+}
+
+/**
  * Render the loaded page: header, alert, the section's shortcuts, ledger form, table,
  * pagination and the section's block after the ledger.
  *
@@ -180,6 +193,12 @@ function renderLoaded(state, handlers, options) {
         onNavigate={handlers.onNavigate}
       />
       {renderSlot(options.renderAfterLedger, account, handlers, state)}
+      <StatementsHistory
+        context={state.context}
+        account={account}
+        historyVersion={state.reconcile?.historyVersion ?? 0}
+        onUndone={() => onHistoryUndone(handlers)}
+      />
       {renderConfirm(state.confirmation, state, handlers)}
     </>
   );

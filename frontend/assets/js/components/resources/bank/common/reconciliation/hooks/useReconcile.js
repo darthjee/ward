@@ -12,8 +12,8 @@ import ReconcileController, { INITIAL_RECONCILE } from '../controllers/Reconcile
  * @param {object} state - The reconcile state (see {@link useReconcile}).
  * @returns {object} The handlers: `onReconcile`, `onEditStatement`, `onCloseForm`,
  *   `onFieldChange`, `onSubmitStatement`, `onToggle`, `onTickAll`, `onUntickAll`,
- *   `onToggleOnlyUncleared`, `onFinish`, `onCancel`, `onConfirmCancel`, `onDismissCancel` and
- *   `onDismissError`.
+ *   `onToggleOnlyUncleared`, `onFinish`, `onCancel`, `onConfirmCancel`, `onDismissCancel`,
+ *   `onDismissError` and `onReset` (leave the mode without a request).
  */
 export function buildReconcileHandlers(controller, state) {
   return {
@@ -35,6 +35,7 @@ export function buildReconcileHandlers(controller, state) {
     onConfirmCancel: () => controller.confirmCancel(state.statement),
     onDismissCancel: () => controller.dismissCancel(),
     onDismissError: () => controller.dismissError(),
+    onReset: () => controller.resetMode(),
   };
 }
 

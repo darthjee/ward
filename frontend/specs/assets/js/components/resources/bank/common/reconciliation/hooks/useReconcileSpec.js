@@ -37,7 +37,7 @@ describe('useReconcile', () => {
     expect(Object.keys(reconcileHandlers)).toEqual([
       'onReconcile', 'onEditStatement', 'onCloseForm', 'onFieldChange', 'onSubmitStatement', 'onToggle',
       'onTickAll', 'onUntickAll', 'onToggleOnlyUncleared', 'onFinish', 'onCancel', 'onConfirmCancel',
-      'onDismissCancel', 'onDismissError',
+      'onDismissCancel', 'onDismissError', 'onReset',
     ]);
   });
 
@@ -65,7 +65,7 @@ describe('useReconcile', () => {
     beforeEach(() => {
       controller = jasmine.createSpyObj('controller', [
         'open', 'openEdit', 'closeForm', 'changeField', 'submitForm', 'toggle', 'tickAll', 'untickAll',
-        'toggleOnlyUncleared', 'finish', 'requestCancel', 'confirmCancel', 'dismissCancel', 'dismissError',
+        'toggleOnlyUncleared', 'finish', 'requestCancel', 'confirmCancel', 'dismissCancel', 'dismissError', 'resetMode',
       ]);
       handlers = buildReconcileHandlers(controller, { statement: STATEMENT, fields: {} });
     });
@@ -86,6 +86,7 @@ describe('useReconcile', () => {
       handlers.onConfirmCancel();
       handlers.onDismissCancel();
       handlers.onDismissError();
+      handlers.onReset();
 
       expect(controller.open).toHaveBeenCalled();
       expect(controller.openEdit).toHaveBeenCalledWith(STATEMENT);
@@ -100,6 +101,7 @@ describe('useReconcile', () => {
       expect(controller.confirmCancel).toHaveBeenCalledWith(STATEMENT);
       expect(controller.dismissCancel).toHaveBeenCalled();
       expect(controller.dismissError).toHaveBeenCalled();
+      expect(controller.resetMode).toHaveBeenCalled();
     });
 
     it('prevents the default of a form submit and submits the state', () => {
