@@ -14,7 +14,8 @@ const LEDGER = {
   },
 };
 const noop = () => undefined;
-const HANDLERS = new Proxy({}, { get: () => noop });
+const RECONCILE_HANDLERS = new Proxy({}, { get: () => noop });
+const HANDLERS = new Proxy({}, { get: (_target, key) => (key === 'reconcile' ? RECONCILE_HANDLERS : noop) });
 
 function findAll(node, predicate, acc = []) {
   if (Array.isArray(node)) {
